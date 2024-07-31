@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "retraction"
+version = "0.1.0"
+description = "Compiler for Action language, compiles to 6502 assembly"
+authors = [{ name = "Michael White", email = "retraction@mypalmike.com" }]
+urls = { "Homepage" = "https://github.com/mypalmike/RetrAction" }
+dependencies = []
+classifiers = [
+    "Operating System :: POSIX",
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: System Administrators",
+    "License :: OSI Approved :: MIT License",
+    "Topic :: Utilities",
+]
+
+[project.scripts]
+retraction = "retraction:main"
