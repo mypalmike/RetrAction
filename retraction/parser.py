@@ -62,35 +62,57 @@ class ExprRule:
 
 
 EXPRESSION_RULES = {
-    TokenType.LPAREN: ExprRule(
+    TokenType.OP_LPAREN: ExprRule(
         ExprAction.GROUPING, ExprAction.NONE, ExprPrecedence.NONE
     ),
-    TokenType.RPAREN: ExprRule(ExprAction.NONE, ExprAction.NONE, ExprPrecedence.NONE),
-    TokenType.PLUS: ExprRule(ExprAction.NONE, ExprAction.BINARY, ExprPrecedence.TERM),
-    TokenType.MINUS: ExprRule(ExprAction.UNARY, ExprAction.BINARY, ExprPrecedence.TERM),
-    TokenType.TIMES: ExprRule(
+    TokenType.OP_RPAREN: ExprRule(
+        ExprAction.NONE, ExprAction.NONE, ExprPrecedence.NONE
+    ),
+    TokenType.OP_PLUS: ExprRule(
+        ExprAction.NONE, ExprAction.BINARY, ExprPrecedence.TERM
+    ),
+    TokenType.OP_MINUS: ExprRule(
+        ExprAction.UNARY, ExprAction.BINARY, ExprPrecedence.TERM
+    ),
+    TokenType.OP_TIMES: ExprRule(
         ExprAction.NONE, ExprAction.BINARY, ExprPrecedence.FACTOR
     ),
-    TokenType.DIVIDE: ExprRule(
+    TokenType.OP_DIVIDE: ExprRule(
         ExprAction.NONE, ExprAction.BINARY, ExprPrecedence.FACTOR
     ),
     TokenType.MOD: ExprRule(ExprAction.NONE, ExprAction.BINARY, ExprPrecedence.FACTOR),
     TokenType.LSH: ExprRule(ExprAction.NONE, ExprAction.BINARY, ExprPrecedence.FACTOR),
     TokenType.RSH: ExprRule(ExprAction.NONE, ExprAction.BINARY, ExprPrecedence.FACTOR),
-    TokenType.EQUAL: ExprRule(
+    TokenType.OP_EQ: ExprRule(
         ExprAction.NONE, ExprAction.BINARY, ExprPrecedence.COMPARE
     ),
-    TokenType.NE: ExprRule(ExprAction.NONE, ExprAction.BINARY, ExprPrecedence.COMPARE),
-    TokenType.GR: ExprRule(ExprAction.NONE, ExprAction.BINARY, ExprPrecedence.COMPARE),
-    TokenType.GE: ExprRule(ExprAction.NONE, ExprAction.BINARY, ExprPrecedence.COMPARE),
-    TokenType.LS: ExprRule(ExprAction.NONE, ExprAction.BINARY, ExprPrecedence.COMPARE),
-    TokenType.LE: ExprRule(ExprAction.NONE, ExprAction.BINARY, ExprPrecedence.COMPARE),
+    TokenType.OP_NE: ExprRule(
+        ExprAction.NONE, ExprAction.BINARY, ExprPrecedence.COMPARE
+    ),
+    TokenType.OP_GT: ExprRule(
+        ExprAction.NONE, ExprAction.BINARY, ExprPrecedence.COMPARE
+    ),
+    TokenType.OP_GE: ExprRule(
+        ExprAction.NONE, ExprAction.BINARY, ExprPrecedence.COMPARE
+    ),
+    TokenType.OP_LT: ExprRule(
+        ExprAction.NONE, ExprAction.BINARY, ExprPrecedence.COMPARE
+    ),
+    TokenType.OP_LE: ExprRule(
+        ExprAction.NONE, ExprAction.BINARY, ExprPrecedence.COMPARE
+    ),
     TokenType.AND: ExprRule(ExprAction.NONE, ExprAction.BINARY, ExprPrecedence.AND),
     TokenType.OR: ExprRule(ExprAction.NONE, ExprAction.BINARY, ExprPrecedence.OR),
     TokenType.XOR: ExprRule(ExprAction.NONE, ExprAction.BINARY, ExprPrecedence.XOR),
-    TokenType.INT: ExprRule(ExprAction.NUMBER, ExprAction.NONE, ExprPrecedence.NONE),
-    TokenType.HEX: ExprRule(ExprAction.NUMBER, ExprAction.NONE, ExprPrecedence.NONE),
-    TokenType.CHAR: ExprRule(ExprAction.NUMBER, ExprAction.NONE, ExprPrecedence.NONE),
+    TokenType.INT_LITERAL: ExprRule(
+        ExprAction.NUMBER, ExprAction.NONE, ExprPrecedence.NONE
+    ),
+    TokenType.HEX_LITERAL: ExprRule(
+        ExprAction.NUMBER, ExprAction.NONE, ExprPrecedence.NONE
+    ),
+    TokenType.CHAR_LITERAL: ExprRule(
+        ExprAction.NUMBER, ExprAction.NONE, ExprPrecedence.NONE
+    ),
     TokenType.EOF: ExprRule(ExprAction.NONE, ExprAction.NONE, ExprPrecedence.NONE),
 }
 
@@ -192,15 +214,15 @@ class Parser:
     # <def> ::= <identifier>=<str const>
     # TODO: Remove this when there's a preprocessing step to handle defines
     def parse_def(self) -> bool:
-        if self.current_token().type != TokenType.VAR_T:
+        if self.current_token().type != TokenType.IDENTIFIER:
             return False
-        if self.next_token().type != TokenType.EQUAL:
+        if self.next_token().type != TokenType.OP_EQ:
             return False
         identifier = self.current_token().value
         self.advance()
         self.advance()
         str_const = self.current_token().value
-        self.consume(TokenType.STRING)
+        self.consume(TokenType.STRING_LITERAL)
         self.directives.define(identifier, str_const)
 
     # <TYPE decl> ::= TYPE <rec ident list>
@@ -221,16 +243,16 @@ class Parser:
 
     # <rec ident> ::= <rec name>=[<field init>]
     def parse_rec_ident(self) -> bool:
-        if self.current_token().type != TokenType.VAR_T:
+        if self.current_token().type != TokenType.IDENTIFIER:
             return False
-        if self.next_token().type != TokenType.EQUAL:
+        if self.next_token().type != TokenType.OP_EQ:
             return False
         rec_name = self.current_token().value
         self.advance()
         self.advance()
-        self.consume(TokenType.LBRACKET)
+        self.consume(TokenType.OP_LBRACK)
         self.parse_field_init()
-        self.consume(TokenType.RBRACKET)
+        self.consume(TokenType.OP_RBRACK)
 
         return True
 
@@ -293,18 +315,18 @@ class Parser:
     def parse_fund_ident_list(self, fund_type: TokenType) -> bool:
         if not self.parse_fund_ident(fund_type):
             return False
-        while self.current_token().type == TokenType.COMMA:
+        while self.current_token().type == TokenType.OP_COMMA:
             self.advance()
             self.parse_fund_ident(fund_type)
         return True
 
     # <fund ident> ::= <identifier>{=<init opts>}
     def parse_fund_ident(self, fund_type: TokenType) -> bool:
-        if self.current_token().type != TokenType.VAR_T:
+        if self.current_token().type != TokenType.IDENTIFIER:
             return False
         identifier = self.current_token().value
         self.advance()
-        if self.current_token().type == TokenType.EQUAL:
+        if self.current_token().type == TokenType.OP_EQ:
             self.advance()
             self.parse_init_opts(fund_type, identifier)
         else:
@@ -312,7 +334,7 @@ class Parser:
         return True
 
         # identifier = self.current_token().value
-        # self.expect(TokenType.VAR_T)
+        # self.expect(TokenType.IDENTIFIER)
         # if self.current_token().type == TokenType.EQUAL:
         #     self.advance()
         #     self.parse_init_opts(fund_type, identifier)
@@ -321,10 +343,10 @@ class Parser:
 
     # <init opts> ::= <addr> | [<value>]
     def parse_init_opts(self, fund_type: TokenType, identifier: str) -> bool:
-        if self.current_token().type == TokenType.LBRACKET:
+        if self.current_token().type == TokenType.OP_LBRACK:
             self.advance()
             value = self.parse_value_const()
-            self.consume(TokenType.RBRACKET)
+            self.consume(TokenType.OP_RBRACK)
             self.code_gen.emit_define_value(identifier, value)
         else:
             addr = self.parse_addr()
@@ -337,25 +359,25 @@ class Parser:
 
     # <num const> ::= <dec num> | <hex num> | <char>
     def parse_num_const(self) -> int:
-        if self.current_token().type == TokenType.INT:
+        if self.current_token().type == TokenType.INT_LITERAL:
             return self.parse_dec_num()
-        if self.current_token().type == TokenType.HEX:
+        if self.current_token().type == TokenType.HEX_LITERAL:
             return self.parse_hex_num()
-        if self.current_token().type == TokenType.CHAR:
+        if self.current_token().type == TokenType.CHAR_LITERAL:
             return self.parse_char()
         raise SyntaxError(f"Unexpected token: {self.current_token()}")
 
     # <dec num> ::= <digit>{<digit>}
     def parse_dec_num(self) -> int:
-        return int(self.consume(TokenType.INT).value)
+        return int(self.consume(TokenType.INT_LITERAL).value)
 
     # <hex num> ::= $<hex digit>{<hex digit>}
     def parse_hex_num(self) -> int:
-        return int(self.consume(TokenType.HEX).value, 16)
+        return int(self.consume(TokenType.HEX_LITERAL).value, 16)
 
     # <char> ::= '<char const>'
     def parse_char(self) -> str:
-        return ord(self.consume(TokenType.CHAR).value)
+        return ord(self.consume(TokenType.CHAR_LITERAL).value)
 
     # <POINTER decl> ::= <ptr type> POINTER <ptr ident list>
     def parse_pointer_decl(self) -> bool:
@@ -370,7 +392,7 @@ class Parser:
     def parse_ptr_ident_list(self, ptr_type: str) -> bool:
         if not self.parse_ptr_ident(ptr_type):
             return False
-        while self.current_token().type == TokenType.COMMA:
+        while self.current_token().type == TokenType.OP_COMMA:
             self.advance()
             self.parse_ptr_ident(ptr_type)
         return True
@@ -378,8 +400,8 @@ class Parser:
     # <ptr ident> ::= <identifier>{=<value>}
     def parse_ptr_ident(self, ptr_type) -> bool:
         identifier = self.current_token().value
-        self.consume(TokenType.VAR_T)
-        if self.current_token().type == TokenType.EQUAL:
+        self.consume(TokenType.IDENTIFIER)
+        if self.current_token().type == TokenType.OP_EQ:
             self.advance()
             value = self.parse_value_const()
             self.code_gen.emit_ptr_ident_value(ptr_type, identifier, value)
@@ -409,7 +431,7 @@ class Parser:
     # TODO: Probably need to refer to a symbol/type table to look up the record type to
     # distinguish between record and array or other declarations
     def parse_record_decl(self) -> bool:
-        if self.current_token().type != TokenType.VAR_T:
+        if self.current_token().type != TokenType.IDENTIFIER:
             return False
         rec_type = self.current_token().value
         self.advance()
@@ -419,17 +441,17 @@ class Parser:
     def parse_rec_ident_list(self, rec_type: str) -> bool:
         if not self.parse_rec_ident(rec_type):
             return False
-        while self.current_token().type == TokenType.COMMA:
+        while self.current_token().type == TokenType.OP_COMMA:
             self.advance()
             self.parse_rec_ident(rec_type)
 
     # <rec ident> ::= <identifier>{=<address>}
     def parse_rec_ident(self, rec_type: str) -> bool:
-        if self.current_token().type != TokenType.VAR_T:
+        if self.current_token().type != TokenType.IDENTIFIER:
             return False
         identifier = self.current_token().value
         self.advance()
-        if self.current_token().type == TokenType.EQUAL:
+        if self.current_token().type == TokenType.OP_EQ:
             self.advance()
             addr = self.parse_addr()
             self.code_gen.emit_rec_ident_value(rec_type, identifier, addr)
@@ -449,7 +471,7 @@ class Parser:
     #     if self.current_token().type == TokenType.AT:
     #         self.advance()
     #         identifier = self.current_token().value
-    #         self.consume(TokenType.VAR_T)
+    #         self.consume(TokenType.IDENTIFIER)
     #         return StubExpressionNode(f"mem_ref(@{identifier})")
     #     return None
 
@@ -473,7 +495,7 @@ class Parser:
 
     # <arr ref> ::= <identifier>(<arith exp>)
     # def parse_arr_ref(self) -> ExpressionNode | None:
-    #     if self.current_token().type != TokenType.VAR_T:
+    #     if self.current_token().type != TokenType.IDENTIFIER:
     #         return None
     #     identifier = self.current_token().value
     #     self.advance()
@@ -489,7 +511,7 @@ class Parser:
 
     # # <ptr ref> ::= <identifier>^
     # def parse_ptr_ref(self) -> ExpressionNode | None:
-    #     if self.current_token().type != TokenType.VAR_T:
+    #     if self.current_token().type != TokenType.IDENTIFIER:
     #         return None
     #     identifier = self.current_token().value
     #     self.advance()
@@ -500,7 +522,7 @@ class Parser:
 
     # # <rec ref> ::= <identifier>.<identifier>
     # def parse_rec_ref(self) -> ExpressionNode | None:
-    #     if self.current_token().type != TokenType.VAR_T:
+    #     if self.current_token().type != TokenType.IDENTIFIER:
     #         return None
     #     identifier = self.current_token().value
     #     self.advance()
@@ -513,7 +535,7 @@ class Parser:
 
     # # # <fund ref> ::= <identifier>
     # def parse_fund_ref(self) -> ExpressionNode | None:
-    #     if self.current_token().type != TokenType.VAR_T:
+    #     if self.current_token().type != TokenType.IDENTIFIER:
     #         return None
     #     identifier = self.current_token().value
     #     self.advance()
@@ -549,8 +571,8 @@ class Parser:
         if self.current_token().type != TokenType.PROC:
             return False
         self.advance()
-        identifier = self.consume(TokenType.VAR_T).value
-        if self.current_token().type == TokenType.EQUAL:
+        identifier = self.consume(TokenType.IDENTIFIER).value
+        if self.current_token().type == TokenType.OP_EQ:
             self.advance()
             addr = self.parse_addr()
         self.consume(TokenType.LPAREN)
@@ -570,9 +592,9 @@ class Parser:
         self.parse_stmt_list()
         if self.current_token().type == TokenType.RETURN:
             self.advance()
-            self.consume(TokenType.LPAREN)
+            self.consume(TokenType.OP_LPAREN)
             self.parse_arith_exp()
-            self.consume(TokenType.RPAREN)
+            self.consume(TokenType.OP_RPAREN)
         return True
 
         # self.consume(TokenType.FUNC)
@@ -591,13 +613,13 @@ class Parser:
         if fund_type is None:
             return False
         self.consume(TokenType.FUNC)
-        identifier = self.consume(TokenType.VAR_T).value
-        if self.current_token().type == TokenType.PERIOD:
+        identifier = self.consume(TokenType.IDENTIFIER).value
+        if self.current_token().type == TokenType.OP_DOT:
             self.advance()
             addr = self.parse_addr()
-        self.consume(TokenType.LPAREN)
+        self.consume(TokenType.OP_LPAREN)
         self.parse_param_decl()
-        self.consume(TokenType.RPAREN)
+        self.consume(TokenType.OP_RPAREN)
         return True
 
     # <param decl> ::= <var decl>
@@ -625,10 +647,10 @@ class Parser:
         #         ]
         #     )
         #     or (
-        #         self.current_token().type == TokenType.VAR_T
+        #         self.current_token().type == TokenType.IDENTIFIER
         #         and self.next_token().type == TokenType.EQUAL
         #     )
-        #     or (self.current_token().type == TokenType.LBRACK)
+        #     or (self.current_token().type == TokenType.OP_LBRACK)
         # ):
         #     self.parse_stmt()
 
@@ -683,11 +705,11 @@ class Parser:
                 "A function call may not be used as a parameter in a routine call or declaration"
             )
         identifier = self.current_token().value
-        self.consume(TokenType.VAR_T)
-        self.consume(TokenType.LPAREN)
+        self.consume(TokenType.IDENTIFIER)
+        self.consume(TokenType.OP_LPAREN)
         if self.current_token().type != TokenType.RPAREN:
             self.parse_params()
-        self.consume(TokenType.RPAREN)
+        self.consume(TokenType.OP_RPAREN)
         self.code_gen.emit_routine_call(identifier)
 
     # <params> ::= <params>,<arith exp> | <arith exp>
@@ -696,7 +718,7 @@ class Parser:
             self.parsing_params = True
             self.parse_arith_exp()
             param_count = 1
-            while self.current_token().type == TokenType.COMMA:
+            while self.current_token().type == TokenType.OP_COMMA:
                 self.advance()
                 self.parse_arith_exp(False)
                 param_count += 1
@@ -792,7 +814,7 @@ class Parser:
         if self.current_token().type != TokenType.FOR:
             return False
         self.advance()
-        identifier = self.consume(TokenType.VAR_T).value
+        identifier = self.consume(TokenType.IDENTIFIER).value
         self.consume(TokenType.EQUAL)
         self.parse_arith_exp()
         self.consume(TokenType.TO)
@@ -805,11 +827,11 @@ class Parser:
 
     # <code block> ::= [<comp const list>]
     def parse_code_block(self) -> bool:
-        if self.current_token().type != TokenType.LBRACK:
+        if self.current_token().type != TokenType.OP_LBRACK:
             return False
         self.advance()
         self.parse_comp_const_list()
-        self.consume(TokenType.RBRACK)
+        self.consume(TokenType.OP_RBRACK)
         return True
 
     # <comp const list> ::= <comp const list> <comp const> | <comp const>
@@ -851,19 +873,19 @@ class Parser:
             self.parse_binary()
 
     def parse_number(self):
-        if self.prev_token().type == TokenType.INT:
+        if self.prev_token().type == TokenType.INT_LITERAL:
             self.code_gen.emit_number(int(self.prev_token().value))
-        elif self.prev_token().type == TokenType.HEX:
+        elif self.prev_token().type == TokenType.HEX_LITERAL:
             self.code_gen.emit_number(int(self.prev_token().value, 16))
 
     def parse_grouping(self):
         self.parse_expression()
-        self.consume(TokenType.RPAREN)
+        self.consume(TokenType.OP_RPAREN)
 
     def parse_unary(self):
         operator_type = self.prev_token().type
         self.parse_expr_precedence(ExprPrecedence.UNARY)
-        if operator_type == TokenType.MINUS:
+        if operator_type == TokenType.OP_MINUS:
             self.code_gen.emit_unary_minus()
 
     def parse_binary(self):
@@ -871,53 +893,28 @@ class Parser:
         rule = EXPRESSION_RULES[operator_type]
         self.parse_expr_precedence(ExprPrecedence(rule.precedence.value + 1))
 
-        if operator_type == TokenType.PLUS:
+        if operator_type == TokenType.OP_PLUS:
             self.code_gen.emit_add()
-        elif operator_type == TokenType.MINUS:
+        elif operator_type == TokenType.OP_MINUS:
             self.code_gen.emit_subtract()
-        elif operator_type == TokenType.TIMES:
+        elif operator_type == TokenType.OP_TIMES:
             self.code_gen.emit_multiply()
-        elif operator_type == TokenType.DIVIDE:
+        elif operator_type == TokenType.OP_DIVIDE:
             self.code_gen.emit_divide()
 
-    def parse_comp_const(self):
-        components = [self.parse_base_comp_const()]
-        while (
-            self.current_token() is not None
-            and self.current_token().type == TokenType.PLUS
-        ):
-            self.advance()  # Consume the '+' token
-            components.append(self.parse_base_comp_const())
-        return {"type": "comp_const", "components": components}
+    # def parse_comp_const(self):
 
-    def parse_base_comp_const(self):
-        token = self.current_token()
-        if token.type == TokenType.IDENTIFIER:
-            self.advance()  # Consume the identifier
-            return {"type": "identifier", "value": token.value}
-        elif token.type == TokenType.NUM_CONST:
-            self.advance()  # Consume the numeric constant
-            return {"type": "num_const", "value": token.value}
-        elif token.type == TokenType.PTR_REF:
-            self.advance()  # Consume the pointer reference
-            return {"type": "ptr_ref", "value": token.value}
-        elif token.type == TokenType.STAR:
-            self.advance()  # Consume the '*' token
-            return {"type": "star"}
-        else:
-            raise SyntaxError(f"Unexpected token in base comp const: {token}")
+    # def parse_param_decl(self):
+    #     # Implement the parsing logic for <param decl>
+    #     # For now, just return a placeholder
+    #     return {"type": "param_decl"}
 
-    def parse_param_decl(self):
-        # Implement the parsing logic for <param decl>
-        # For now, just return a placeholder
-        return {"type": "param_decl"}
+    # def parse_system_decls(self):
+    #     # Implement the parsing logic for <system decls>
+    #     # For now, just return a placeholder
+    #     return {"type": "system_decls"}
 
-    def parse_system_decls(self):
-        # Implement the parsing logic for <system decls>
-        # For now, just return a placeholder
-        return {"type": "system_decls"}
-
-    def parse_stmt_list(self):
-        # Implement the parsing logic for <stmt list>
-        # For now, just return a placeholder
-        return {"type": "stmt_list"}
+    # def parse_stmt_list(self):
+    #     # Implement the parsing logic for <stmt list>
+    #     # For now, just return a placeholder
+    #     return {"type": "stmt_list"}
