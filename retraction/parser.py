@@ -1,8 +1,9 @@
 from enum import Enum
 
 from retraction.tokens import Token, TokenType
-from retraction.codegen import CodeGenForTest
-from retraction.symtab import SymTab
+from retraction.codegen import ByteCodeGen
+from retraction.symtab import SymbolTable
+from retraction.tipes import BYTE_TIPE, CARD_TIPE, CHAR_TIPE, INT_TIPE, BaseTipe, Tipe
 
 # from retraction.expression import ExpressionNode, StubExpressionNode
 
@@ -122,8 +123,8 @@ class Parser:
         self,
         tokens: list[Token],
         directives,
-        code_gen: CodeGenForTest,
-        symbol_table: SymTab,
+        code_gen: ByteCodeGen,
+        symbol_table: SymbolTable,
     ):
         self.tokens = tokens
         self.current_token_index = 0
@@ -151,7 +152,7 @@ class Parser:
 
     def consume(self, token_type) -> Token:
         token = self.current_token()
-        if token is None or token.type != token_type:
+        if token is None or token.tok_type != token_type:
             raise SyntaxError(f"Expected token {token_type}, got {token}")
         self.advance()
         return token
@@ -162,11 +163,14 @@ class Parser:
         #     )
         # self.advance()
 
+    def parse_dev(self):
+        self.parse_expression()
+
     # <program> ::= <program> MODULE <prog module> | {MODULE} <prog module>
     def parse_program(self):
         # TODO: Not sure the grammar is correct here, but it's from the manual
         while self.current_token() is not None:
-            if self.current_token().type == TokenType.MODULE:
+            if self.current_token().tok_type == TokenType.MODULE:
                 self.advance()
             else:
                 break
@@ -196,7 +200,7 @@ class Parser:
 
     # <DEFINE decl> ::= <DEFINE> <def list>
     def parse_define_decl(self) -> bool:
-        if self.current_token().type == TokenType.DEFINE:
+        if self.current_token().tok_type == TokenType.DEFINE:
             self.advance()
             self.parse_def_list()
             return True
@@ -206,7 +210,7 @@ class Parser:
     def parse_def_list(self) -> bool:
         if not self.parse_def():
             return False
-        while self.current_token().type == TokenType.COMMA:
+        while self.current_token().tok_type == TokenType.COMMA:
             self.advance()
             self.parse_def()
         return True
@@ -214,9 +218,9 @@ class Parser:
     # <def> ::= <identifier>=<str const>
     # TODO: Remove this when there's a preprocessing step to handle defines
     def parse_def(self) -> bool:
-        if self.current_token().type != TokenType.IDENTIFIER:
+        if self.current_token().tok_type != TokenType.IDENTIFIER:
             return False
-        if self.next_token().type != TokenType.OP_EQ:
+        if self.next_token().tok_type != TokenType.OP_EQ:
             return False
         identifier = self.current_token().value
         self.advance()
@@ -227,7 +231,7 @@ class Parser:
 
     # <TYPE decl> ::= TYPE <rec ident list>
     def parse_type_decl(self) -> bool:
-        if self.current_token().type == TokenType.TYPE:
+        if self.current_token().tok_type == TokenType.TYPE:
             self.advance()
             self.parse_rec_ident_list()
             return True
@@ -243,9 +247,9 @@ class Parser:
 
     # <rec ident> ::= <rec name>=[<field init>]
     def parse_rec_ident(self) -> bool:
-        if self.current_token().type != TokenType.IDENTIFIER:
+        if self.current_token().tok_type != TokenType.IDENTIFIER:
             return False
-        if self.next_token().type != TokenType.OP_EQ:
+        if self.next_token().tok_type != TokenType.OP_EQ:
             return False
         rec_name = self.current_token().value
         self.advance()
@@ -296,18 +300,19 @@ class Parser:
         if fund_type is None:
             return False
         self.parse_fund_ident_list(fund_type)
+        print(f"current_token: {self.current_token()}")
         return True
 
     # <fund type> ::= CARD | CHAR | BYTE | INT
     def parse_fund_type(self) -> TokenType | None:
-        if self.current_token().type not in [
+        if self.current_token().tok_type not in [
             TokenType.CARD,
             TokenType.CHAR,
             TokenType.BYTE,
             TokenType.INT,
         ]:
             return None
-        fund_type = self.current_token().type
+        fund_type = self.current_token().tok_type
         self.advance()
         return fund_type
 
@@ -315,22 +320,37 @@ class Parser:
     def parse_fund_ident_list(self, fund_type: TokenType) -> bool:
         if not self.parse_fund_ident(fund_type):
             return False
-        while self.current_token().type == TokenType.OP_COMMA:
+        while self.current_token().tok_type == TokenType.OP_COMMA:
             self.advance()
             self.parse_fund_ident(fund_type)
         return True
 
     # <fund ident> ::= <identifier>{=<init opts>}
     def parse_fund_ident(self, fund_type: TokenType) -> bool:
-        if self.current_token().type != TokenType.IDENTIFIER:
+        print(f"parse_fund_ident... fund_type: {fund_type}")
+        if self.current_token().tok_type != TokenType.IDENTIFIER:
             return False
         identifier = self.current_token().value
         self.advance()
-        if self.current_token().type == TokenType.OP_EQ:
+        if self.current_token().tok_type == TokenType.OP_EQ:
             self.advance()
             self.parse_init_opts(fund_type, identifier)
         else:
-            self.code_gen.emit_fund_ident(fund_type, identifier)
+            print(f"fund_type: {fund_type}, identifier: {identifier}")
+            print(f"current_token: {self.current_token()}")
+            # TODO: To simplify this code, maybe use same Tipe enum for tokens and symbol table
+            # Would be like a token with type TokenType.TYPE and value BYTE_TIPE
+            tipe = None
+            if fund_type == TokenType.BYTE:
+                tipe = BYTE_TIPE
+            elif fund_type == TokenType.CHAR:
+                tipe = CHAR_TIPE
+            elif fund_type == TokenType.INT:
+                tipe = INT_TIPE
+            elif fund_type == TokenType.CARD:
+                tipe = CARD_TIPE
+            # TODO: Deal with locals
+            ident_index = self.symbol_table.declare_global(identifier, tipe)
         return True
 
         # identifier = self.current_token().value
@@ -343,7 +363,7 @@ class Parser:
 
     # <init opts> ::= <addr> | [<value>]
     def parse_init_opts(self, fund_type: TokenType, identifier: str) -> bool:
-        if self.current_token().type == TokenType.OP_LBRACK:
+        if self.current_token().tok_type == TokenType.OP_LBRACK:
             self.advance()
             value = self.parse_value_const()
             self.consume(TokenType.OP_RBRACK)
@@ -359,11 +379,11 @@ class Parser:
 
     # <num const> ::= <dec num> | <hex num> | <char>
     def parse_num_const(self) -> int:
-        if self.current_token().type == TokenType.INT_LITERAL:
+        if self.current_token().tok_type == TokenType.INT_LITERAL:
             return self.parse_dec_num()
-        if self.current_token().type == TokenType.HEX_LITERAL:
+        if self.current_token().tok_type == TokenType.HEX_LITERAL:
             return self.parse_hex_num()
-        if self.current_token().type == TokenType.CHAR_LITERAL:
+        if self.current_token().tok_type == TokenType.CHAR_LITERAL:
             return self.parse_char()
         raise SyntaxError(f"Unexpected token: {self.current_token()}")
 
@@ -381,7 +401,9 @@ class Parser:
 
     # <POINTER decl> ::= <ptr type> POINTER <ptr ident list>
     def parse_pointer_decl(self) -> bool:
-        if self.next_token().type != TokenType.POINTER:
+        if not self.next_token():
+            return False
+        if self.next_token().tok_type != TokenType.POINTER:
             return False
         ptr_type = self.current_token().value
         self.advance()
@@ -392,7 +414,7 @@ class Parser:
     def parse_ptr_ident_list(self, ptr_type: str) -> bool:
         if not self.parse_ptr_ident(ptr_type):
             return False
-        while self.current_token().type == TokenType.OP_COMMA:
+        while self.current_token().tok_type == TokenType.OP_COMMA:
             self.advance()
             self.parse_ptr_ident(ptr_type)
         return True
@@ -401,7 +423,7 @@ class Parser:
     def parse_ptr_ident(self, ptr_type) -> bool:
         identifier = self.current_token().value
         self.consume(TokenType.IDENTIFIER)
-        if self.current_token().type == TokenType.OP_EQ:
+        if self.current_token().tok_type == TokenType.OP_EQ:
             self.advance()
             value = self.parse_value_const()
             self.code_gen.emit_ptr_ident_value(ptr_type, identifier, value)
@@ -420,9 +442,10 @@ class Parser:
     # <addr> ::= <comp const>
     # <value list> ::= <value list><value> | <value>
     # <value> ::= <comp const>
-    def parse_array_decl(self):
+    def parse_array_decl(self) -> bool:
         # TODO
-        raise NotImplementedError()
+        # raise NotImplementedError()
+        return False
 
     # Variable Declaration for Records
     # --------------------------------
@@ -431,7 +454,7 @@ class Parser:
     # TODO: Probably need to refer to a symbol/type table to look up the record type to
     # distinguish between record and array or other declarations
     def parse_record_decl(self) -> bool:
-        if self.current_token().type != TokenType.IDENTIFIER:
+        if self.current_token().tok_type != TokenType.IDENTIFIER:
             return False
         rec_type = self.current_token().value
         self.advance()
@@ -441,17 +464,17 @@ class Parser:
     def parse_rec_ident_list(self, rec_type: str) -> bool:
         if not self.parse_rec_ident(rec_type):
             return False
-        while self.current_token().type == TokenType.OP_COMMA:
+        while self.current_token().tok_type == TokenType.OP_COMMA:
             self.advance()
             self.parse_rec_ident(rec_type)
 
     # <rec ident> ::= <identifier>{=<address>}
     def parse_rec_ident(self, rec_type: str) -> bool:
-        if self.current_token().type != TokenType.IDENTIFIER:
+        if self.current_token().tok_type != TokenType.IDENTIFIER:
             return False
         identifier = self.current_token().value
         self.advance()
-        if self.current_token().type == TokenType.OP_EQ:
+        if self.current_token().tok_type == TokenType.OP_EQ:
             self.advance()
             addr = self.parse_addr()
             self.code_gen.emit_rec_ident_value(rec_type, identifier, addr)
@@ -561,18 +584,18 @@ class Parser:
             return False
         self.parse_system_decls()
         self.parse_stmt_list()
-        if self.current_token().type == TokenType.RETURN:
+        if self.current_token().tok_type == TokenType.RETURN:
             self.code_gen.emit_return()
             self.advance()
         return True
 
     # <proc decl> ::= PROC <identifier>{=<addr>}({<param decl>})
     def parse_proc_decl(self) -> bool:
-        if self.current_token().type != TokenType.PROC:
+        if self.current_token().tok_type != TokenType.PROC:
             return False
         self.advance()
         identifier = self.consume(TokenType.IDENTIFIER).value
-        if self.current_token().type == TokenType.OP_EQ:
+        if self.current_token().tok_type == TokenType.OP_EQ:
             self.advance()
             addr = self.parse_addr()
         self.consume(TokenType.LPAREN)
@@ -590,7 +613,7 @@ class Parser:
             return False
         self.parse_system_decls()
         self.parse_stmt_list()
-        if self.current_token().type == TokenType.RETURN:
+        if self.current_token().tok_type == TokenType.RETURN:
             self.advance()
             self.consume(TokenType.OP_LPAREN)
             self.parse_arith_exp()
@@ -614,7 +637,7 @@ class Parser:
             return False
         self.consume(TokenType.FUNC)
         identifier = self.consume(TokenType.IDENTIFIER).value
-        if self.current_token().type == TokenType.OP_DOT:
+        if self.current_token().tok_type == TokenType.OP_DOT:
             self.advance()
             addr = self.parse_addr()
         self.consume(TokenType.OP_LPAREN)
@@ -676,7 +699,7 @@ class Parser:
 
     # <assign stmt> ::= <mem contents>=<arith exp>
     def parse_assign_stmt(self) -> bool:
-        if self.next_token().type == TokenType.EQUAL:
+        if self.next_token().tok_type == TokenType.EQUAL:
             mem_contents = self.parse_mem_contents()
             self.consume(TokenType.EQUAL)
             self.parse_arith_exp()
@@ -686,9 +709,9 @@ class Parser:
 
     # <EXIT stmt> ::= EXIT
     def parse_exit_stmt(self) -> bool:
-        if self.current_token().type == TokenType.EXIT:
+        if self.current_token().tok_type == TokenType.EXIT:
             self.advance()
-            self.code_gen.emit_exit_stmt()
+            self.code_gen.emit_exit()
             return True
         return False
 
@@ -707,7 +730,7 @@ class Parser:
         identifier = self.current_token().value
         self.consume(TokenType.IDENTIFIER)
         self.consume(TokenType.OP_LPAREN)
-        if self.current_token().type != TokenType.RPAREN:
+        if self.current_token().tok_type != TokenType.RPAREN:
             self.parse_params()
         self.consume(TokenType.OP_RPAREN)
         self.code_gen.emit_routine_call(identifier)
@@ -718,7 +741,7 @@ class Parser:
             self.parsing_params = True
             self.parse_arith_exp()
             param_count = 1
-            while self.current_token().type == TokenType.OP_COMMA:
+            while self.current_token().tok_type == TokenType.OP_COMMA:
                 self.advance()
                 self.parse_arith_exp(False)
                 param_count += 1
@@ -741,10 +764,10 @@ class Parser:
 
     # <IF stmt> ::= IF <cond exp> THEN {stmt list} {|:ELSEIF exten:|}{ELSE exten} FI
     def parse_if_stmt(self) -> bool:
-        if self.current_token().type != TokenType.IF:
+        if self.current_token().tok_type != TokenType.IF:
             return False
         self.advance()
-        cond_exp = self.parse_cond_exp()
+        self.parse_cond_exp()
         self.consume(TokenType.THEN)
         self.parse_stmt_list()
         while self.parse_elseif_exten():
@@ -763,7 +786,7 @@ class Parser:
 
     # <ELSEIF exten> ::= ELSEIF <cond exp> THEN {stmt list}
     def parse_elseif_exten(self) -> bool:
-        if self.current_token().type != TokenType.ELSEIF:
+        if self.current_token().tok_type != TokenType.ELSEIF:
             return False
         self.advance()
         self.parse_cond_exp()
@@ -773,7 +796,7 @@ class Parser:
 
     # <ELSE exten> ::= ELSE {stmt list}
     def parse_else_exten(self) -> bool:
-        if self.current_token().type != TokenType.ELSE:
+        if self.current_token().tok_type != TokenType.ELSE:
             return False
         self.advance()
         self.parse_stmt_list()
@@ -781,7 +804,7 @@ class Parser:
 
     # <DO loop> ::= DO {<stmt list>} {<UNTIL stmt>} OD
     def parse_do_loop(self) -> bool:
-        if self.current_token().type != TokenType.DO:
+        if self.current_token().tok_type != TokenType.DO:
             return False
         self.advance()
         self.parse_stmt_list()
@@ -791,7 +814,7 @@ class Parser:
 
     # <UNTIL stmt> ::= UNTIL <cond exp>
     def parse_until_stmt(self) -> bool:
-        if self.current_token().type != TokenType.UNTIL:
+        if self.current_token().tok_type != TokenType.UNTIL:
             return False
         self.advance()
         self.parse_cond_exp()
@@ -799,7 +822,7 @@ class Parser:
 
     # <WHILE loop> ::= WHILE <cond exp> <DO loop>
     def parse_while_loop(self) -> bool:
-        if self.current_token().type != TokenType.WHILE:
+        if self.current_token().tok_type != TokenType.WHILE:
             return False
         self.advance()
         self.parse_cond_exp()
@@ -811,7 +834,7 @@ class Parser:
     # <finish> ::= <arith exp>
     # <inc> ::= <arith exp>
     def parse_for_loop(self) -> bool:
-        if self.current_token().type != TokenType.FOR:
+        if self.current_token().tok_type != TokenType.FOR:
             return False
         self.advance()
         identifier = self.consume(TokenType.IDENTIFIER).value
@@ -819,7 +842,7 @@ class Parser:
         self.parse_arith_exp()
         self.consume(TokenType.TO)
         self.parse_arith_exp()
-        if self.current_token().type == TokenType.STEP:
+        if self.current_token().tok_type == TokenType.STEP:
             self.advance()
             self.parse_arith_exp()
         self.parse_do_loop()
@@ -827,7 +850,7 @@ class Parser:
 
     # <code block> ::= [<comp const list>]
     def parse_code_block(self) -> bool:
-        if self.current_token().type != TokenType.OP_LBRACK:
+        if self.current_token().tok_type != TokenType.OP_LBRACK:
             return False
         self.advance()
         self.parse_comp_const_list()
@@ -850,17 +873,17 @@ class Parser:
 
     def parse_expr_precedence(self, precedence: ExprPrecedence):
         self.advance()
-        prefix = EXPRESSION_RULES[self.prev_token().type].prefix
+        prefix = EXPRESSION_RULES[self.prev_token().tok_type].prefix
         if prefix == ExprAction.NONE:
             raise SyntaxError(f"Expected expression: {self.prev_token()}")
         self.parse_expr_action(prefix)
 
         while (
             precedence.value
-            <= EXPRESSION_RULES[self.current_token().type].precedence.value
+            <= EXPRESSION_RULES[self.current_token().tok_type].precedence.value
         ):
             self.advance()
-            self.parse_expr_action(EXPRESSION_RULES[self.prev_token().type].infix)
+            self.parse_expr_action(EXPRESSION_RULES[self.prev_token().tok_type].infix)
 
     def parse_expr_action(self, action: ExprAction):
         if action == ExprAction.NUMBER:
@@ -873,23 +896,28 @@ class Parser:
             self.parse_binary()
 
     def parse_number(self):
-        if self.prev_token().type == TokenType.INT_LITERAL:
-            self.code_gen.emit_number(int(self.prev_token().value))
-        elif self.prev_token().type == TokenType.HEX_LITERAL:
-            self.code_gen.emit_number(int(self.prev_token().value, 16))
+        value = None
+        if self.prev_token().tok_type == TokenType.INT_LITERAL:
+            value = int(self.prev_token().value)
+        elif self.prev_token().tok_type == TokenType.HEX_LITERAL:
+            value = int(self.prev_token().value, 16)
+        if value < -65535 or value > 65535:
+            raise SyntaxError(f"Numeric literal {value} out of range [-65535, 65535]")
+        const_index = self.symbol_table.declare_constant(value)
+        self.code_gen.emit_constant(const_index)
 
     def parse_grouping(self):
         self.parse_expression()
         self.consume(TokenType.OP_RPAREN)
 
     def parse_unary(self):
-        operator_type = self.prev_token().type
+        operator_type = self.prev_token().tok_type
         self.parse_expr_precedence(ExprPrecedence.UNARY)
         if operator_type == TokenType.OP_MINUS:
             self.code_gen.emit_unary_minus()
 
     def parse_binary(self):
-        operator_type = self.prev_token().type
+        operator_type = self.prev_token().tok_type
         rule = EXPRESSION_RULES[operator_type]
         self.parse_expr_precedence(ExprPrecedence(rule.precedence.value + 1))
 
@@ -901,6 +929,30 @@ class Parser:
             self.code_gen.emit_multiply()
         elif operator_type == TokenType.OP_DIVIDE:
             self.code_gen.emit_divide()
+        elif operator_type == TokenType.MOD:
+            self.code_gen.emit_mod()
+        elif operator_type == TokenType.LSH:
+            self.code_gen.emit_lsh()
+        elif operator_type == TokenType.RSH:
+            self.code_gen.emit_rsh()
+        elif operator_type == TokenType.OP_EQ:
+            self.code_gen.emit_eq()
+        elif operator_type == TokenType.OP_NE:
+            self.code_gen.emit_ne()
+        elif operator_type == TokenType.OP_GT:
+            self.code_gen.emit_gt()
+        elif operator_type == TokenType.OP_GE:
+            self.code_gen.emit_ge()
+        elif operator_type == TokenType.OP_LT:
+            self.code_gen.emit_lt()
+        elif operator_type == TokenType.OP_LE:
+            self.code_gen.emit_le()
+        elif operator_type == TokenType.AND:
+            self.code_gen.emit_and()
+        elif operator_type == TokenType.OR:
+            self.code_gen.emit_or()
+        elif operator_type == TokenType.XOR:
+            self.code_gen.emit_xor()
 
     # def parse_comp_const(self):
 

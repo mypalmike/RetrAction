@@ -13,7 +13,7 @@ class TokenizeTestCase(unittest.TestCase):
         ]
         tokens = tokenize(source_code)
         for token, expected_token in zip(tokens, expected_tokens):
-            self.assertEqual(token.type, expected_token.type)
+            self.assertEqual(token.tok_type, expected_token.tok_type)
             self.assertEqual(token.value, expected_token.value)
 
     def test_symbol_tokens(self):
@@ -65,7 +65,7 @@ class TokenizeTestCase(unittest.TestCase):
 
         tokens = tokenize(source_code)
         for token, expected_token in zip(tokens, expected_tokens):
-            self.assertEqual(token.type, expected_token.type)
+            self.assertEqual(token.tok_type, expected_token.tok_type)
             self.assertEqual(token.value, expected_token.value)
 
     def test_literal_tokens(self):
@@ -79,7 +79,7 @@ class TokenizeTestCase(unittest.TestCase):
         ]
         tokens = tokenize(source_code)
         for token, expected_token in zip(tokens, expected_tokens):
-            self.assertEqual(token.type, expected_token.type)
+            self.assertEqual(token.tok_type, expected_token.tok_type)
             self.assertEqual(token.value, expected_token.value)
 
     def test_identifier_tokens(self):
@@ -93,5 +93,5 @@ class TokenizeTestCase(unittest.TestCase):
         ]
         tokens = tokenize(source_code)
         for token, expected_token in zip(tokens, expected_tokens):
-            self.assertEqual(token.type, expected_token.type)
+            self.assertEqual(token.tok_type, expected_token.tok_type)
             self.assertEqual(token.value, expected_token.value)

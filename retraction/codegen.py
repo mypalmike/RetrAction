@@ -1,3 +1,7 @@
+from retraction.symtab import SymbolTable
+from retraction.bytecode import ByteCode, ByteCodeOp
+
+
 # Action calling conventions:
 #
 # Address     nth byte of parameters-------
@@ -10,72 +14,83 @@
 # :
 # $AF         16th
 
+# Mixing numerical types table:
+#       BYTE    INT    CARD
+# BYTE  BYTE    INT    CARD
+# INT   INT     INT    CARD
+# CARD  CARD    CARD   CARD
 
-class CodeGenForTest:
-    def __init__(self):
-        self.code = []
-        self.addr = 0
+# Unary minus implies INT
+# # @ implies CARD
+# TECHNICAL NOTE: using the '*', '/' or 'MOD' operand results
+# in an INT type, so processing of very large CARD values (>
+# 32767) will not work p
 
-    def emit_exit_stmt(self):
-        self.code.append("EXIT")
-        self.addr += 1
 
-    def emit_fund_ident(self, fund_type, identifier):
-        self.code.append(f"FUND_IDENT {fund_type} {identifier}")
-        self.addr += 1
+class ByteCodeGen:
+    def __init__(self, symbol_table: SymbolTable, start_addr: int = 0):
+        self.code: list[ByteCode] = []
+        self.addr = start_addr
 
-    def emit_ptr_ident_value(self, ptr_type, identifier, value):
-        self.code.append(f"PTR_IDENT_VALUE {ptr_type} {identifier} {value}")
-        self.addr += 1
-
-    def emit_ptr_ident(self, ptr_type, identifier):
-        self.code.append(f"PTR_IDENT {ptr_type} {identifier}")
-        self.addr += 1
-
-    def emit_rec_ident_value(self, rec_type, identifier, addr):
-        self.code.append(f"REC_IDENT_VAL {rec_type} {identifier} {addr}")
-        self.addr += 1
-
-    def emit_rec_ident(self, ref_type, identifier):
-        self.code.append(f"REC_IDENT {ref_type} {identifier}")
-        self.addr += 1
+    def emit_exit(self):
+        self.code.append(ByteCode(ByteCodeOp.EXIT))
 
     def emit_routine_call(self, identifier, params):
-        self.code.append(f"ROUTINE_CALL {identifier} {params}")
-        self.addr += 1
+        self.code.append(ByteCode(ByteCodeOp.ROUTINE_CALL, identifier))
 
     def emit_return(self):
-        self.code.append("RETURN")
-        self.addr += 1
-
-    def emit_define(self, addr):
-        self.code.append(f"DEFINE {addr}")
-        self.addr += 1
-
-    def emit_define_value(self, name, value):
-        self.code.append(f"DEFINE_VALUE {name} {value}")
-        self.addr += 1
+        self.code.append(ByteCode(ByteCodeOp.RETURN))
 
     def emit_add(self):
-        self.code.append("ADD")
-        self.addr += 1
+        self.code.append(ByteCode(ByteCodeOp.ADD))
 
     def emit_subtract(self):
-        self.code.append("SUBTRACT")
-        self.addr += 1
+        self.code.append(ByteCode(ByteCodeOp.SUBTRACT))
 
     def emit_multiply(self):
-        self.code.append("MULTIPLY")
-        self.addr += 1
+        self.code.append(ByteCode(ByteCodeOp.MULTIPLY))
 
     def emit_divide(self):
-        self.code.append("DIVIDE")
-        self.addr += 1
+        self.code.append(ByteCode(ByteCodeOp.DIVIDE))
+
+    def emit_mod(self):
+        self.code.append(ByteCode(ByteCodeOp.MOD))
+
+    def emit_lsh(self):
+        self.code.append(ByteCode(ByteCodeOp.LSH))
+
+    def emit_rsh(self):
+        self.code.append(ByteCode(ByteCodeOp.RSH))
+
+    def emit_eq(self):
+        self.code.append(ByteCode(ByteCodeOp.OP_EQ))
+
+    def emit_ne(self):
+        self.code.append(ByteCode(ByteCodeOp.OP_NE))
+
+    def emit_gt(self):
+        self.code.append(ByteCode(ByteCodeOp.OP_GT))
+
+    def emit_ge(self):
+        self.code.append(ByteCode(ByteCodeOp.OP_GE))
+
+    def emit_lt(self):
+        self.code.append(ByteCode(ByteCodeOp.OP_LT))
+
+    def emit_le(self):
+        self.code.append(ByteCode(ByteCodeOp.OP_LE))
+
+    def emit_and(self):
+        self.code.append(ByteCode(ByteCodeOp.AND))
+
+    def emit_or(self):
+        self.code.append(ByteCode(ByteCodeOp.OR))
+
+    def emit_xor(self):
+        self.code.append(ByteCode(ByteCodeOp.XOR))
 
     def emit_unary_minus(self):
-        self.code.append("UNARY_MINUS")
-        self.addr += 1
+        self.code.append(ByteCode(ByteCodeOp.UNARY_MINUS))
 
-    def emit_number(self, number):
-        self.code.append(f"NUMBER {number}")
-        self.addr += 1
+    def emit_constant(self, const_index):
+        self.code.append(ByteCode(ByteCodeOp.CONSTANT, const_index))

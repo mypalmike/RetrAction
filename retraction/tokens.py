@@ -286,12 +286,12 @@ SYMBOL_CHARS = set([s for s in TEXT_TO_TOKEN.keys() if not s[0].isalpha()])
 
 # Token class
 class Token:
-    def __init__(self, type, value):
-        self.type = type
+    def __init__(self, tok_type, value):
+        self.tok_type = tok_type
         self.value = value
 
     def __repr__(self):
-        return f"Token({self.type}, {self.value})"
+        return f"Token({self.tok_type}, {self.value})"
 
 
 # Tokenizer function
