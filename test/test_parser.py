@@ -15,7 +15,6 @@ class ParserTestCase(unittest.TestCase):
         symbol_table = SymbolTable()
         codegen = ByteCodeGen(symbol_table)
         parser = Parser(tokens, directives, codegen, symbol_table)
-        # parser.advance()
         parser.parse_expression()
         expected_code = [
             ByteCode(ByteCodeOp.CONSTANT, 0),
@@ -40,7 +39,6 @@ class ParserTestCase(unittest.TestCase):
         symbol_table = SymbolTable()
         codegen = ByteCodeGen(symbol_table)
         parser = Parser(tokens, directives, codegen, symbol_table)
-        # parser.advance()
         parser.parse_expression()
         expected_code = [
             ByteCode(ByteCodeOp.CONSTANT, 0),
