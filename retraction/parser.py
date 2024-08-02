@@ -105,6 +105,15 @@ EXPRESSION_RULES = {
     TokenType.AND: ExprRule(ExprAction.NONE, ExprAction.BINARY, ExprPrecedence.AND),
     TokenType.OR: ExprRule(ExprAction.NONE, ExprAction.BINARY, ExprPrecedence.OR),
     TokenType.XOR: ExprRule(ExprAction.NONE, ExprAction.BINARY, ExprPrecedence.XOR),
+    TokenType.OP_BIT_AND: ExprRule(
+        ExprAction.NONE, ExprAction.BINARY, ExprPrecedence.AND
+    ),
+    TokenType.OP_BIT_OR: ExprRule(
+        ExprAction.NONE, ExprAction.BINARY, ExprPrecedence.OR
+    ),
+    TokenType.OP_BIT_XOR: ExprRule(
+        ExprAction.NONE, ExprAction.BINARY, ExprPrecedence.XOR
+    ),
     TokenType.INT_LITERAL: ExprRule(
         ExprAction.NUMBER, ExprAction.NONE, ExprPrecedence.NONE
     ),
@@ -953,6 +962,12 @@ class Parser:
             self.code_gen.emit_or()
         elif operator_type == TokenType.XOR:
             self.code_gen.emit_xor()
+        elif operator_type == TokenType.OP_BIT_AND:
+            self.code_gen.emit_bit_and()
+        elif operator_type == TokenType.OP_BIT_OR:
+            self.code_gen.emit_bit_or()
+        elif operator_type == TokenType.OP_BIT_XOR:
+            self.code_gen.emit_bit_xor()
 
     # def parse_comp_const(self):
 

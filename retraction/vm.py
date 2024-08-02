@@ -72,6 +72,15 @@ class VirtualMachine:
             elif instr.op == ByteCodeOp.XOR:
                 self.stack[-2] = self.stack[-2] ^ self.stack[-1]
                 self.stack.pop()
+            elif instr.op == ByteCodeOp.OP_BIT_AND:
+                self.stack[-2] &= self.stack[-1]
+                self.stack.pop()
+            elif instr.op == ByteCodeOp.OP_BIT_OR:
+                self.stack[-2] |= self.stack[-1]
+                self.stack.pop()
+            elif instr.op == ByteCodeOp.OP_BIT_XOR:
+                self.stack[-2] ^= self.stack[-1]
+                self.stack.pop()
             elif instr.op == ByteCodeOp.UNARY_MINUS:
                 self.stack[-1] = -self.stack[-1]
             elif instr.op == ByteCodeOp.CONSTANT:
@@ -89,5 +98,7 @@ class VirtualMachine:
                 self.pc = self.stack.pop()
             elif instr.op == ByteCodeOp.EXIT:
                 break
+            else:
+                raise ValueError(f"Unknown instruction {instr.op}")
             self.pc += 1
         print(self.stack)

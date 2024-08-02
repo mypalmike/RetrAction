@@ -89,6 +89,15 @@ class ByteCodeGen:
     def emit_xor(self):
         self.code.append(ByteCode(ByteCodeOp.XOR))
 
+    def emit_bit_and(self):
+        self.code.append(ByteCode(ByteCodeOp.OP_BIT_AND))
+
+    def emit_bit_or(self):
+        self.code.append(ByteCode(ByteCodeOp.OP_BIT_OR))
+
+    def emit_bit_xor(self):
+        self.code.append(ByteCode(ByteCodeOp.OP_BIT_XOR))
+
     def emit_unary_minus(self):
         self.code.append(ByteCode(ByteCodeOp.UNARY_MINUS))
 

@@ -70,86 +70,6 @@ class TokenType(Enum):
     SET = auto()
     OP_SEMICOLON = auto()
 
-    # PLUS = 1
-    # MINUS = 2
-    # TIMES = 3
-    # DIVIDE = 4
-    # OR = 5
-    # AND = 6
-    # EQUAL = 7
-    # NE = 8
-    # GR = 9
-    # GE = 10
-    # LS = 11
-    # LE = 12
-    # REM = 13
-    # XOR = 14
-    # LSH = 15
-    # RSH = 16
-    # UMINUS = 17
-    # AT = 18
-    # SCOLON = 21
-    # SQUOTE = 22
-    # PERIOD = 23
-    # RPAREN = 24
-    # LPAREN = 25
-    # COMMA = 26
-    # DEF = 27
-    # DIGIT = 28 + 0x80
-    # HEX = 29
-    # QUOTE = 30
-    # CHAR = 32
-    # BYTE = 33
-    # INT = 34
-    # CARD = 35
-    # STRING = 36
-    # REAL = 37
-    # DEFINE = 38
-    # RECORD = 39
-    # ARRAY = 64
-    # FUNC = 65
-    # PROC = 66
-    # GET = 67
-    # SET = 68
-    # POINTER = 69
-    # TYPE = 70
-    # IF = 80
-    # WHILE = 81
-    # RETURN = 82
-    # EXIT = 83
-    # FOR = 84
-    # CASE = 85
-    # CODE = 86
-    # MOD = 87
-    # UNTIL = 88
-    # LBRACK = 91
-    # RBRACK = 93
-    # UPARROW = 94
-    # THEN = 96
-    # ELSE = 97
-    # DO = 98
-    # FI = 99
-    # OD = 100
-    # TO = 101
-    # STEP = 102
-    # OF = 103
-    # ESAC = 104
-    # EDOC = 105
-    # ELSEIF = 106
-    # DOWNTO = 107
-
-    # NOT = 108  # mypalmike - added NOT
-    # CARET = 109  # mypalmike - added CARET
-
-    # TYPET = 0x70  # 112
-    # EOF = 127
-    # CONST_T = 0x80
-    # VAR_T = 0x88
-    # ARRAY_T = 0x90
-    # TEMP_T = 0xA8
-    # FUNC_T = 0xC0
-    # COND_T = 0x48
-
 
 # Create a reverse mapping from integers to token type strings
 INT_TO_TOKEN = {token.value: token.name for token in TokenType}
@@ -210,78 +130,16 @@ TEXT_TO_TOKEN = {
     "]": TokenType.OP_RBRACK,
     "==": TokenType.OP_SELF_ASSIGN,
     # TODO: Remove the tokens after this to preprocessor
+    # Keep in mind that comments can be used as no-ops in if/elseif/else(?), so it
+    # might be better to keep them in the main parser
     "DEFINE": TokenType.DEFINE,
     "INCLUDE": TokenType.INCLUDE,
     "SET": TokenType.SET,
     ";": TokenType.OP_SEMICOLON,
 }
 
-# # Define keywords and symbols
-# KEYWORDS = [
-#     "AND",
-#     "ARRAY",
-#     "BYTE",
-#     "CARD",
-#     "CHAR",
-#     "DEFINE",
-#     "DO",
-#     "ELSE",
-#     "ELSEIF",
-#     "EXIT",
-#     "FI",
-#     "FOR",
-#     "FUNC",
-#     "IF",
-#     "INCLUDE",
-#     "INT",
-#     "LSH",
-#     "MOD",
-#     "MODULE",
-#     "OD",
-#     "OR",
-#     "POINTER",
-#     "PROC",
-#     "RETURN",
-#     "RSH",
-#     "SET",
-#     "STEP",
-#     "THEN",
-#     "TO",
-#     "TYPE",
-#     "UNTIL",
-#     "WHILE",
-#     "XOR",
-# ]
 
 SYMBOL_CHARS = set([s for s in TEXT_TO_TOKEN.keys() if not s[0].isalpha()])
-
-# SYMBOL_CHARS = set(
-#     [
-#         "+",
-#         "-",
-#         "*",
-#         "/",
-#         "&",
-#         "%",
-#         "!",
-#         "=",
-#         "<",
-#         "#",
-#         ">",
-#         "$",
-#         "^",
-#         "@",
-#         "(",
-#         ")",
-#         ",",
-#         ";",
-#         "'",
-#         ".",
-#         "[",
-#         "]",
-#         "==",
-#     ]
-# )
 
 
 # Token class
@@ -333,15 +191,6 @@ def tokenize(source_code):
             else:
                 raise ValueError("Invalid character constant")
             continue
-
-        # if source_code[i] == "'":
-        #     if i + 2 < length and source_code[i + 2] == "'":
-        #         char_const = source_code[i : i + 3][1:-1]
-        #         tokens.append(Token(TokenType.CHAR, char_const))
-        #         i += 3
-        #     else:
-        #         raise ValueError("Invalid character constant")
-        #     continue
 
         # Match decimal numbers
         if source_code[i].isdigit():
