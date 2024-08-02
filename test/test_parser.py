@@ -30,7 +30,7 @@ class ParserTestCase(unittest.TestCase):
         ]
         expected_const_values = [1, 2, 3]
         for i, index in enumerate(expected_const_indices):
-            self.assertEqual(symbol_table.constants[index][1], expected_const_values[i])
+            self.assertEqual(symbol_table.constants[index], expected_const_values[i])
 
     def test_arith_expr_parens(self):
         source_code = "(1 + 2) * (3 + $1B)"
@@ -56,7 +56,7 @@ class ParserTestCase(unittest.TestCase):
         ]
         expected_const_values = [1, 2, 3, 0x1B]
         for i, index in enumerate(expected_const_indices):
-            self.assertEqual(symbol_table.constants[index][1], expected_const_values[i])
+            self.assertEqual(symbol_table.constants[index], expected_const_values[i])
 
     def test_system_decls(self):
         source_code = """
