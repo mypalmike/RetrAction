@@ -97,7 +97,9 @@ class VirtualMachine:
                 # TODO: Is this right?
                 self.pc = self.stack.pop()
             elif instr.op == ByteCodeOp.EXIT:
-                break
+                raise NotImplementedError()
+            elif instr.op == ByteCodeOp.OP_DEVPRINT:
+                print(self.stack.pop())
             else:
                 raise ValueError(f"Unknown instruction {instr.op}")
             self.pc += 1

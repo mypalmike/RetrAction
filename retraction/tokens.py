@@ -64,6 +64,8 @@ class TokenType(Enum):
     HEX_LITERAL = auto()
     IDENTIFIER = auto()
     EOF = auto()
+    # TODO: Remove this after it's not needed
+    DEVPRINT = auto()
     # TODO: Move the tokens after this to preprocessor
     DEFINE = auto()
     INCLUDE = auto()
@@ -129,6 +131,8 @@ TEXT_TO_TOKEN = {
     "[": TokenType.OP_LBRACK,
     "]": TokenType.OP_RBRACK,
     "==": TokenType.OP_SELF_ASSIGN,
+    # TODO: Remove this after it's not needed
+    "DEVPRINT": TokenType.DEVPRINT,
     # TODO: Remove the tokens after this to preprocessor
     # Keep in mind that comments can be used as no-ops in if/elseif/else(?), so it
     # might be better to keep them in the main parser

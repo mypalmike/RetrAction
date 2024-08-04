@@ -42,27 +42,6 @@ class TokenizeTestCase(unittest.TestCase):
             Token(TokenType.EOF, None),
         ]
 
-        # Token(TokenType.PLUS, None),
-        # Token(TokenType.MINUS, None),
-        # Token(TokenType.TIMES, None),
-        # Token(TokenType.DIVIDE, None),
-        # Token(TokenType.AND, None),
-        # Token(TokenType.MOD, None),
-        # Token(TokenType.NOT, None),
-        # Token(TokenType.EQUAL, None),
-        # Token(TokenType.NE, None),
-        # Token(TokenType.NE, None),
-        # Token(TokenType.GR, None),
-        # Token(TokenType.GE, None),
-        # Token(TokenType.LS, None),
-        # Token(TokenType.LE, None),
-        # Token(TokenType.CARET, None),
-        # Token(TokenType.AT, None),
-        # Token(TokenType.LPAREN, None),
-        # Token(TokenType.NE, None),
-        # Token(TokenType.RPAREN, None),
-        # Token(TokenType.EOF, None),
-
         tokens = tokenize(source_code)
         for token, expected_token in zip(tokens, expected_tokens):
             self.assertEqual(token.tok_type, expected_token.tok_type)

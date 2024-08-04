@@ -2,6 +2,7 @@ from enum import Enum
 
 from retraction.tokens import Token, TokenType
 from retraction.codegen import ByteCodeGen
+from retraction.bytecode import ByteCode
 from retraction.symtab import SymbolTable
 from retraction.tipes import BYTE_TIPE, CARD_TIPE, CHAR_TIPE, INT_TIPE, BaseTipe, Tipe
 
@@ -140,6 +141,9 @@ class Parser:
         self.directives = directives
         self.code_gen = code_gen
         self.symbol_table = symbol_table
+
+        # Parser state variables
+        self.parsing_params = False
 
     def current_token(self):
         if self.current_token_index < len(self.tokens):
@@ -668,24 +672,6 @@ class Parser:
             if not self.parse_stmt():
                 break
 
-        # while (
-        #     (
-        #         self.current_token()
-        #         in [
-        #             TokenType.IF,
-        #             TokenType.DO,
-        #             TokenType.WHILE,
-        #             TokenType.FOR,
-        #         ]
-        #     )
-        #     or (
-        #         self.current_token().type == TokenType.IDENTIFIER
-        #         and self.next_token().type == TokenType.EQUAL
-        #     )
-        #     or (self.current_token().type == TokenType.OP_LBRACK)
-        # ):
-        #     self.parse_stmt()
-
     # <stmt> ::= <simp stmt> | <struc stmt> | <code block>
     def parse_stmt(self) -> bool:
         if self.parse_simp_stmt():
@@ -698,6 +684,8 @@ class Parser:
 
     # <simp stmt> ::= <assign stmt> | <EXIT stmt> | <routine call>
     def parse_simp_stmt(self) -> bool:
+        if self.parse_devprint_stmt():
+            return True
         if self.parse_assign_stmt():
             return True
         if self.parse_exit_stmt():
@@ -706,11 +694,21 @@ class Parser:
             return True
         return False
 
+    def parse_devprint_stmt(self) -> bool:
+        if self.current_token().tok_type == TokenType.DEVPRINT:
+            self.advance()
+            self.consume(TokenType.OP_LPAREN)
+            self.parse_arith_exp()
+            self.consume(TokenType.OP_RPAREN)
+            self.code_gen.emit_devprint()
+            return True
+        return False
+
     # <assign stmt> ::= <mem contents>=<arith exp>
     def parse_assign_stmt(self) -> bool:
-        if self.next_token().tok_type == TokenType.EQUAL:
+        if self.next_token().tok_type == TokenType.OP_EQ:
             mem_contents = self.parse_mem_contents()
-            self.consume(TokenType.EQUAL)
+            self.consume(TokenType.OP_EQ)
             self.parse_arith_exp()
             self.code_gen.emit_assign_stmt(mem_contents)
             return True
@@ -731,7 +729,8 @@ class Parser:
     # Functions calls may NOT be used in an
     # arithmetic expression when that expression is used
     # as a parameter in a routine call or declaration."
-    def parse_routine_call(self):
+    def parse_routine_call(self) -> bool:
+        return False
         if self.parsing_params:
             raise SyntaxError(
                 "A function call may not be used as a parameter in a routine call or declaration"
@@ -739,10 +738,11 @@ class Parser:
         identifier = self.current_token().value
         self.consume(TokenType.IDENTIFIER)
         self.consume(TokenType.OP_LPAREN)
-        if self.current_token().tok_type != TokenType.RPAREN:
+        if self.current_token().tok_type != TokenType.OP_RPAREN:
             self.parse_params()
         self.consume(TokenType.OP_RPAREN)
-        self.code_gen.emit_routine_call(identifier)
+        # TODO: Implement this
+        # self.code_gen.emit_routine_call(identifier)
 
     # <params> ::= <params>,<arith exp> | <arith exp>
     def parse_params(self):
@@ -758,6 +758,14 @@ class Parser:
                     raise SyntaxError("Too many parameters (max 8)")
         finally:
             self.parsing_params = False
+
+    # <cond exp> ::= <complex rel>
+    # Note: This was not in the manual but it seems like they are synonymous
+    def parse_cond_exp(self) -> bool:
+        return self.parse_expression()
+
+    def parse_arith_exp(self) -> bool:
+        return self.parse_expression()
 
     # <struc stmt> ::= <IF stmt> | <DO loop> | <WHILE loop> | <FOR loop>
     def parse_struc_stmt(self) -> bool:
@@ -775,40 +783,38 @@ class Parser:
     def parse_if_stmt(self) -> bool:
         if self.current_token().tok_type != TokenType.IF:
             return False
+        jump_ends: list[ByteCode] = []
+
+        # If
         self.advance()
         self.parse_cond_exp()
         self.consume(TokenType.THEN)
+        jump_over = self.code_gen.emit_jump_if_false()
         self.parse_stmt_list()
-        while self.parse_elseif_exten():
-            pass
-        self.parse_else_exten()
+        jump_ends.append(self.code_gen.emit_jump())
+        jump_over.value = self.code_gen.get_next_addr()
+
+        # Elseif
+        while self.current_token().tok_type == TokenType.ELSEIF:
+            self.advance()
+            self.parse_cond_exp()
+            self.consume(TokenType.THEN)
+            jump_over = self.code_gen.emit_jump_if_false()
+            self.parse_stmt_list()
+            jump_ends.append(self.code_gen.emit_jump())
+            jump_over.value = self.code_gen.get_next_addr()
+
+        # Else
+        if self.current_token().tok_type == TokenType.ELSE:
+            self.advance()
+            self.parse_stmt_list()
+
+        # Fi
         self.consume(TokenType.FI)
-        return True
+        end_addr = self.code_gen.get_next_addr()
+        for jump_end in jump_ends:
+            jump_end.value = end_addr
 
-    # <cond exp> ::= <complex rel>
-    # Note: This was not in the manual but it seems like they are synonymous
-    def parse_cond_exp(self) -> bool:
-        return self.parse_expression()
-
-    def parse_arith_exp(self) -> bool:
-        return self.parse_expression()
-
-    # <ELSEIF exten> ::= ELSEIF <cond exp> THEN {stmt list}
-    def parse_elseif_exten(self) -> bool:
-        if self.current_token().tok_type != TokenType.ELSEIF:
-            return False
-        self.advance()
-        self.parse_cond_exp()
-        self.consume(TokenType.THEN)
-        self.parse_stmt_list()
-        return True
-
-    # <ELSE exten> ::= ELSE {stmt list}
-    def parse_else_exten(self) -> bool:
-        if self.current_token().tok_type != TokenType.ELSE:
-            return False
-        self.advance()
-        self.parse_stmt_list()
         return True
 
     # <DO loop> ::= DO {<stmt list>} {<UNTIL stmt>} OD
@@ -882,17 +888,23 @@ class Parser:
 
     def parse_expr_precedence(self, precedence: ExprPrecedence):
         self.advance()
+        if self.prev_token().tok_type not in EXPRESSION_RULES:
+            return
         prefix = EXPRESSION_RULES[self.prev_token().tok_type].prefix
         if prefix == ExprAction.NONE:
             raise SyntaxError(f"Expected expression: {self.prev_token()}")
         self.parse_expr_action(prefix)
 
+        if self.current_token().tok_type not in EXPRESSION_RULES:
+            return
         while (
             precedence.value
             <= EXPRESSION_RULES[self.current_token().tok_type].precedence.value
         ):
             self.advance()
             self.parse_expr_action(EXPRESSION_RULES[self.prev_token().tok_type].infix)
+            if self.current_token().tok_type not in EXPRESSION_RULES:
+                return
 
     def parse_expr_action(self, action: ExprAction):
         if action == ExprAction.NUMBER:

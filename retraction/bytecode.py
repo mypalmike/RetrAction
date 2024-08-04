@@ -22,6 +22,8 @@ class ByteCodeOp(Enum):
     OP_BIT_OR = auto()
     OP_BIT_XOR = auto()
     UNARY_MINUS = auto()
+    JUMP_IF_FALSE = auto()
+    JUMP = auto()
     CONSTANT = auto()
     # FUND_IDENT = auto()
     # PTR_IDENT = auto()
@@ -31,6 +33,8 @@ class ByteCodeOp(Enum):
     ROUTINE_CALL = auto()
     RETURN = auto()
     EXIT = auto()
+    # TODO: Remove when not needed
+    OP_DEVPRINT = auto()
 
 
 class ByteCode:

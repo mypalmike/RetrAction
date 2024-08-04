@@ -80,3 +80,43 @@ class ParserTestCase(unittest.TestCase):
             g_name, g_type = symbol_table.globals[g_index]
             self.assertEqual(g_name, name)
             self.assertEqual(g_type, type)
+
+    def test_if_stmt(self):
+        source_code = """
+        IF 1 < 3 THEN
+            DEVPRINT (1)
+        ELSEIF 2 < 3 THEN
+            DEVPRINT (2)
+        ELSE
+            DEVPRINT (3)
+        FI
+        """
+        tokens = tokenize(source_code)
+        directives = {}
+        symbol_table = SymbolTable()
+        codegen = ByteCodeGen(symbol_table)
+        parser = Parser(tokens, directives, codegen, symbol_table)
+        parser.parse_if_stmt()
+        expected_code = [
+            ByteCode(ByteCodeOp.CONSTANT, 0),  # 1
+            ByteCode(ByteCodeOp.CONSTANT, 1),  # 3
+            ByteCode(ByteCodeOp.OP_LT),  # 1 < 3
+            ByteCode(ByteCodeOp.JUMP_IF_FALSE, 7),  # Jump to ELSEIF
+            ByteCode(ByteCodeOp.CONSTANT, 2),  # 1
+            ByteCode(ByteCodeOp.OP_DEVPRINT),  # DEVPRINT(1)
+            ByteCode(ByteCodeOp.JUMP, 16),  # Jump to FI
+            ByteCode(ByteCodeOp.CONSTANT, 3),  # 2
+            ByteCode(ByteCodeOp.CONSTANT, 4),  # 3
+            ByteCode(ByteCodeOp.OP_LT),  # 2 < 3
+            ByteCode(ByteCodeOp.JUMP_IF_FALSE, 14),  # Jump to ELSE
+            ByteCode(ByteCodeOp.CONSTANT, 5),  # 2
+            ByteCode(ByteCodeOp.OP_DEVPRINT),  # DEVPRINT(2)
+            ByteCode(ByteCodeOp.JUMP, 16),  # Jump to FI
+            ByteCode(ByteCodeOp.CONSTANT, 6),  # 3
+            ByteCode(ByteCodeOp.OP_DEVPRINT),  # DEVPRINT(3)
+        ]
+        for i, expected_bytecode in enumerate(expected_code):
+            self.assertEqual(
+                codegen.code[i], expected_bytecode, f"Bytecode mismatch at index {i}"
+            )
+        self.assertEqual(parser.current_token().tok_type, TokenType.EOF)

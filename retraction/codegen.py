@@ -101,5 +101,21 @@ class ByteCodeGen:
     def emit_unary_minus(self):
         self.code.append(ByteCode(ByteCodeOp.UNARY_MINUS))
 
+    def emit_jump_if_false(self, addr: int | None = None) -> ByteCode:
+        byte_code = ByteCode(ByteCodeOp.JUMP_IF_FALSE, addr)
+        self.code.append(byte_code)
+        return byte_code
+
+    def emit_jump(self, addr: int | None = None) -> ByteCode:
+        byte_code = ByteCode(ByteCodeOp.JUMP, addr)
+        self.code.append(byte_code)
+        return byte_code
+
     def emit_constant(self, const_index):
         self.code.append(ByteCode(ByteCodeOp.CONSTANT, const_index))
+
+    def emit_devprint(self):
+        self.code.append(ByteCode(ByteCodeOp.OP_DEVPRINT))
+
+    def get_next_addr(self):
+        return len(self.code)
