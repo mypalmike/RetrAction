@@ -730,6 +730,12 @@ class Parser:
     # arithmetic expression when that expression is used
     # as a parameter in a routine call or declaration."
     def parse_routine_call(self) -> bool:
+        if self.current_token().tok_type != TokenType.IDENTIFIER:
+            return False
+        routine_name = self.current_token().value
+        if self.symbol_table.routines_lookup[routine_name] is None:
+            return False
+        # TODO: Finish the implementation
         return False
         if self.parsing_params:
             raise SyntaxError(
@@ -761,6 +767,11 @@ class Parser:
 
     # <cond exp> ::= <complex rel>
     # Note: This was not in the manual but it seems like they are synonymous
+    #
+    # Also worth noting, the grammar rules in the manual show that an expression like
+    # "1" is not a valid conditional expression. But in practice, the Action
+    # compiler cartridge allows it, e.g. "IF 1 THEN do_something() FI" compiles and
+    # runs as expected, treating nonzero values as true and zero as false
     def parse_cond_exp(self) -> bool:
         return self.parse_expression()
 
@@ -818,22 +829,25 @@ class Parser:
         return True
 
     # <DO loop> ::= DO {<stmt list>} {<UNTIL stmt>} OD
+    # <UNTIL stmt> ::= UNTIL <cond exp>
     def parse_do_loop(self) -> bool:
         if self.current_token().tok_type != TokenType.DO:
             return False
         self.advance()
+        jump_start = self.code_gen.get_next_addr()
         self.parse_stmt_list()
-        self.parse_until_stmt()
+        self.consume(TokenType.UNTIL)
+        self.parse_cond_exp()
         self.consume(TokenType.OD)
+        self.code_gen.emit_jump_if_false(jump_start)
         return True
 
-    # <UNTIL stmt> ::= UNTIL <cond exp>
-    def parse_until_stmt(self) -> bool:
-        if self.current_token().tok_type != TokenType.UNTIL:
-            return False
-        self.advance()
-        self.parse_cond_exp()
-        return True
+    # def parse_until_stmt(self) -> bool:
+    #     if self.current_token().tok_type != TokenType.UNTIL:
+    #         return False
+    #     self.advance()
+    #     self.parse_cond_exp()
+    #     return True
 
     # <WHILE loop> ::= WHILE <cond exp> <DO loop>
     def parse_while_loop(self) -> bool:

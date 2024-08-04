@@ -120,3 +120,53 @@ class ParserTestCase(unittest.TestCase):
                 codegen.code[i], expected_bytecode, f"Bytecode mismatch at index {i}"
             )
         self.assertEqual(parser.current_token().tok_type, TokenType.EOF)
+
+    def test_if_stmt_int_cond(self):
+        source_code = """
+        IF 1 THEN
+            DEVPRINT (1)
+        FI
+        """
+        tokens = tokenize(source_code)
+        directives = {}
+        symbol_table = SymbolTable()
+        codegen = ByteCodeGen(symbol_table)
+        parser = Parser(tokens, directives, codegen, symbol_table)
+        parser.parse_if_stmt()
+        expected_code = [
+            ByteCode(ByteCodeOp.CONSTANT, 0),  # 1
+            ByteCode(ByteCodeOp.JUMP_IF_FALSE, 5),  # Jump to ELSE
+            ByteCode(ByteCodeOp.CONSTANT, 1),  # 1
+            ByteCode(ByteCodeOp.OP_DEVPRINT),  # DEVPRINT(1)
+            ByteCode(ByteCodeOp.JUMP, 5),  # Jump to FI
+        ]
+        for i, expected_bytecode in enumerate(expected_code):
+            self.assertEqual(
+                codegen.code[i], expected_bytecode, f"Bytecode mismatch at index {i}"
+            )
+        self.assertEqual(parser.current_token().tok_type, TokenType.EOF)
+
+    def test_do_loop(self):
+        source_code = """
+        DO
+            DEVPRINT (1)
+        UNTIL 2
+        OD
+        """
+        tokens = tokenize(source_code)
+        directives = {}
+        symbol_table = SymbolTable()
+        codegen = ByteCodeGen(symbol_table)
+        parser = Parser(tokens, directives, codegen, symbol_table)
+        parser.parse_do_loop()
+        expected_code = [
+            ByteCode(ByteCodeOp.CONSTANT, 0),  # 1
+            ByteCode(ByteCodeOp.OP_DEVPRINT),  # DEVPRINT(1)
+            ByteCode(ByteCodeOp.CONSTANT, 1),  # 2
+            ByteCode(ByteCodeOp.JUMP_IF_FALSE, 0),  # Jump to DO
+        ]
+        for i, expected_bytecode in enumerate(expected_code):
+            self.assertEqual(
+                codegen.code[i], expected_bytecode, f"Bytecode mismatch at index {i}"
+            )
+        self.assertEqual(parser.current_token().tok_type, TokenType.EOF)

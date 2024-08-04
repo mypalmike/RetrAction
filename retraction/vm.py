@@ -90,6 +90,11 @@ class VirtualMachine:
                 if type(const_value) == str:
                     raise NotImplementedError
                 self.stack.append(const_value)
+            elif instr.op == ByteCodeOp.JUMP_IF_FALSE:
+                if not self.stack.pop():
+                    self.pc = instr.value
+            elif instr.op == ByteCodeOp.JUMP:
+                self.pc = instr.value
             elif instr.op == ByteCodeOp.ROUTINE_CALL:
                 routine = self.symbol_table.routines[instr.value]
                 raise NotImplementedError()
