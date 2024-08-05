@@ -58,6 +58,19 @@ class ParserTestCase(unittest.TestCase):
         for i, index in enumerate(expected_const_indices):
             self.assertEqual(symbol_table.constants[index], expected_const_values[i])
 
+    def test_arith_expr_nums(self):
+        source_code = "1 2 3"
+        tokens = tokenize(source_code)
+        directives = {}
+        symbol_table = SymbolTable()
+        codegen = ByteCodeGen(symbol_table)
+        parser = Parser(tokens, directives, codegen, symbol_table)
+        parser.parse_expression()
+        expected_code = [
+            ByteCode(ByteCodeOp.CONSTANT, 0),
+        ]
+        self.assertEqual(codegen.code, expected_code, "Should only parse first number")
+
     def test_system_decls(self):
         source_code = """
         BYTE somebyte

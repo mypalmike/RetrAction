@@ -1,4 +1,4 @@
-from enum import Enum
+from enum import Enum, auto
 
 from retraction.tokens import Token, TokenType
 from retraction.codegen import ByteCodeGen
@@ -36,11 +36,13 @@ class ExprPrecedence(Enum):
 
 
 class ExprAction(Enum):
-    NONE = 0
-    NUMBER = 1
-    GROUPING = 2
-    UNARY = 3
-    BINARY = 4
+    NONE = auto()
+    NUMBER = auto()
+    GROUPING = auto()
+    UNARY = auto()
+    BINARY = auto()
+    AND = auto()
+    OR = auto()
 
 
 class ExprRule:
@@ -103,8 +105,8 @@ EXPRESSION_RULES = {
     TokenType.OP_LE: ExprRule(
         ExprAction.NONE, ExprAction.BINARY, ExprPrecedence.COMPARE
     ),
-    TokenType.AND: ExprRule(ExprAction.NONE, ExprAction.BINARY, ExprPrecedence.AND),
-    TokenType.OR: ExprRule(ExprAction.NONE, ExprAction.BINARY, ExprPrecedence.OR),
+    TokenType.AND: ExprRule(ExprAction.NONE, ExprAction.AND, ExprPrecedence.AND),
+    TokenType.OR: ExprRule(ExprAction.NONE, ExprAction.OR, ExprPrecedence.OR),
     TokenType.XOR: ExprRule(ExprAction.NONE, ExprAction.BINARY, ExprPrecedence.XOR),
     TokenType.OP_BIT_AND: ExprRule(
         ExprAction.NONE, ExprAction.BINARY, ExprPrecedence.AND
@@ -836,10 +838,14 @@ class Parser:
         self.advance()
         jump_start = self.code_gen.get_next_addr()
         self.parse_stmt_list()
-        self.consume(TokenType.UNTIL)
-        self.parse_cond_exp()
-        self.consume(TokenType.OD)
-        self.code_gen.emit_jump_if_false(jump_start)
+        if self.current_token().tok_type == TokenType.UNTIL:
+            self.advance()
+            self.parse_cond_exp()
+            self.code_gen.emit_jump_if_false(jump_start)
+            self.consume(TokenType.OD)
+        else:
+            self.consume(TokenType.OD)
+            self.code_gen.emit_jump(jump_start)
         return True
 
     # <WHILE loop> ::= WHILE <cond exp> <DO loop>
@@ -872,6 +878,7 @@ class Parser:
     def parse_for_loop(self) -> bool:
         if self.current_token().tok_type != TokenType.FOR:
             return False
+        raise NotImplementedError()
         self.advance()
         identifier = self.consume(TokenType.IDENTIFIER).value
         self.consume(TokenType.EQUAL)
@@ -936,6 +943,10 @@ class Parser:
             self.parse_unary()
         elif action == ExprAction.BINARY:
             self.parse_binary()
+        elif action == ExprAction.AND:
+            self.parse_and()
+        elif action == ExprAction.OR:
+            self.parse_or()
 
     def parse_number(self):
         value = None
@@ -989,10 +1000,6 @@ class Parser:
             self.code_gen.emit_lt()
         elif operator_type == TokenType.OP_LE:
             self.code_gen.emit_le()
-        elif operator_type == TokenType.AND:
-            self.code_gen.emit_and()
-        elif operator_type == TokenType.OR:
-            self.code_gen.emit_or()
         elif operator_type == TokenType.XOR:
             self.code_gen.emit_xor()
         elif operator_type == TokenType.OP_BIT_AND:
@@ -1002,19 +1009,18 @@ class Parser:
         elif operator_type == TokenType.OP_BIT_XOR:
             self.code_gen.emit_bit_xor()
 
-    # def parse_comp_const(self):
+    def parse_and(self):
+        # AND is a short-circuiting operator
+        jump_end = self.code_gen.emit_jump_if_false()
+        self.code_gen.emit_pop()
+        self.parse_expr_precedence(ExprPrecedence.AND)
+        jump_end.value = self.code_gen.get_next_addr()
 
-    # def parse_param_decl(self):
-    #     # Implement the parsing logic for <param decl>
-    #     # For now, just return a placeholder
-    #     return {"type": "param_decl"}
-
-    # def parse_system_decls(self):
-    #     # Implement the parsing logic for <system decls>
-    #     # For now, just return a placeholder
-    #     return {"type": "system_decls"}
-
-    # def parse_stmt_list(self):
-    #     # Implement the parsing logic for <stmt list>
-    #     # For now, just return a placeholder
-    #     return {"type": "stmt_list"}
+    def parse_or(self):
+        # OR is a short-circuiting operator
+        jump_else = self.code_gen.emit_jump_if_false()
+        jump_end = self.code_gen.emit_jump()
+        jump_else.value = self.code_gen.get_next_addr()
+        self.code_gen.emit_pop()
+        self.parse_expr_precedence(ExprPrecedence.OR)
+        jump_end.value = self.code_gen.get_next_addr()

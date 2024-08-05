@@ -80,12 +80,6 @@ class ByteCodeGen:
     def emit_le(self):
         self.code.append(ByteCode(ByteCodeOp.OP_LE))
 
-    def emit_and(self):
-        self.code.append(ByteCode(ByteCodeOp.AND))
-
-    def emit_or(self):
-        self.code.append(ByteCode(ByteCodeOp.OR))
-
     def emit_xor(self):
         self.code.append(ByteCode(ByteCodeOp.XOR))
 
@@ -110,6 +104,9 @@ class ByteCodeGen:
         byte_code = ByteCode(ByteCodeOp.JUMP, addr)
         self.code.append(byte_code)
         return byte_code
+
+    def emit_pop(self):
+        self.code.append(ByteCode(ByteCodeOp.POP))
 
     def emit_constant(self, const_index):
         self.code.append(ByteCode(ByteCodeOp.CONSTANT, const_index))
