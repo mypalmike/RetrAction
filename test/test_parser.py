@@ -209,3 +209,61 @@ class ParserTestCase(unittest.TestCase):
                 codegen.code[i], expected_bytecode, f"Bytecode mismatch at index {i}"
             )
         self.assertEqual(parser.current_token().tok_type, TokenType.EOF)
+
+    def test_exit_stmt(self):
+        source_code = """
+        WHILE 1
+        DO
+          IF 2 THEN
+            DEVPRINT (3)
+            EXIT
+            DEVPRINT (4)
+          FI
+          DO
+            DEVPRINT (5)
+            DO
+              DEVPRINT (6)
+              EXIT
+              DEVPRINT (7)
+            OD
+          OD
+          EXIT
+          DEVPRINT (8)
+        OD
+        """
+        tokens = tokenize(source_code)
+        directives = {}
+        symbol_table = SymbolTable()
+        codegen = ByteCodeGen(symbol_table)
+        parser = Parser(tokens, directives, codegen, symbol_table)
+        parser.parse_while_loop()
+        expected_code = [
+            ByteCode(ByteCodeOp.CONSTANT, 0),  # 1 [0]
+            ByteCode(ByteCodeOp.JUMP_IF_FALSE, 23),  # Jump to OD [1]
+            ByteCode(ByteCodeOp.CONSTANT, 1),  # 2 [2]
+            ByteCode(ByteCodeOp.JUMP_IF_FALSE, 10),  # Jump to DO [3]
+            ByteCode(ByteCodeOp.CONSTANT, 2),  # 3 [4]
+            ByteCode(ByteCodeOp.OP_DEVPRINT),  # DEVPRINT(3) [5]
+            ByteCode(ByteCodeOp.JUMP, 23),  # Jump to OD [6]
+            ByteCode(ByteCodeOp.CONSTANT, 3),  # 4 [7]
+            ByteCode(ByteCodeOp.OP_DEVPRINT),  # DEVPRINT(4) [8]
+            ByteCode(ByteCodeOp.JUMP, 10),  # Jump to OD [9]
+            ByteCode(ByteCodeOp.CONSTANT, 4),  # 5 [10]
+            ByteCode(ByteCodeOp.OP_DEVPRINT),  # DEVPRINT(5) [11]
+            ByteCode(ByteCodeOp.CONSTANT, 5),  # 6 [12]
+            ByteCode(ByteCodeOp.OP_DEVPRINT),  # DEVPRINT(6) [13]
+            ByteCode(ByteCodeOp.JUMP, 18),  # Jump to OD [14]
+            ByteCode(ByteCodeOp.CONSTANT, 6),  # 7 [15]
+            ByteCode(ByteCodeOp.OP_DEVPRINT),  # DEVPRINT(7) [16]
+            ByteCode(ByteCodeOp.JUMP, 12),  # Jump to OD [17]
+            ByteCode(ByteCodeOp.JUMP, 10),  # Jump to OD [18]
+            ByteCode(ByteCodeOp.JUMP, 23),  # 8 [19]
+            ByteCode(ByteCodeOp.CONSTANT, 7),  # 9 [20]
+            ByteCode(ByteCodeOp.OP_DEVPRINT),  # DEVPRINT(8) [21]
+            ByteCode(ByteCodeOp.JUMP, 0),  # Jump to WHILE [22]
+        ]
+        for i, expected_bytecode in enumerate(expected_code):
+            self.assertEqual(
+                codegen.code[i], expected_bytecode, f"Bytecode mismatch at index {i}"
+            )
+        self.assertEqual(parser.current_token().tok_type, TokenType.EOF)

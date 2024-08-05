@@ -146,6 +146,7 @@ class Parser:
 
         # Parser state variables
         self.parsing_params = False
+        self.exits_to_patch: list[list[ByteCode]] = []
 
     def current_token(self):
         if self.current_token_index < len(self.tokens):
@@ -697,32 +698,36 @@ class Parser:
         return False
 
     def parse_devprint_stmt(self) -> bool:
-        if self.current_token().tok_type == TokenType.DEVPRINT:
-            self.advance()
-            self.consume(TokenType.OP_LPAREN)
-            self.parse_arith_exp()
-            self.consume(TokenType.OP_RPAREN)
-            self.code_gen.emit_devprint()
-            return True
-        return False
+        if self.current_token().tok_type != TokenType.DEVPRINT:
+            return False
+        self.advance()
+        self.consume(TokenType.OP_LPAREN)
+        self.parse_arith_exp()
+        self.consume(TokenType.OP_RPAREN)
+        self.code_gen.emit_devprint()
+        return True
 
     # <assign stmt> ::= <mem contents>=<arith exp>
     def parse_assign_stmt(self) -> bool:
-        if self.next_token().tok_type == TokenType.OP_EQ:
-            mem_contents = self.parse_mem_contents()
-            self.consume(TokenType.OP_EQ)
-            self.parse_arith_exp()
-            self.code_gen.emit_assign_stmt(mem_contents)
-            return True
-        return False
+        if self.next_token().tok_type != TokenType.OP_EQ:
+            return False
+        mem_contents = self.parse_mem_contents()
+        self.consume(TokenType.OP_EQ)
+        self.parse_arith_exp()
+        self.code_gen.emit_assign_stmt(mem_contents)
+        return True
 
     # <EXIT stmt> ::= EXIT
     def parse_exit_stmt(self) -> bool:
-        if self.current_token().tok_type == TokenType.EXIT:
-            self.advance()
-            self.code_gen.emit_exit()
-            return True
-        return False
+        if self.current_token().tok_type != TokenType.EXIT:
+            return False
+        self.advance()
+        if len(self.exits_to_patch) == 0:
+            raise SyntaxError("EXIT statement outside of loop")
+        # This gets patched at the end of the loop with the address following the loop
+        jump_exit = self.code_gen.emit_jump()
+        self.exits_to_patch[-1].append(jump_exit)
+        return True
 
     # <routine call> ::= <FUNC call> | <PROC call>
     # <FUNC call> ::= <identifier>({<params>})
@@ -830,12 +835,25 @@ class Parser:
 
         return True
 
+    # Helper function to set up exit patching
+    def prepare_exits(self):
+        self.exits_to_patch.append([])
+
+    # Helper function for patching exits at the end of loops
+    def patch_exits(self):
+        exits_to_patch = self.exits_to_patch.pop()
+        if exits_to_patch:
+            next_addr = self.code_gen.get_next_addr()
+            for jump_exit in exits_to_patch:
+                jump_exit.value = next_addr
+
     # <DO loop> ::= DO {<stmt list>} {<UNTIL stmt>} OD
     # <UNTIL stmt> ::= UNTIL <cond exp>
     def parse_do_loop(self) -> bool:
         if self.current_token().tok_type != TokenType.DO:
             return False
         self.advance()
+        self.prepare_exits()
         jump_start = self.code_gen.get_next_addr()
         self.parse_stmt_list()
         if self.current_token().tok_type == TokenType.UNTIL:
@@ -846,6 +864,7 @@ class Parser:
         else:
             self.consume(TokenType.OD)
             self.code_gen.emit_jump(jump_start)
+        self.patch_exits()
         return True
 
     # <WHILE loop> ::= WHILE <cond exp> <DO loop>
@@ -856,6 +875,7 @@ class Parser:
         if self.current_token().tok_type != TokenType.WHILE:
             return False
         self.advance()
+        self.prepare_exits()
         jump_start = self.code_gen.get_next_addr()
         self.parse_cond_exp()
         jump_end = self.code_gen.emit_jump_if_false()
@@ -867,8 +887,10 @@ class Parser:
             self.code_gen.emit_jump_if_false(jump_start)
         else:
             self.code_gen.emit_jump(jump_start)
-        jump_end.value = self.code_gen.get_next_addr()
         self.consume(TokenType.OD)
+        jump_end.value = self.code_gen.get_next_addr()
+        self.patch_exits()
+
         return True
 
     # <FOR loop> ::= FOR <identifier>=<start> TO <finish> {STEP <inc>}<DO loop>
@@ -880,6 +902,7 @@ class Parser:
             return False
         raise NotImplementedError()
         self.advance()
+        self.prepare_exits()
         identifier = self.consume(TokenType.IDENTIFIER).value
         self.consume(TokenType.EQUAL)
         self.parse_arith_exp()
@@ -889,6 +912,7 @@ class Parser:
             self.advance()
             self.parse_arith_exp()
         self.parse_do_loop()
+        self.patch_exits()
         return True
 
     # <code block> ::= [<comp const list>]

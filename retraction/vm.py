@@ -101,8 +101,6 @@ class VirtualMachine:
             elif instr.op == ByteCodeOp.RETURN:
                 # TODO: Is this right?
                 self.pc = self.stack.pop()
-            elif instr.op == ByteCodeOp.EXIT:
-                raise NotImplementedError()
             elif instr.op == ByteCodeOp.OP_DEVPRINT:
                 print(self.stack.pop())
             else:

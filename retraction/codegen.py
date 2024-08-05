@@ -32,9 +32,6 @@ class ByteCodeGen:
         self.code: list[ByteCode] = []
         self.addr = start_addr
 
-    def emit_exit(self):
-        self.code.append(ByteCode(ByteCodeOp.EXIT))
-
     def emit_routine_call(self, identifier, params):
         self.code.append(ByteCode(ByteCodeOp.ROUTINE_CALL, identifier))
 
