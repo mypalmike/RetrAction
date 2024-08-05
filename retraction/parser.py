@@ -842,20 +842,27 @@ class Parser:
         self.code_gen.emit_jump_if_false(jump_start)
         return True
 
-    # def parse_until_stmt(self) -> bool:
-    #     if self.current_token().tok_type != TokenType.UNTIL:
-    #         return False
-    #     self.advance()
-    #     self.parse_cond_exp()
-    #     return True
-
     # <WHILE loop> ::= WHILE <cond exp> <DO loop>
+    # <DO loop> ::= DO {<stmt list>} {<UNTIL stmt>} OD
+    # <UNTIL stmt> ::= UNTIL <cond exp>
+    # Note: Yes,  WHILE loop can also have an UNTIL statement
     def parse_while_loop(self) -> bool:
         if self.current_token().tok_type != TokenType.WHILE:
             return False
         self.advance()
+        jump_start = self.code_gen.get_next_addr()
         self.parse_cond_exp()
-        self.parse_do_loop()
+        jump_end = self.code_gen.emit_jump_if_false()
+        self.consume(TokenType.DO)
+        self.parse_stmt_list()
+        if self.current_token().tok_type == TokenType.UNTIL:
+            self.advance()
+            self.parse_cond_exp()
+            self.code_gen.emit_jump_if_false(jump_start)
+        else:
+            self.code_gen.emit_jump(jump_start)
+        jump_end.value = self.code_gen.get_next_addr()
+        self.consume(TokenType.OD)
         return True
 
     # <FOR loop> ::= FOR <identifier>=<start> TO <finish> {STEP <inc>}<DO loop>

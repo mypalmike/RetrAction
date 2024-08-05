@@ -170,3 +170,29 @@ class ParserTestCase(unittest.TestCase):
                 codegen.code[i], expected_bytecode, f"Bytecode mismatch at index {i}"
             )
         self.assertEqual(parser.current_token().tok_type, TokenType.EOF)
+
+    def test_while_loop(self):
+        source_code = """
+        WHILE 1
+        DO
+            DEVPRINT (2)
+        OD
+        """
+        tokens = tokenize(source_code)
+        directives = {}
+        symbol_table = SymbolTable()
+        codegen = ByteCodeGen(symbol_table)
+        parser = Parser(tokens, directives, codegen, symbol_table)
+        parser.parse_while_loop()
+        expected_code = [
+            ByteCode(ByteCodeOp.CONSTANT, 0),  # 1
+            ByteCode(ByteCodeOp.JUMP_IF_FALSE, 5),  # Jump to OD
+            ByteCode(ByteCodeOp.CONSTANT, 1),  # 2
+            ByteCode(ByteCodeOp.OP_DEVPRINT),  # DEVPRINT(2)
+            ByteCode(ByteCodeOp.JUMP, 0),  # Jump to WHILE
+        ]
+        for i, expected_bytecode in enumerate(expected_code):
+            self.assertEqual(
+                codegen.code[i], expected_bytecode, f"Bytecode mismatch at index {i}"
+            )
+        self.assertEqual(parser.current_token().tok_type, TokenType.EOF)
