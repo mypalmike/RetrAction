@@ -71,29 +71,6 @@ class ParserTestCase(unittest.TestCase):
         ]
         self.assertEqual(codegen.code, expected_code, "Should only parse first number")
 
-    def test_system_decls(self):
-        source_code = """
-        BYTE somebyte
-        CARD somecard
-        INT someint
-        """
-        tokens = tokenize(source_code)
-        directives = {}
-        symbol_table = SymbolTable()
-        codegen = ByteCodeGen(symbol_table)
-        parser = Parser(tokens, directives, codegen, symbol_table)
-        parser.parse_system_decls()
-        for name, type in [
-            ("somebyte", BYTE_TIPE),
-            ("somecard", CARD_TIPE),
-            ("someint", INT_TIPE),
-        ]:
-            self.assertTrue(symbol_table.symbol_exists(name))
-            g_index = symbol_table.globals_lookup[name]
-            g_name, g_type = symbol_table.globals[g_index]
-            self.assertEqual(g_name, name)
-            self.assertEqual(g_type, type)
-
     def test_if_stmt(self):
         source_code = """
         IF 1 < 3 THEN
@@ -267,3 +244,27 @@ class ParserTestCase(unittest.TestCase):
                 codegen.code[i], expected_bytecode, f"Bytecode mismatch at index {i}"
             )
         self.assertEqual(parser.current_token().tok_type, TokenType.EOF)
+
+    def test_system_decls(self):
+        source_code = """
+        BYTE somebyte
+        CARD somecard
+        INT someint
+        """
+        tokens = tokenize(source_code)
+        directives = {}
+        symbol_table = SymbolTable()
+        codegen = ByteCodeGen(symbol_table)
+        parser = Parser(tokens, directives, codegen, symbol_table)
+        parser.parse_system_decls()
+        for name, type, value in [
+            ("somebyte", BYTE_TIPE, 0),
+            ("somecard", CARD_TIPE, 0),
+            ("someint", INT_TIPE, 0),
+        ]:
+            self.assertTrue(symbol_table.symbol_exists(name))
+            g_index = symbol_table.globals_lookup[name]
+            g_name, g_type, g_value = symbol_table.globals[g_index]
+            self.assertEqual(g_name, name)
+            self.assertEqual(g_type, type)
+            self.assertEqual(g_value, value)

@@ -4,8 +4,8 @@ from retraction.tipes import RecordTipe, Tipe, RoutineSignature
 class SymbolTable:
     def __init__(self):
         self.constants: list[str | int] = []
-        self.globals: list[tuple[str, Tipe]] = []
-        self.locals: list[tuple[int, str, Tipe]] = []
+        self.globals: list[tuple[str, Tipe, int]] = []
+        self.locals: list[tuple[int, str, Tipe, int]] = []
         self.routines = list[RoutineSignature]
         self.types: list[RecordTipe] = []
         self.globals_lookup: dict[str, int] = {}
@@ -29,17 +29,19 @@ class SymbolTable:
         if self.symbol_exists(name):
             raise ValueError(f"Symbol {name} already exists")
 
-    def declare_global(self, name: str, var_type: Tipe):
+    def declare_global(self, name: str, var_type: Tipe, initial_value: int = 0):
         self.check_no_symbol(name)
         next_index = len(self.globals)
-        self.globals.append((name, var_type))
+        self.globals.append((name, var_type, initial_value))
         self.globals_lookup[name] = next_index
         return next_index
 
-    def declare_local(self, routine_index: int, name: str, type: Tipe):
+    def declare_local(
+        self, routine_index: int, name: str, type: Tipe, initial_value: int = 0
+    ):
         self.check_no_symbol(name)
         next_index = len(self.locals)
-        self.locals.append((routine_index, name, type))
+        self.locals.append((routine_index, name, type, initial_value))
         self.locals_lookup[name] = next_index
         return next_index
 

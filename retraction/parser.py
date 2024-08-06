@@ -6,8 +6,6 @@ from retraction.bytecode import ByteCode
 from retraction.symtab import SymbolTable
 from retraction.tipes import BYTE_TIPE, CARD_TIPE, CHAR_TIPE, INT_TIPE, BaseTipe, Tipe
 
-# from retraction.expression import ExpressionNode, StubExpressionNode
-
 
 class SyntaxError(Exception):
     pass
@@ -31,8 +29,6 @@ class ExprPrecedence(Enum):
     TERM = 5
     FACTOR = 6
     UNARY = 7
-    # PARENTHESIS = 8
-    # HIGHEST = 9
 
 
 class ExprAction(Enum):
@@ -503,34 +499,87 @@ class Parser:
     # without ExpreressionNodes
     # -----------------
     # <mem reference> ::= <mem contents> | @<identifier>
-    # def parse_mem_reference(self) -> ExpressionNode | None:
-    #     mem_contents = self.parse_mem_contents()
-    #     if mem_contents:
-    #         return mem_contents
-    #     if self.current_token().type == TokenType.AT:
-    #         self.advance()
-    #         identifier = self.current_token().value
-    #         self.consume(TokenType.IDENTIFIER)
-    #         return StubExpressionNode(f"mem_ref(@{identifier})")
-    #     return None
+    # <mem contents> ::= <fund ref> | <arr ref> | <ptr ref> | <rec ref>
+    # <fund ref> ::= <identifier>
+    # <arr ref> ::= <identifier>(<arith exp>)
+    # <ptr ref> ::= <identifier>^
+    # <rec ref> ::= <identifier>.<identifier>
+    def parse_mem_reference(self):
+        if (
+            self.current_token().tok_type == TokenType.AT
+            and self.next_token().tok_type == TokenType.IDENTIFIER
+            and self.next_token().value in self.symbol_table.globals_lookup
+        ):
+            self.advance()
+            identifier = self.consume(TokenType.IDENTIFIER).value
+            self.code_gen.emit_get_global_ref(identifier)
+        elif (
+            self.current_token().tok_type == TokenType.IDENTIFIER
+            and self.current_token().value in self.symbol_table.globals_lookup
+        ):
+            if self.next_token().tok_type == TokenType.LPAREN:
+                # Handle array reference
+                raise NotImplementedError()
+            elif self.next_token().tok_type == TokenType.PERIOD:
+                # Handle record reference
+                raise NotImplementedError()
+            elif self.next_token().tok_type == TokenType.CARET:
+                raise NotImplementedError()
+            else:
+                # TODO: Deal with locals. Just do globals for now
+                identifier = self.consume(TokenType.IDENTIFIER).value
+                global_index = self.symbol_table.globals_lookup.get(identifier)
+                if global_index is None:
+                    raise SyntaxError(f"Undefined variable: {identifier}")
+                self.code_gen.emit_get_global(global_index)
+        # mem_contents = self.parse_mem_contents()
+        # if mem_contents:
+        #     return mem_contents
+        # if self.current_token().type == TokenType.AT:
+        #     self.advance()
+        #     identifier = self.current_token().value
+        #     self.consume(TokenType.IDENTIFIER)
+        #     # return StubExpressionNode(f"mem_ref(@{identifier})")
+        # return None
 
-    # # <mem contents> ::= <fund ref> | <arr ref> | <ptr ref> | <rec ref>
-    # def parse_mem_contents(self) -> ExpressionNode | None:
-    #     arr_ref = self.parse_arr_ref()
-    #     if arr_ref:
-    #         return arr_ref
-    #     ptr_ref = self.parse_ptr_ref()
-    #     if ptr_ref:
-    #         return ptr_ref
-    #     rec_ref = self.parse_rec_ref()
-    #     if rec_ref:
-    #         return rec_ref
-    #     # Note: This has to be last because it will match any identifier, whereas the others
-    #     # match an identifier followed by specific "next" tokens that they look for (e.g. LPAREN, CARET, PERIOD)
-    #     fund_ref = self.parse_fund_ref()
-    #     if fund_ref:
-    #         return fund_ref
-    #     return None
+    # <mem contents> ::= <fund ref> | <arr ref> | <ptr ref> | <rec ref>
+    # <fund ref> ::= <identifier>
+    # <arr ref> ::= <identifier>(<arith exp>)
+    # <ptr ref> ::= <identifier>^
+    # <rec ref> ::= <identifier>.<identifier>
+    # def parse_mem_contents(self):
+    #     if self.next_token().tok_type == TokenType.LPAREN:
+    #         # Handle array reference
+    #         raise NotImplementedError()
+    #     elif self.next_token().tok_type == TokenType.PERIOD:
+    #         # Handle record reference
+    #         raise NotImplementedError()
+    #     elif self.next_token().tok_type == TokenType.CARET:
+    #         # Handle pointer reference
+    #         raise NotImplementedError()
+    #     else:
+    #         # TODO: Deal with locals. Just do globals for now
+    #         identifier = self.consume(TokenType.IDENTIFIER).value
+    #         global_index = self.symbol_table.globals_lookup.get(identifier)
+    #         if global_index is None:
+    #             raise SyntaxError(f"Undefined variable: {identifier}")
+    #         self.code_gen.emit_get_global(global_index)
+
+    # arr_ref = self.parse_arr_ref()
+    # if arr_ref:
+    #     return arr_ref
+    # ptr_ref = self.parse_ptr_ref()
+    # if ptr_ref:
+    #     return ptr_ref
+    # rec_ref = self.parse_rec_ref()
+    # if rec_ref:
+    #     return rec_ref
+    # # Note: This has to be last because it will match any identifier, whereas the others
+    # # match an identifier followed by specific "next" tokens that they look for (e.g. LPAREN, CARET, PERIOD)
+    # fund_ref = self.parse_fund_ref()
+    # if fund_ref:
+    #     return fund_ref
+    # return None
 
     # <arr ref> ::= <identifier>(<arith exp>)
     # def parse_arr_ref(self) -> ExpressionNode | None:
@@ -708,14 +757,26 @@ class Parser:
         return True
 
     # <assign stmt> ::= <mem contents>=<arith exp>
+    # <mem contents> ::= <fund ref> | <arr ref> | <ptr ref> | <rec ref>
+    # <fund ref> ::= <identifier>
+    # <arr ref> ::= <identifier>(<arith exp>)
+    # <ptr ref> ::= <identifier>^
+    # <rec ref> ::= <identifier>.<identifier>
     def parse_assign_stmt(self) -> bool:
-        if self.next_token().tok_type != TokenType.OP_EQ:
+        if self.current_token().tok_type != TokenType.IDENTIFIER:
             return False
-        mem_contents = self.parse_mem_contents()
-        self.consume(TokenType.OP_EQ)
+        identifier = self.current_token().value
+        self.advance()
+        if self.current_token().tok_type != TokenType.OP_EQ:
+            return False
+        self.advance()
         self.parse_arith_exp()
-        self.code_gen.emit_assign_stmt(mem_contents)
-        return True
+        # TODO: Handle arrays, pointers, and records
+        # For now, just emit for simple global identifier
+        global_index = self.symbol_table.globals_lookup.get(identifier)
+        if global_index is None:
+            raise SyntaxError(f"Undefined variable: {identifier}")
+        self.code_gen.emit_set_global(global_index)
 
     # <EXIT stmt> ::= EXIT
     def parse_exit_stmt(self) -> bool:

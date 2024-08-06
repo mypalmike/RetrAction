@@ -26,6 +26,8 @@ class ByteCodeOp(Enum):
     CONSTANT = auto()
     ROUTINE_CALL = auto()
     RETURN = auto()
+    GET_GLOBAL = auto()
+    SET_GLOBAL = auto()
     # TODO: Remove when not needed
     OP_DEVPRINT = auto()
 
