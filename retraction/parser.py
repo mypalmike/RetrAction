@@ -158,11 +158,6 @@ class Parser:
             return self.tokens[self.current_token_index + 1]
         return None
 
-    def prev_token(self):
-        if self.current_token_index > 0:
-            return self.tokens[self.current_token_index - 1]
-        return None
-
     def advance(self):
         self.current_token_index += 1
 
@@ -172,12 +167,6 @@ class Parser:
             raise SyntaxError(f"Expected token {token_type}, got {token}")
         self.advance()
         return token
-
-        # if self.current_token() is None or self.current_token().type != token_type:
-        #     raise SyntaxError(
-        #         f"Expected token {token_type}, got {self.current_token()}"
-        #     )
-        # self.advance()
 
     def parse_dev(self):
         self.parse_expression()
@@ -368,14 +357,6 @@ class Parser:
             # TODO: Deal with locals
             ident_index = self.symbol_table.declare_global(identifier, tipe)
         return True
-
-        # identifier = self.current_token().value
-        # self.expect(TokenType.IDENTIFIER)
-        # if self.current_token().type == TokenType.EQUAL:
-        #     self.advance()
-        #     self.parse_init_opts(fund_type, identifier)
-        # else:
-        #     self.code_gen.emit_fund_ident(fund_type, identifier)
 
     # <init opts> ::= <addr> | [<value>]
     def parse_init_opts(self, fund_type: TokenType, identifier: str) -> bool:
@@ -1004,12 +985,15 @@ class Parser:
         self.parse_expr_precedence(ExprPrecedence.XOR)
 
     def parse_expr_precedence(self, precedence: ExprPrecedence):
-        self.advance()
-        if self.prev_token().tok_type not in EXPRESSION_RULES:
+        # self.advance()
+        print(
+            f"parse_expr_precedence: current_token: {self.current_token()}, precedence: {precedence}"
+        )
+        if self.current_token().tok_type not in EXPRESSION_RULES:
             return
-        prefix = EXPRESSION_RULES[self.prev_token().tok_type].prefix
+        prefix = EXPRESSION_RULES[self.current_token().tok_type].prefix
         if prefix == ExprAction.NONE:
-            raise SyntaxError(f"Expected expression: {self.prev_token()}")
+            raise SyntaxError(f"Expected prefix expression: {self.current_token()}")
         self.parse_expr_action(prefix)
 
         if self.current_token().tok_type not in EXPRESSION_RULES:
@@ -1018,10 +1002,13 @@ class Parser:
             precedence.value
             <= EXPRESSION_RULES[self.current_token().tok_type].precedence.value
         ):
-            self.advance()
-            self.parse_expr_action(EXPRESSION_RULES[self.prev_token().tok_type].infix)
+            # self.advance()
+            self.parse_expr_action(
+                EXPRESSION_RULES[self.current_token().tok_type].infix
+            )
             if self.current_token().tok_type not in EXPRESSION_RULES:
                 return
+        # self.advance()
 
     def parse_expr_action(self, action: ExprAction):
         if action == ExprAction.NUMBER:
@@ -1041,27 +1028,35 @@ class Parser:
 
     def parse_number(self):
         value = None
-        if self.prev_token().tok_type == TokenType.INT_LITERAL:
-            value = int(self.prev_token().value)
-        elif self.prev_token().tok_type == TokenType.HEX_LITERAL:
-            value = int(self.prev_token().value, 16)
+        if self.current_token().tok_type == TokenType.INT_LITERAL:
+            value = int(self.current_token().value)
+        elif self.current_token().tok_type == TokenType.HEX_LITERAL:
+            value = int(self.current_token().value, 16)
+        else:
+            raise SyntaxError(
+                f"Unexpected token in parse_number: {self.current_token()}"
+            )
         if value < -65535 or value > 65535:
             raise SyntaxError(f"Numeric literal {value} out of range [-65535, 65535]")
+        self.advance()
         const_index = self.symbol_table.declare_constant(value)
         self.code_gen.emit_constant(const_index)
 
     def parse_grouping(self):
+        self.advance()
         self.parse_expression()
         self.consume(TokenType.OP_RPAREN)
 
     def parse_unary(self):
-        operator_type = self.prev_token().tok_type
+        operator_type = self.current_token().tok_type
         self.parse_expr_precedence(ExprPrecedence.UNARY)
         if operator_type == TokenType.OP_MINUS:
             self.code_gen.emit_unary_minus()
+        self.advance()
 
     def parse_binary(self):
-        operator_type = self.prev_token().tok_type
+        operator_type = self.current_token().tok_type
+        self.advance()
         rule = EXPRESSION_RULES[operator_type]
         self.parse_expr_precedence(ExprPrecedence(rule.precedence.value + 1))
 
@@ -1104,6 +1099,7 @@ class Parser:
         # AND is a short-circuiting operator
         jump_end = self.code_gen.emit_jump_if_false()
         self.code_gen.emit_pop()
+        self.advance()
         self.parse_expr_precedence(ExprPrecedence.AND)
         jump_end.value = self.code_gen.get_next_addr()
 
@@ -1113,19 +1109,17 @@ class Parser:
         jump_end = self.code_gen.emit_jump()
         jump_else.value = self.code_gen.get_next_addr()
         self.code_gen.emit_pop()
+        self.advance()
         self.parse_expr_precedence(ExprPrecedence.OR)
         jump_end.value = self.code_gen.get_next_addr()
 
     def parse_identifier(self):
         # An identifier in an expression might be a variable of some sort
         # or a function call
-        identifier = self.prev_token().value
+        identifier = self.current_token().value
         if self.symbol_table.globals_lookup.get(identifier) is not None:
-            # TODO: Should call parse_mem_reference to deal with arrays, etc., but...
-            # We are a token ahead at this point because the expression parser is look-behind.
-            # So this is a place where we run into a conflict because the expression parser
-            # is look-behind and the rest is look-ahead. One or the other needs to change
-            # (probably look-ahead is best)
+            # TODO: Should call parse_mem_reference to deal with arrays.
             self.code_gen.emit_get_global(self.symbol_table.globals_lookup[identifier])
+            self.advance()
         else:
             raise NotImplemented("Function calls in expressions not yet implemented")
