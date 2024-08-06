@@ -297,3 +297,32 @@ class ParserTestCase(unittest.TestCase):
                 codegen.code[i], expected_bytecode, f"Bytecode mismatch at index {i}"
             )
         self.assertEqual(parser.current_token().tok_type, TokenType.EOF)
+
+    def test_global_get(self):
+        source_code = """
+        BYTE somebyte
+        BYTE otherbyte
+        """
+        # This test invokes two parsers to isolate the assignment parsing
+        tokens = tokenize(source_code)
+        directives = {}
+        symbol_table = SymbolTable()
+        codegen = ByteCodeGen(symbol_table)
+        parser = Parser(tokens, directives, codegen, symbol_table)
+        parser.parse_system_decls()
+
+        source_code = """
+        DEVPRINT(otherbyte)
+        """
+        tokens = tokenize(source_code)
+        parser = Parser(tokens, directives, codegen, symbol_table)
+        parser.parse_simp_stmt()
+        expected_code = [
+            ByteCode(ByteCodeOp.GET_GLOBAL, 1),  # otherbyte
+            ByteCode(ByteCodeOp.OP_DEVPRINT),
+        ]
+        for i, expected_bytecode in enumerate(expected_code):
+            self.assertEqual(
+                codegen.code[i], expected_bytecode, f"Bytecode mismatch at index {i}"
+            )
+        self.assertEqual(parser.current_token().tok_type, TokenType.EOF)

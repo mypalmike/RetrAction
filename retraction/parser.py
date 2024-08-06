@@ -39,6 +39,7 @@ class ExprAction(Enum):
     BINARY = auto()
     AND = auto()
     OR = auto()
+    IDENTIFIER = auto()
 
 
 class ExprRule:
@@ -121,6 +122,9 @@ EXPRESSION_RULES = {
     ),
     TokenType.CHAR_LITERAL: ExprRule(
         ExprAction.NUMBER, ExprAction.NONE, ExprPrecedence.NONE
+    ),
+    TokenType.IDENTIFIER: ExprRule(
+        ExprAction.IDENTIFIER, ExprAction.NONE, ExprPrecedence.NONE
     ),
     TokenType.EOF: ExprRule(ExprAction.NONE, ExprAction.NONE, ExprPrecedence.NONE),
 }
@@ -1032,6 +1036,8 @@ class Parser:
             self.parse_and()
         elif action == ExprAction.OR:
             self.parse_or()
+        elif action == ExprAction.IDENTIFIER:
+            self.parse_identifier()
 
     def parse_number(self):
         value = None
@@ -1109,3 +1115,17 @@ class Parser:
         self.code_gen.emit_pop()
         self.parse_expr_precedence(ExprPrecedence.OR)
         jump_end.value = self.code_gen.get_next_addr()
+
+    def parse_identifier(self):
+        # An identifier in an expression might be a variable of some sort
+        # or a function call
+        identifier = self.prev_token().value
+        if self.symbol_table.globals_lookup.get(identifier) is not None:
+            # TODO: Should call parse_mem_reference to deal with arrays, etc., but...
+            # We are a token ahead at this point because the expression parser is look-behind.
+            # So this is a place where we run into a conflict because the expression parser
+            # is look-behind and the rest is look-ahead. One or the other needs to change
+            # (probably look-ahead is best)
+            self.code_gen.emit_get_global(self.symbol_table.globals_lookup[identifier])
+        else:
+            raise NotImplemented("Function calls in expressions not yet implemented")
