@@ -22,7 +22,6 @@ class VirtualMachine:
         self.stack.clear()
         self.pc = 0
         while self.pc < len(self.code):
-            print(self.stack)
             instr = self.code[self.pc]
             if instr.op == ByteCodeOp.ADD:
                 self.stack[-2] += self.stack[-1]
@@ -85,7 +84,6 @@ class VirtualMachine:
                 self.stack[-1] = -self.stack[-1]
             elif instr.op == ByteCodeOp.CONSTANT:
                 const_value = self.symbol_table.constants[instr.value]
-                print(f"Pushing constant {const_value}")
                 # TODO : Deal with string constants
                 if type(const_value) == str:
                     raise NotImplementedError
@@ -101,9 +99,8 @@ class VirtualMachine:
             elif instr.op == ByteCodeOp.RETURN:
                 # TODO: Is this right?
                 self.pc = self.stack.pop()
-            elif instr.op == ByteCodeOp.OP_DEVPRINT:
+            elif instr.op == ByteCodeOp.DEVPRINT:
                 print(self.stack.pop())
             else:
                 raise ValueError(f"Unknown instruction {instr.op}")
             self.pc += 1
-        print(self.stack)

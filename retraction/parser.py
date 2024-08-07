@@ -4,7 +4,15 @@ from retraction.tokens import Token, TokenType
 from retraction.codegen import ByteCodeGen
 from retraction.bytecode import ByteCode
 from retraction.symtab import SymbolTable
-from retraction.tipes import BYTE_TIPE, CARD_TIPE, CHAR_TIPE, INT_TIPE, BaseTipe, Tipe
+from retraction.tipes import (
+    BYTE_TIPE,
+    CARD_TIPE,
+    CHAR_TIPE,
+    INT_TIPE,
+    BaseTipe,
+    Tipe,
+    Routine,
+)
 
 
 class SyntaxError(Exception):
@@ -81,6 +89,10 @@ EXPRESSION_RULES = {
     TokenType.OP_DIVIDE: ExprRule(
         ExprAction.NONE, ExprAction.BINARY, ExprPrecedence.FACTOR
     ),
+    # TODO: Does precedence matter for this?
+    TokenType.OP_AT: ExprRule(
+        ExprAction.IDENTIFIER, ExprAction.NONE, ExprPrecedence.UNARY
+    ),
     TokenType.MOD: ExprRule(ExprAction.NONE, ExprAction.BINARY, ExprPrecedence.FACTOR),
     TokenType.LSH: ExprRule(ExprAction.NONE, ExprAction.BINARY, ExprPrecedence.FACTOR),
     TokenType.RSH: ExprRule(ExprAction.NONE, ExprAction.BINARY, ExprPrecedence.FACTOR),
@@ -134,19 +146,18 @@ class Parser:
     def __init__(
         self,
         tokens: list[Token],
-        directives,
         code_gen: ByteCodeGen,
         symbol_table: SymbolTable,
     ):
         self.tokens = tokens
         self.current_token_index = 0
-        self.directives = directives
         self.code_gen = code_gen
         self.symbol_table = symbol_table
 
-        # Parser state variables
+        # Parsing state
         self.parsing_params = False
         self.exits_to_patch: list[list[ByteCode]] = []
+        self.curr_routine_index = None
 
     def current_token(self):
         if self.current_token_index < len(self.tokens):
@@ -158,15 +169,16 @@ class Parser:
             return self.tokens[self.current_token_index + 1]
         return None
 
-    def advance(self):
+    def advance(self) -> Token:
+        token = self.current_token()
         self.current_token_index += 1
+        return token
 
     def consume(self, token_type) -> Token:
         token = self.current_token()
         if token is None or token.tok_type != token_type:
             raise SyntaxError(f"Expected token {token_type}, got {token}")
-        self.advance()
-        return token
+        return self.advance()
 
     def parse_dev(self):
         self.parse_expression()
@@ -195,23 +207,28 @@ class Parser:
         return result
 
     def parse_system_decl(self) -> bool:
+
         if self.parse_define_decl():
             return True
-        elif self.parse_type_decl():
+
+        if self.parse_type_decl():
             return True
-        elif self.parse_var_decl():
+
+        if self.parse_var_decl():
             return True
         return False
 
     # <DEFINE decl> ::= <DEFINE> <def list>
+    # TODO: Remove this when there's a preprocessing step to handle defines
     def parse_define_decl(self) -> bool:
-        if self.current_token().tok_type == TokenType.DEFINE:
-            self.advance()
-            self.parse_def_list()
-            return True
-        return False
+        if self.current_token().tok_type != TokenType.DEFINE:
+            return False
+        self.advance()
+        self.parse_def_list()
+        return True
 
     # <def list> ::= <def list>,<def> | <def>
+    # TODO: Remove this when there's a preprocessing step to handle defines
     def parse_def_list(self) -> bool:
         if not self.parse_def():
             return False
@@ -223,24 +240,25 @@ class Parser:
     # <def> ::= <identifier>=<str const>
     # TODO: Remove this when there's a preprocessing step to handle defines
     def parse_def(self) -> bool:
-        if self.current_token().tok_type != TokenType.IDENTIFIER:
-            return False
-        if self.next_token().tok_type != TokenType.OP_EQ:
-            return False
-        identifier = self.current_token().value
-        self.advance()
-        self.advance()
-        str_const = self.current_token().value
-        self.consume(TokenType.STRING_LITERAL)
-        self.directives.define(identifier, str_const)
+        raise NotImplementedError()
+        # if self.current_token().tok_type != TokenType.IDENTIFIER:
+        #     return False
+        # if self.next_token().tok_type != TokenType.OP_EQ:
+        #     return False
+        # identifier = self.current_token().value
+        # self.advance()
+        # self.advance()
+        # str_const = self.current_token().value
+        # self.consume(TokenType.STRING_LITERAL)
+        # self.directives.define(identifier, str_const)
 
     # <TYPE decl> ::= TYPE <rec ident list>
     def parse_type_decl(self) -> bool:
-        if self.current_token().tok_type == TokenType.TYPE:
-            self.advance()
-            self.parse_rec_ident_list()
-            return True
-        return False
+        if self.current_token().tok_type != TokenType.TYPE:
+            return False
+        self.advance()
+        self.parse_rec_ident_list()
+        return True
 
     # <rec ident list> ::= <rec ident list> <rec ident> | <rec ident>
     def parse_rec_ident_list(self) -> bool:
@@ -305,7 +323,6 @@ class Parser:
         if fund_type is None:
             return False
         self.parse_fund_ident_list(fund_type)
-        print(f"current_token: {self.current_token()}")
         return True
 
     # <fund type> ::= CARD | CHAR | BYTE | INT
@@ -332,7 +349,7 @@ class Parser:
 
     # <fund ident> ::= <identifier>{=<init opts>}
     def parse_fund_ident(self, fund_type: TokenType) -> bool:
-        print(f"parse_fund_ident... fund_type: {fund_type}")
+
         if self.current_token().tok_type != TokenType.IDENTIFIER:
             return False
         identifier = self.current_token().value
@@ -341,8 +358,7 @@ class Parser:
             self.advance()
             self.parse_init_opts(fund_type, identifier)
         else:
-            print(f"fund_type: {fund_type}, identifier: {identifier}")
-            print(f"current_token: {self.current_token()}")
+
             # TODO: To simplify this code, maybe use same Tipe enum for tokens and symbol table
             # Would be like a token with type TokenType.TYPE and value BYTE_TIPE
             tipe = None
@@ -359,42 +375,49 @@ class Parser:
         return True
 
     # <init opts> ::= <addr> | [<value>]
+    # <addr> ::= <comp const>
+    # <value> ::= <num const>
+    # <num const> ::= <dec num> | <hex num> | <char>
     def parse_init_opts(self, fund_type: TokenType, identifier: str) -> bool:
         if self.current_token().tok_type == TokenType.OP_LBRACK:
             self.advance()
-            value = self.parse_value_const()
+            value = self.current_token().int_value()
+            self.advance()
             self.consume(TokenType.OP_RBRACK)
-            self.code_gen.emit_define_value(identifier, value)
+            # A little hacky - set the value of the last global
+            self.symbol_table.globals[-1][2] = value
         else:
+            raise NotImplementedError()
+            # TODO: Special flag for global showing it's tied to an address.
             addr = self.parse_addr()
             self.code_gen.emit_define(identifier, addr)
         return True
 
-    # <value> ::= <num const>
-    def parse_value_const(self) -> int:
-        return self.parse_num_const()
+    # # <value> ::= <num const>
+    # def parse_value_const(self) -> int:
+    #     return self.parse_num_const()
 
     # <num const> ::= <dec num> | <hex num> | <char>
-    def parse_num_const(self) -> int:
-        if self.current_token().tok_type == TokenType.INT_LITERAL:
-            return self.parse_dec_num()
-        if self.current_token().tok_type == TokenType.HEX_LITERAL:
-            return self.parse_hex_num()
-        if self.current_token().tok_type == TokenType.CHAR_LITERAL:
-            return self.parse_char()
-        raise SyntaxError(f"Unexpected token: {self.current_token()}")
+    # def parse_num_const(self) -> int:
+    #     if self.current_token().tok_type == TokenType.INT_LITERAL:
+    #         return self.parse_dec_num()
+    #     if self.current_token().tok_type == TokenType.HEX_LITERAL:
+    #         return self.parse_hex_num()
+    #     if self.current_token().tok_type == TokenType.CHAR_LITERAL:
+    #         return self.parse_char()
+    #     raise SyntaxError(f"Unexpected token: {self.current_token()}")
 
-    # <dec num> ::= <digit>{<digit>}
-    def parse_dec_num(self) -> int:
-        return int(self.consume(TokenType.INT_LITERAL).value)
+    # # <dec num> ::= <digit>{<digit>}
+    # def parse_dec_num(self) -> int:
+    #     return int(self.consume(TokenType.INT_LITERAL).value)
 
-    # <hex num> ::= $<hex digit>{<hex digit>}
-    def parse_hex_num(self) -> int:
-        return int(self.consume(TokenType.HEX_LITERAL).value, 16)
+    # # <hex num> ::= $<hex digit>{<hex digit>}
+    # def parse_hex_num(self) -> int:
+    #     return int(self.consume(TokenType.HEX_LITERAL).value, 16)
 
-    # <char> ::= '<char const>'
-    def parse_char(self) -> str:
-        return ord(self.consume(TokenType.CHAR_LITERAL).value)
+    # # <char> ::= '<char const>'
+    # def parse_char(self) -> str:
+    #     return ord(self.consume(TokenType.CHAR_LITERAL).value)
 
     # <POINTER decl> ::= <ptr type> POINTER <ptr ident list>
     def parse_pointer_decl(self) -> bool:
@@ -453,6 +476,12 @@ class Parser:
     def parse_record_decl(self) -> bool:
         if self.current_token().tok_type != TokenType.IDENTIFIER:
             return False
+        # Make sure it's a record.
+        record_type_index = self.symbol_table.types_lookup.get(
+            self.current_token().value
+        )
+        if record_type_index is None:
+            return False
         rec_type = self.current_token().value
         self.advance()
         return self.parse_rec_ident_list(rec_type)
@@ -479,141 +508,6 @@ class Parser:
             self.code_gen.emit_rec_ident(rec_type, identifier)
         return True
 
-    # Memory References
-    # TODO: All of these need to be reworked using the table parser
-    # without ExpreressionNodes
-    # -----------------
-    # <mem reference> ::= <mem contents> | @<identifier>
-    # <mem contents> ::= <fund ref> | <arr ref> | <ptr ref> | <rec ref>
-    # <fund ref> ::= <identifier>
-    # <arr ref> ::= <identifier>(<arith exp>)
-    # <ptr ref> ::= <identifier>^
-    # <rec ref> ::= <identifier>.<identifier>
-    def parse_mem_reference(self):
-        if (
-            self.current_token().tok_type == TokenType.AT
-            and self.next_token().tok_type == TokenType.IDENTIFIER
-            and self.next_token().value in self.symbol_table.globals_lookup
-        ):
-            self.advance()
-            identifier = self.consume(TokenType.IDENTIFIER).value
-            self.code_gen.emit_get_global_ref(identifier)
-        elif (
-            self.current_token().tok_type == TokenType.IDENTIFIER
-            and self.current_token().value in self.symbol_table.globals_lookup
-        ):
-            if self.next_token().tok_type == TokenType.LPAREN:
-                # Handle array reference
-                raise NotImplementedError()
-            elif self.next_token().tok_type == TokenType.PERIOD:
-                # Handle record reference
-                raise NotImplementedError()
-            elif self.next_token().tok_type == TokenType.CARET:
-                raise NotImplementedError()
-            else:
-                # TODO: Deal with locals. Just do globals for now
-                identifier = self.consume(TokenType.IDENTIFIER).value
-                global_index = self.symbol_table.globals_lookup.get(identifier)
-                if global_index is None:
-                    raise SyntaxError(f"Undefined variable: {identifier}")
-                self.code_gen.emit_get_global(global_index)
-        # mem_contents = self.parse_mem_contents()
-        # if mem_contents:
-        #     return mem_contents
-        # if self.current_token().type == TokenType.AT:
-        #     self.advance()
-        #     identifier = self.current_token().value
-        #     self.consume(TokenType.IDENTIFIER)
-        #     # return StubExpressionNode(f"mem_ref(@{identifier})")
-        # return None
-
-    # <mem contents> ::= <fund ref> | <arr ref> | <ptr ref> | <rec ref>
-    # <fund ref> ::= <identifier>
-    # <arr ref> ::= <identifier>(<arith exp>)
-    # <ptr ref> ::= <identifier>^
-    # <rec ref> ::= <identifier>.<identifier>
-    # def parse_mem_contents(self):
-    #     if self.next_token().tok_type == TokenType.LPAREN:
-    #         # Handle array reference
-    #         raise NotImplementedError()
-    #     elif self.next_token().tok_type == TokenType.PERIOD:
-    #         # Handle record reference
-    #         raise NotImplementedError()
-    #     elif self.next_token().tok_type == TokenType.CARET:
-    #         # Handle pointer reference
-    #         raise NotImplementedError()
-    #     else:
-    #         # TODO: Deal with locals. Just do globals for now
-    #         identifier = self.consume(TokenType.IDENTIFIER).value
-    #         global_index = self.symbol_table.globals_lookup.get(identifier)
-    #         if global_index is None:
-    #             raise SyntaxError(f"Undefined variable: {identifier}")
-    #         self.code_gen.emit_get_global(global_index)
-
-    # arr_ref = self.parse_arr_ref()
-    # if arr_ref:
-    #     return arr_ref
-    # ptr_ref = self.parse_ptr_ref()
-    # if ptr_ref:
-    #     return ptr_ref
-    # rec_ref = self.parse_rec_ref()
-    # if rec_ref:
-    #     return rec_ref
-    # # Note: This has to be last because it will match any identifier, whereas the others
-    # # match an identifier followed by specific "next" tokens that they look for (e.g. LPAREN, CARET, PERIOD)
-    # fund_ref = self.parse_fund_ref()
-    # if fund_ref:
-    #     return fund_ref
-    # return None
-
-    # <arr ref> ::= <identifier>(<arith exp>)
-    # def parse_arr_ref(self) -> ExpressionNode | None:
-    #     if self.current_token().type != TokenType.IDENTIFIER:
-    #         return None
-    #     identifier = self.current_token().value
-    #     self.advance()
-    #     if self.current_token().type != TokenType.LPAREN:
-    #         return None
-    #     self.advance()
-    #     arith_exp = self.parse_arith_exp()
-    #     if self.current_token().type != TokenType.RPAREN:
-    #         return None
-    #     self.advance()
-    #     # TODO: Make this return a subclass of Expression
-    #     return StubExpressionNode(f"arr_ref({identifier}, {arith_exp})")
-
-    # # <ptr ref> ::= <identifier>^
-    # def parse_ptr_ref(self) -> ExpressionNode | None:
-    #     if self.current_token().type != TokenType.IDENTIFIER:
-    #         return None
-    #     identifier = self.current_token().value
-    #     self.advance()
-    #     if self.current_token().type != TokenType.CARET:
-    #         return None
-    #     self.advance()
-    #     return StubExpressionNode(f"ptr_ref({identifier})")
-
-    # # <rec ref> ::= <identifier>.<identifier>
-    # def parse_rec_ref(self) -> ExpressionNode | None:
-    #     if self.current_token().type != TokenType.IDENTIFIER:
-    #         return None
-    #     identifier = self.current_token().value
-    #     self.advance()
-    #     if self.current_token().type != TokenType.PERIOD:
-    #         return None
-    #     self.advance()
-    #     field = self.current_token().value
-    #     self.advance()
-    #     return StubExpressionNode(f"rec_ref({identifier}, {field})")
-
-    # # # <fund ref> ::= <identifier>
-    # def parse_fund_ref(self) -> ExpressionNode | None:
-    #     if self.current_token().type != TokenType.IDENTIFIER:
-    #         return None
-    #     identifier = self.current_token().value
-    #     self.advance()
-    #     return StubExpressionNode(f"fund_ref({identifier})")
-
     # <routine list> ::= <routine list> <routine> | <routine>
     def parse_routine_list(self):
         while self.parse_routine():
@@ -628,30 +522,56 @@ class Parser:
         return False
 
     # <proc routine> ::= <PROC decl> {<system decls>} {<stmt list>}{RETURN}
-    # The RETURN token is apparently optional because it's not uncommon to fall through to the next routine
-    def parse_proc_routine(self) -> bool:
-        if not self.parse_proc_decl():
-            return False
-        self.parse_system_decls()
-        self.parse_stmt_list()
-        if self.current_token().tok_type == TokenType.RETURN:
-            self.code_gen.emit_return()
-            self.advance()
-        return True
-
     # <proc decl> ::= PROC <identifier>{=<addr>}({<param decl>})
-    def parse_proc_decl(self) -> bool:
+    # The RETURN token is optional because it's desirable to be able to fall through
+    # to the next routine on a 6502.
+    def parse_proc_routine(self) -> bool:
         if self.current_token().tok_type != TokenType.PROC:
             return False
         self.advance()
         identifier = self.consume(TokenType.IDENTIFIER).value
         if self.current_token().tok_type == TokenType.OP_EQ:
+            # TODO: Implement routine address
+            # Note: There seem to be limitations in the original implementation in testing
+            # i.e. ("BYTE x PROC xFunc = x + 1") should compile by the spec, but it doesn't
+            raise NotImplementedError("PROC with routine address")
             self.advance()
             addr = self.parse_addr()
-        self.consume(TokenType.LPAREN)
-        self.parse_param_decl()
-        self.consume(TokenType.RPAREN)
+        self.consume(TokenType.OP_LPAREN)
+
+        # TODO: Implement parameters. Current parsing code ends up declaring globals,
+        # so that needs to be avoided
+        # self.parse_param_decl()
+        self.consume(TokenType.OP_RPAREN)
+        bytecode_addr = self.code_gen.get_next_addr()
+        routine = Routine(identifier, bytecode_addr, [], None)
+        try:
+            self.curr_routine_index = self.symbol_table.declare_routine(routine)
+
+            self.parse_system_decls()
+
+            self.parse_stmt_list()
+        finally:
+            self.curr_routine_index = None
+        # RETURN is optional, and handled by the stmt list
+        # if self.current_token().tok_type == TokenType.RETURN:
+        #     self.code_gen.emit_return()
+        #     self.advance()
+
         return True
+
+    # def parse_proc_decl(self) -> bool:
+    #     if self.current_token().tok_type != TokenType.PROC:
+    #         return False
+    #     self.advance()
+    #     identifier = self.consume(TokenType.IDENTIFIER).value
+    #     if self.current_token().tok_type == TokenType.OP_EQ:
+    #         self.advance()
+    #         addr = self.parse_addr()
+    #     self.consume(TokenType.LPAREN)
+    #     self.parse_param_decl()
+    #     self.consume(TokenType.RPAREN)
+    #     return True
 
     # <addr> ::= <comp const>
     def parse_addr(self):
@@ -663,11 +583,12 @@ class Parser:
             return False
         self.parse_system_decls()
         self.parse_stmt_list()
-        if self.current_token().tok_type == TokenType.RETURN:
-            self.advance()
-            self.consume(TokenType.OP_LPAREN)
-            self.parse_arith_exp()
-            self.consume(TokenType.OP_RPAREN)
+        # RETURN is optional
+        # if self.current_token().tok_type == TokenType.RETURN:
+        #     self.advance()
+        #     self.consume(TokenType.OP_LPAREN)
+        #     self.parse_arith_exp()
+        #     self.consume(TokenType.OP_RPAREN)
         return True
 
         # self.consume(TokenType.FUNC)
@@ -706,7 +627,9 @@ class Parser:
     # <stmt list> ::= <stmt list> <stmt> | <stmt>
     def parse_stmt_list(self) -> bool:
         while True:
+
             if not self.parse_stmt():
+
                 break
 
     # <stmt> ::= <simp stmt> | <struc stmt> | <code block>
@@ -729,6 +652,8 @@ class Parser:
             return True
         if self.parse_routine_call():
             return True
+        if self.parse_return_stmt():
+            return True
         return False
 
     def parse_devprint_stmt(self) -> bool:
@@ -748,12 +673,13 @@ class Parser:
     # <ptr ref> ::= <identifier>^
     # <rec ref> ::= <identifier>.<identifier>
     def parse_assign_stmt(self) -> bool:
+        # TODO: Only deals with simple variables. Need to handle arrays, pointers, and records.
         if self.current_token().tok_type != TokenType.IDENTIFIER:
+            return False
+        if self.next_token().tok_type != TokenType.OP_EQ:
             return False
         identifier = self.current_token().value
         self.advance()
-        if self.current_token().tok_type != TokenType.OP_EQ:
-            return False
         self.advance()
         self.parse_arith_exp()
         # TODO: Handle arrays, pointers, and records
@@ -775,6 +701,20 @@ class Parser:
         self.exits_to_patch[-1].append(jump_exit)
         return True
 
+    # <RETURN stmt> ::= RETURN | RETURN (<arith exp>) - depending on PROC or FUNC
+    def parse_return_stmt(self) -> bool:
+        if self.current_token().tok_type != TokenType.RETURN:
+            return False
+        self.advance()
+        if self.symbol_table.routines[self.curr_routine_index].return_tipe is not None:
+            self.consume(TokenType.OP_LPAREN)
+            self.advance()
+            self.parse_arith_exp()
+            self.consume(TokenType.OP_RPAREN)
+        self.code_gen.emit_return()
+
+        return True
+
     # <routine call> ::= <FUNC call> | <PROC call>
     # <FUNC call> ::= <identifier>({<params>})
     # <PROC call> ::= <identifier>({<params>})
@@ -785,23 +725,24 @@ class Parser:
     def parse_routine_call(self) -> bool:
         if self.current_token().tok_type != TokenType.IDENTIFIER:
             return False
-        routine_name = self.current_token().value
-        if self.symbol_table.routines_lookup[routine_name] is None:
+        if self.next_token().tok_type != TokenType.OP_LPAREN:
             return False
-        # TODO: Finish the implementation
-        return False
+        identifier = self.current_token().value
+        routine_index = self.symbol_table.routines_lookup.get(identifier)
+        # Might be an array reference if it's not a routine
+        if routine_index is None:
+            return False
         if self.parsing_params:
             raise SyntaxError(
                 "A function call may not be used as a parameter in a routine call or declaration"
             )
-        identifier = self.current_token().value
-        self.consume(TokenType.IDENTIFIER)
-        self.consume(TokenType.OP_LPAREN)
-        if self.current_token().tok_type != TokenType.OP_RPAREN:
-            self.parse_params()
+        self.advance()  # routine name
+        self.advance()  # (
+        # TODO: Implement params
+        # self.parse_params()
         self.consume(TokenType.OP_RPAREN)
-        # TODO: Implement this
-        # self.code_gen.emit_routine_call(identifier)
+        self.code_gen.emit_routine_call(routine_index)
+        return True
 
     # <params> ::= <params>,<arith exp> | <arith exp>
     def parse_params(self):
@@ -985,10 +926,6 @@ class Parser:
         self.parse_expr_precedence(ExprPrecedence.XOR)
 
     def parse_expr_precedence(self, precedence: ExprPrecedence):
-        # self.advance()
-        print(
-            f"parse_expr_precedence: current_token: {self.current_token()}, precedence: {precedence}"
-        )
         if self.current_token().tok_type not in EXPRESSION_RULES:
             return
         prefix = EXPRESSION_RULES[self.current_token().tok_type].prefix
@@ -1002,13 +939,11 @@ class Parser:
             precedence.value
             <= EXPRESSION_RULES[self.current_token().tok_type].precedence.value
         ):
-            # self.advance()
             self.parse_expr_action(
                 EXPRESSION_RULES[self.current_token().tok_type].infix
             )
             if self.current_token().tok_type not in EXPRESSION_RULES:
                 return
-        # self.advance()
 
     def parse_expr_action(self, action: ExprAction):
         if action == ExprAction.NUMBER:
@@ -1024,7 +959,7 @@ class Parser:
         elif action == ExprAction.OR:
             self.parse_or()
         elif action == ExprAction.IDENTIFIER:
-            self.parse_identifier()
+            self.parse_identifier_expr()
 
     def parse_number(self):
         value = None
@@ -1113,9 +1048,13 @@ class Parser:
         self.parse_expr_precedence(ExprPrecedence.OR)
         jump_end.value = self.code_gen.get_next_addr()
 
-    def parse_identifier(self):
+    def parse_identifier_expr(self):
         # An identifier in an expression might be a variable of some sort
         # or a function call
+        if self.current_token().tok_type == TokenType.OP_AT:
+            raise NotImplementedError()
+        # TODO: Arrays, pointers, and records
+        # TODO: Locals
         identifier = self.current_token().value
         if self.symbol_table.globals_lookup.get(identifier) is not None:
             # TODO: Should call parse_mem_reference to deal with arrays.
@@ -1123,3 +1062,40 @@ class Parser:
             self.advance()
         else:
             raise NotImplemented("Function calls in expressions not yet implemented")
+
+    # Memory References
+    # -----------------
+    # <mem reference> ::= <mem contents> | @<identifier>
+    # <mem contents> ::= <fund ref> | <arr ref> | <ptr ref> | <rec ref>
+    # <fund ref> ::= <identifier>
+    # <arr ref> ::= <identifier>(<arith exp>)
+    # <ptr ref> ::= <identifier>^
+    # <rec ref> ::= <identifier>.<identifier>
+    def parse_mem_reference(self):
+        if (
+            self.current_token().tok_type == TokenType.AT
+            and self.next_token().tok_type == TokenType.IDENTIFIER
+            and self.next_token().value in self.symbol_table.globals_lookup
+        ):
+            self.advance()
+            identifier = self.consume(TokenType.IDENTIFIER).value
+            self.code_gen.emit_get_global_ref(identifier)
+        elif (
+            self.current_token().tok_type == TokenType.IDENTIFIER
+            and self.current_token().value in self.symbol_table.globals_lookup
+        ):
+            if self.next_token().tok_type == TokenType.LPAREN:
+                # Handle array reference
+                raise NotImplementedError()
+            elif self.next_token().tok_type == TokenType.PERIOD:
+                # Handle record reference
+                raise NotImplementedError()
+            elif self.next_token().tok_type == TokenType.CARET:
+                raise NotImplementedError()
+            else:
+                # TODO: Deal with locals. Just do globals for now
+                identifier = self.consume(TokenType.IDENTIFIER).value
+                global_index = self.symbol_table.globals_lookup.get(identifier)
+                if global_index is None:
+                    raise SyntaxError(f"Undefined variable: {identifier}")
+                self.code_gen.emit_get_global(global_index)

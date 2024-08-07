@@ -46,14 +46,36 @@ However, there are some errors and oversights in the published grammar, and I am
 >
 > Another story about manuals lacking in useful information... In college, I took a course in computer architecture. A lot of the homework involved 8086 assembly language, and the preferred tooling was Borland Turbo assembler. My college bookstore had this for sale, and also had Borland Turbo C++ for sale at only a slightly higher price, and this included the assembler. So I decided to splurge because I was pretty sure I wanted to learn C and C++ soon. So I bought this rather huge, heavy Turbo C++ box containing all sorts of disks and manuals. There may have been a dozen books in there, comprising 6-8 inches stacked of paper, literally thousands of pages. Great, I thought. I can learn C and C++ from this! And once again, I was wrong. These books covered how to operate the tools, references for the Borland C++ frameworks, etc. But nothing was in there about how to code in C or C++ (or 8086 assembly for that matter, though now I had coursework which taught me that).
 
-### RETURN statement in a function
+### RETURN statements
 
-A function can have a RETURN statement that returns a value (i.e. `<RETURN expr>`). The grammar only shows "RETURN" by itself as a statement.
+A couple things here.
 
-### `<cond exp>` vs. `<complex rel>`
+The published grammar shows routine declarations ending in a RETURN, and for no other places where RETURN can happen. But the language actually allows any number of RETURN statements within a routine. This includes having no RETURNs at all, which leads to falling through to the next proc an old trick on 6502 processors).
+
+It seems that adding RETURN as a rule for `<simp stmt>` makes the most sense. But there's some context-awareness needed for parsing RETURN as a simple statement: a function must include a value with its return statement (i.e. `RETURN (x + 3)`).
+
+### Equivalence of `<cond exp>` and `<complex rel>`
 
 I believe the intent was that these are synonymous, but there is a disconnect in the published grammar where `<cond exp>` is on the right-hand side of some rules but never defined.
 
 ### Fundamental types as conditions
 
 The grammar rules for `<complex rel>` do not allow for evaluating numerical values as relational expressions. In other words, the code `if 1 then do ...` would be syntactically incorrect by the published grammar rules. However, there are examples in the manual of this, and the original implementation allows it. The rules of the original compiler appear to be non-zero = false, zero = true, as is common in other languages.
+
+### Proc and func pointers
+
+The grammar does not seem to support treatment of routines as pointers to those routines, e.g.
+
+```
+PROC foo()
+  PrintE("In foo")
+RETURN
+
+PROC bar()
+  CARD fooAddr
+  fooAddr = foo  ; fooPtr is now the memory location of the foo procedure
+RETURN
+
+```
+
+I'm not sure if this is very useful, but the Action! language cartridge allows it.

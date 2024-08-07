@@ -1,4 +1,4 @@
-from retraction.tipes import RecordTipe, Tipe, RoutineSignature
+from retraction.tipes import RecordTipe, Tipe, Routine
 
 
 class SymbolTable:
@@ -6,7 +6,7 @@ class SymbolTable:
         self.constants: list[str | int] = []
         self.globals: list[tuple[str, Tipe, int]] = []
         self.locals: list[tuple[int, str, Tipe, int]] = []
-        self.routines = list[RoutineSignature]
+        self.routines: list[Routine] = []
         self.types: list[RecordTipe] = []
         self.globals_lookup: dict[str, int] = {}
         self.locals_lookup: dict[str, int] = {}
@@ -45,11 +45,11 @@ class SymbolTable:
         self.locals_lookup[name] = next_index
         return next_index
 
-    def declare_routine(self, name, routine: RoutineSignature):
-        self.check_no_symbol(name)
+    def declare_routine(self, routine_signature: Routine):
+        self.check_no_symbol(routine_signature.name)
         next_index = len(self.routines)
-        self.routines.append(routine)
-        self.routines_lookup[name] = next_index
+        self.routines.append(routine_signature)
+        self.routines_lookup[routine_signature.name] = next_index
         return next_index
 
     def declare_type(self, record_type: RecordTipe) -> int:

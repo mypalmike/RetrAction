@@ -29,7 +29,7 @@ class ByteCodeOp(Enum):
     GET_GLOBAL = auto()
     SET_GLOBAL = auto()
     # TODO: Remove when not needed
-    OP_DEVPRINT = auto()
+    DEVPRINT = auto()
 
 
 class ByteCode:

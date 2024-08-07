@@ -32,8 +32,8 @@ class ByteCodeGen:
         self.code: list[ByteCode] = []
         self.addr = start_addr
 
-    def emit_routine_call(self, identifier, params):
-        self.code.append(ByteCode(ByteCodeOp.ROUTINE_CALL, identifier))
+    def emit_routine_call(self, routine_index):
+        self.code.append(ByteCode(ByteCodeOp.ROUTINE_CALL, routine_index))
 
     def emit_return(self):
         self.code.append(ByteCode(ByteCodeOp.RETURN))
@@ -115,7 +115,7 @@ class ByteCodeGen:
         self.code.append(ByteCode(ByteCodeOp.SET_GLOBAL, global_index))
 
     def emit_devprint(self):
-        self.code.append(ByteCode(ByteCodeOp.OP_DEVPRINT))
+        self.code.append(ByteCode(ByteCodeOp.DEVPRINT))
 
     def get_next_addr(self):
         return len(self.code)

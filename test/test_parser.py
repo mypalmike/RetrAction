@@ -11,10 +11,9 @@ class ParserTestCase(unittest.TestCase):
     def test_arith_expr_simple(self):
         source_code = "1 + 2 * 3"
         tokens = tokenize(source_code)
-        directives = {}
         symbol_table = SymbolTable()
         codegen = ByteCodeGen(symbol_table)
-        parser = Parser(tokens, directives, codegen, symbol_table)
+        parser = Parser(tokens, codegen, symbol_table)
         parser.parse_expression()
         expected_code = [
             ByteCode(ByteCodeOp.CONSTANT, 0),
@@ -35,10 +34,9 @@ class ParserTestCase(unittest.TestCase):
     def test_arith_expr_parens(self):
         source_code = "(1 + 2) * (3 + $1B)"
         tokens = tokenize(source_code)
-        directives = {}
         symbol_table = SymbolTable()
         codegen = ByteCodeGen(symbol_table)
-        parser = Parser(tokens, directives, codegen, symbol_table)
+        parser = Parser(tokens, codegen, symbol_table)
         parser.parse_expression()
         expected_code = [
             ByteCode(ByteCodeOp.CONSTANT, 0),
@@ -61,10 +59,9 @@ class ParserTestCase(unittest.TestCase):
     def test_arith_expr_nums(self):
         source_code = "1 2 3"
         tokens = tokenize(source_code)
-        directives = {}
         symbol_table = SymbolTable()
         codegen = ByteCodeGen(symbol_table)
-        parser = Parser(tokens, directives, codegen, symbol_table)
+        parser = Parser(tokens, codegen, symbol_table)
         parser.parse_expression()
         expected_code = [
             ByteCode(ByteCodeOp.CONSTANT, 0),
@@ -82,10 +79,10 @@ class ParserTestCase(unittest.TestCase):
         FI
         """
         tokens = tokenize(source_code)
-        directives = {}
+
         symbol_table = SymbolTable()
         codegen = ByteCodeGen(symbol_table)
-        parser = Parser(tokens, directives, codegen, symbol_table)
+        parser = Parser(tokens, codegen, symbol_table)
         parser.parse_if_stmt()
         expected_code = [
             ByteCode(ByteCodeOp.CONSTANT, 0),  # 1
@@ -93,17 +90,17 @@ class ParserTestCase(unittest.TestCase):
             ByteCode(ByteCodeOp.OP_LT),  # 1 < 3
             ByteCode(ByteCodeOp.JUMP_IF_FALSE, 7),  # Jump to ELSEIF
             ByteCode(ByteCodeOp.CONSTANT, 2),  # 1
-            ByteCode(ByteCodeOp.OP_DEVPRINT),  # DEVPRINT(1)
+            ByteCode(ByteCodeOp.DEVPRINT),  # DEVPRINT(1)
             ByteCode(ByteCodeOp.JUMP, 16),  # Jump to FI
             ByteCode(ByteCodeOp.CONSTANT, 3),  # 2
             ByteCode(ByteCodeOp.CONSTANT, 4),  # 3
             ByteCode(ByteCodeOp.OP_LT),  # 2 < 3
             ByteCode(ByteCodeOp.JUMP_IF_FALSE, 14),  # Jump to ELSE
             ByteCode(ByteCodeOp.CONSTANT, 5),  # 2
-            ByteCode(ByteCodeOp.OP_DEVPRINT),  # DEVPRINT(2)
+            ByteCode(ByteCodeOp.DEVPRINT),  # DEVPRINT(2)
             ByteCode(ByteCodeOp.JUMP, 16),  # Jump to FI
             ByteCode(ByteCodeOp.CONSTANT, 6),  # 3
-            ByteCode(ByteCodeOp.OP_DEVPRINT),  # DEVPRINT(3)
+            ByteCode(ByteCodeOp.DEVPRINT),  # DEVPRINT(3)
         ]
         for i, expected_bytecode in enumerate(expected_code):
             self.assertEqual(
@@ -118,16 +115,15 @@ class ParserTestCase(unittest.TestCase):
         FI
         """
         tokens = tokenize(source_code)
-        directives = {}
         symbol_table = SymbolTable()
         codegen = ByteCodeGen(symbol_table)
-        parser = Parser(tokens, directives, codegen, symbol_table)
+        parser = Parser(tokens, codegen, symbol_table)
         parser.parse_if_stmt()
         expected_code = [
             ByteCode(ByteCodeOp.CONSTANT, 0),  # 1
             ByteCode(ByteCodeOp.JUMP_IF_FALSE, 5),  # Jump to ELSE
             ByteCode(ByteCodeOp.CONSTANT, 1),  # 1
-            ByteCode(ByteCodeOp.OP_DEVPRINT),  # DEVPRINT(1)
+            ByteCode(ByteCodeOp.DEVPRINT),  # DEVPRINT(1)
             ByteCode(ByteCodeOp.JUMP, 5),  # Jump to FI
         ]
         for i, expected_bytecode in enumerate(expected_code):
@@ -144,14 +140,13 @@ class ParserTestCase(unittest.TestCase):
         OD
         """
         tokens = tokenize(source_code)
-        directives = {}
         symbol_table = SymbolTable()
         codegen = ByteCodeGen(symbol_table)
-        parser = Parser(tokens, directives, codegen, symbol_table)
+        parser = Parser(tokens, codegen, symbol_table)
         parser.parse_do_loop()
         expected_code = [
             ByteCode(ByteCodeOp.CONSTANT, 0),  # 1
-            ByteCode(ByteCodeOp.OP_DEVPRINT),  # DEVPRINT(1)
+            ByteCode(ByteCodeOp.DEVPRINT),  # DEVPRINT(1)
             ByteCode(ByteCodeOp.CONSTANT, 1),  # 2
             ByteCode(ByteCodeOp.JUMP_IF_FALSE, 0),  # Jump to DO
         ]
@@ -169,16 +164,15 @@ class ParserTestCase(unittest.TestCase):
         OD
         """
         tokens = tokenize(source_code)
-        directives = {}
         symbol_table = SymbolTable()
         codegen = ByteCodeGen(symbol_table)
-        parser = Parser(tokens, directives, codegen, symbol_table)
+        parser = Parser(tokens, codegen, symbol_table)
         parser.parse_while_loop()
         expected_code = [
             ByteCode(ByteCodeOp.CONSTANT, 0),  # 1
             ByteCode(ByteCodeOp.JUMP_IF_FALSE, 5),  # Jump to OD
             ByteCode(ByteCodeOp.CONSTANT, 1),  # 2
-            ByteCode(ByteCodeOp.OP_DEVPRINT),  # DEVPRINT(2)
+            ByteCode(ByteCodeOp.DEVPRINT),  # DEVPRINT(2)
             ByteCode(ByteCodeOp.JUMP, 0),  # Jump to WHILE
         ]
         for i, expected_bytecode in enumerate(expected_code):
@@ -209,10 +203,9 @@ class ParserTestCase(unittest.TestCase):
         OD
         """
         tokens = tokenize(source_code)
-        directives = {}
         symbol_table = SymbolTable()
         codegen = ByteCodeGen(symbol_table)
-        parser = Parser(tokens, directives, codegen, symbol_table)
+        parser = Parser(tokens, codegen, symbol_table)
         parser.parse_while_loop()
         expected_code = [
             ByteCode(ByteCodeOp.CONSTANT, 0),  # 1 [0]
@@ -220,23 +213,23 @@ class ParserTestCase(unittest.TestCase):
             ByteCode(ByteCodeOp.CONSTANT, 1),  # 2 [2]
             ByteCode(ByteCodeOp.JUMP_IF_FALSE, 10),  # Jump to DO [3]
             ByteCode(ByteCodeOp.CONSTANT, 2),  # 3 [4]
-            ByteCode(ByteCodeOp.OP_DEVPRINT),  # DEVPRINT(3) [5]
+            ByteCode(ByteCodeOp.DEVPRINT),  # DEVPRINT(3) [5]
             ByteCode(ByteCodeOp.JUMP, 23),  # Jump to OD [6]
             ByteCode(ByteCodeOp.CONSTANT, 3),  # 4 [7]
-            ByteCode(ByteCodeOp.OP_DEVPRINT),  # DEVPRINT(4) [8]
+            ByteCode(ByteCodeOp.DEVPRINT),  # DEVPRINT(4) [8]
             ByteCode(ByteCodeOp.JUMP, 10),  # Jump to OD [9]
             ByteCode(ByteCodeOp.CONSTANT, 4),  # 5 [10]
-            ByteCode(ByteCodeOp.OP_DEVPRINT),  # DEVPRINT(5) [11]
+            ByteCode(ByteCodeOp.DEVPRINT),  # DEVPRINT(5) [11]
             ByteCode(ByteCodeOp.CONSTANT, 5),  # 6 [12]
-            ByteCode(ByteCodeOp.OP_DEVPRINT),  # DEVPRINT(6) [13]
+            ByteCode(ByteCodeOp.DEVPRINT),  # DEVPRINT(6) [13]
             ByteCode(ByteCodeOp.JUMP, 18),  # Jump to OD [14]
             ByteCode(ByteCodeOp.CONSTANT, 6),  # 7 [15]
-            ByteCode(ByteCodeOp.OP_DEVPRINT),  # DEVPRINT(7) [16]
+            ByteCode(ByteCodeOp.DEVPRINT),  # DEVPRINT(7) [16]
             ByteCode(ByteCodeOp.JUMP, 12),  # Jump to OD [17]
             ByteCode(ByteCodeOp.JUMP, 10),  # Jump to OD [18]
             ByteCode(ByteCodeOp.JUMP, 23),  # 8 [19]
             ByteCode(ByteCodeOp.CONSTANT, 7),  # 9 [20]
-            ByteCode(ByteCodeOp.OP_DEVPRINT),  # DEVPRINT(8) [21]
+            ByteCode(ByteCodeOp.DEVPRINT),  # DEVPRINT(8) [21]
             ByteCode(ByteCodeOp.JUMP, 0),  # Jump to WHILE [22]
         ]
         for i, expected_bytecode in enumerate(expected_code):
@@ -252,10 +245,9 @@ class ParserTestCase(unittest.TestCase):
         INT someint
         """
         tokens = tokenize(source_code)
-        directives = {}
         symbol_table = SymbolTable()
         codegen = ByteCodeGen(symbol_table)
-        parser = Parser(tokens, directives, codegen, symbol_table)
+        parser = Parser(tokens, codegen, symbol_table)
         parser.parse_system_decls()
         for name, type, value in [
             ("somebyte", BYTE_TIPE, 0),
@@ -276,17 +268,16 @@ class ParserTestCase(unittest.TestCase):
         """
         # This test invokes two parsers to isolate the assignment parsing
         tokens = tokenize(source_code)
-        directives = {}
         symbol_table = SymbolTable()
         codegen = ByteCodeGen(symbol_table)
-        parser = Parser(tokens, directives, codegen, symbol_table)
+        parser = Parser(tokens, codegen, symbol_table)
         parser.parse_system_decls()
 
         source_code = """
         otherbyte = 1
         """
         tokens = tokenize(source_code)
-        parser = Parser(tokens, directives, codegen, symbol_table)
+        parser = Parser(tokens, codegen, symbol_table)
         parser.parse_assign_stmt()
         expected_code = [
             ByteCode(ByteCodeOp.CONSTANT, 0),  # 1
@@ -305,23 +296,64 @@ class ParserTestCase(unittest.TestCase):
         """
         # This test invokes two parsers to isolate the assignment parsing
         tokens = tokenize(source_code)
-        directives = {}
         symbol_table = SymbolTable()
         codegen = ByteCodeGen(symbol_table)
-        parser = Parser(tokens, directives, codegen, symbol_table)
+        parser = Parser(tokens, codegen, symbol_table)
         parser.parse_system_decls()
 
         source_code = """
         DEVPRINT(otherbyte)
         """
         tokens = tokenize(source_code)
-        parser = Parser(tokens, directives, codegen, symbol_table)
+        parser = Parser(tokens, codegen, symbol_table)
         parser.parse_simp_stmt()
         expected_code = [
             ByteCode(ByteCodeOp.GET_GLOBAL, 1),  # otherbyte
-            ByteCode(ByteCodeOp.OP_DEVPRINT),
+            ByteCode(ByteCodeOp.DEVPRINT),
         ]
         for i, expected_bytecode in enumerate(expected_code):
+            self.assertEqual(
+                codegen.code[i], expected_bytecode, f"Bytecode mismatch at index {i}"
+            )
+        self.assertEqual(parser.current_token().tok_type, TokenType.EOF)
+
+    def test_routine_basics(self):
+        source_code = """
+        PROC proc1()
+            DEVPRINT(1)
+        RETURN
+
+        PROC proc2()
+            proc1()
+            DEVPRINT(2)
+
+        PROC main()
+            proc2()
+        RETURN
+        """
+        tokens = tokenize(source_code)
+        symbol_table = SymbolTable()
+        codegen = ByteCodeGen(symbol_table)
+        parser = Parser(tokens, codegen, symbol_table)
+        parser.parse_program()
+        expected_code = [
+            ByteCode(ByteCodeOp.CONSTANT, 0),  # 1
+            ByteCode(ByteCodeOp.DEVPRINT),  # DEVPRINT(1)
+            ByteCode(ByteCodeOp.RETURN),
+            ByteCode(ByteCodeOp.ROUTINE_CALL, 0),  # proc1
+            ByteCode(ByteCodeOp.CONSTANT, 1),  # 2
+            ByteCode(ByteCodeOp.DEVPRINT),  # DEVPRINT(2)
+            ByteCode(ByteCodeOp.ROUTINE_CALL, 1),  # proc2
+            ByteCode(ByteCodeOp.RETURN),
+        ]
+        # Check that the symbol table has the correct routine indices
+        for name, index in [("proc1", 0), ("proc2", 1), ("main", 2)]:
+            self.assertTrue(symbol_table.symbol_exists(name))
+            routine_index = symbol_table.routines_lookup[name]
+            self.assertEqual(routine_index, index)
+        # Check that the codegen output matches the expected code
+        for i, expected_bytecode in enumerate(expected_code):
+            self.assertLess(i, len(codegen.code), f"Codegen index {i} out of range")
             self.assertEqual(
                 codegen.code[i], expected_bytecode, f"Bytecode mismatch at index {i}"
             )

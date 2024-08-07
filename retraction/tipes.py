@@ -107,11 +107,21 @@ class PointerTipe(Tipe):
         return self.reference_tipe == other.reference_tipe
 
 
-class RoutineSignature:
-    def __init__(self, name: str, param_tipes: list[Tipe], return_tipe: Tipe | None):
+class Routine:
+    def __init__(
+        self,
+        name: str,
+        bytecode_addr: int,
+        param_tipes: list[Tipe],
+        return_tipe: Tipe | None,
+    ):
         self.name = name
+        self.bytecode_addr = bytecode_addr
         self.param_tipes = param_tipes
         self.return_tipe = return_tipe
+
+    def __repr__(self) -> str:
+        return f"<<Routine {self.name} at addr {self.bytecode_addr}>>"
 
     def is_function(self):
         return self.return_tipe is not None

@@ -155,6 +155,19 @@ class Token:
     def __repr__(self):
         return f"Token({self.tok_type}, {self.value})"
 
+    def int_value(self):
+        """
+        Helper to convert the value of a numeric token to an integer.
+        """
+        if self.tok_type == TokenType.INT_LITERAL:
+            return int(self.value)
+        elif self.tok_type == TokenType.HEX_LITERAL:
+            return int(self.value, 16)
+        elif self.tok_type == TokenType.CHAR_LITERAL:
+            return ord(self.value)
+        else:
+            raise ValueError(f"Token {self.tok_type} has no integer value")
+
 
 # Tokenizer function
 def tokenize(source_code):
