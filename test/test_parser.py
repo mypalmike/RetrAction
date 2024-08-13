@@ -7,10 +7,14 @@ from retraction.symtab import SymbolTable
 from retraction.tipes import BYTE_TIPE, CARD_TIPE, INT_TIPE
 
 
+# Dummy source filename for tests
+S_F = "<test>"
+
+
 class ParserTestCase(unittest.TestCase):
     def test_arith_expr_simple(self):
         source_code = "1 + 2 * 3"
-        tokens = tokenize(source_code)
+        tokens = tokenize(source_code, S_F)
         symbol_table = SymbolTable()
         codegen = ByteCodeGen(symbol_table)
         parser = Parser(tokens, codegen, symbol_table)
@@ -33,7 +37,7 @@ class ParserTestCase(unittest.TestCase):
 
     def test_arith_expr_parens(self):
         source_code = "(1 + 2) * (3 + $1B)"
-        tokens = tokenize(source_code)
+        tokens = tokenize(source_code, S_F)
         symbol_table = SymbolTable()
         codegen = ByteCodeGen(symbol_table)
         parser = Parser(tokens, codegen, symbol_table)
@@ -58,7 +62,7 @@ class ParserTestCase(unittest.TestCase):
 
     def test_arith_expr_nums(self):
         source_code = "1 2 3"
-        tokens = tokenize(source_code)
+        tokens = tokenize(source_code, S_F)
         symbol_table = SymbolTable()
         codegen = ByteCodeGen(symbol_table)
         parser = Parser(tokens, codegen, symbol_table)
@@ -78,7 +82,7 @@ class ParserTestCase(unittest.TestCase):
             DEVPRINT (3)
         FI
         """
-        tokens = tokenize(source_code)
+        tokens = tokenize(source_code, S_F)
 
         symbol_table = SymbolTable()
         codegen = ByteCodeGen(symbol_table)
@@ -114,7 +118,7 @@ class ParserTestCase(unittest.TestCase):
             DEVPRINT (1)
         FI
         """
-        tokens = tokenize(source_code)
+        tokens = tokenize(source_code, S_F)
         symbol_table = SymbolTable()
         codegen = ByteCodeGen(symbol_table)
         parser = Parser(tokens, codegen, symbol_table)
@@ -139,7 +143,7 @@ class ParserTestCase(unittest.TestCase):
         UNTIL 2
         OD
         """
-        tokens = tokenize(source_code)
+        tokens = tokenize(source_code, S_F)
         symbol_table = SymbolTable()
         codegen = ByteCodeGen(symbol_table)
         parser = Parser(tokens, codegen, symbol_table)
@@ -163,7 +167,7 @@ class ParserTestCase(unittest.TestCase):
             DEVPRINT (2)
         OD
         """
-        tokens = tokenize(source_code)
+        tokens = tokenize(source_code, S_F)
         symbol_table = SymbolTable()
         codegen = ByteCodeGen(symbol_table)
         parser = Parser(tokens, codegen, symbol_table)
@@ -202,7 +206,7 @@ class ParserTestCase(unittest.TestCase):
           DEVPRINT (8)
         OD
         """
-        tokens = tokenize(source_code)
+        tokens = tokenize(source_code, S_F)
         symbol_table = SymbolTable()
         codegen = ByteCodeGen(symbol_table)
         parser = Parser(tokens, codegen, symbol_table)
@@ -244,7 +248,7 @@ class ParserTestCase(unittest.TestCase):
         CARD somecard
         INT someint
         """
-        tokens = tokenize(source_code)
+        tokens = tokenize(source_code, S_F)
         symbol_table = SymbolTable()
         codegen = ByteCodeGen(symbol_table)
         parser = Parser(tokens, codegen, symbol_table)
@@ -267,7 +271,7 @@ class ParserTestCase(unittest.TestCase):
         BYTE otherbyte
         """
         # This test invokes two parsers to isolate the assignment parsing
-        tokens = tokenize(source_code)
+        tokens = tokenize(source_code, S_F)
         symbol_table = SymbolTable()
         codegen = ByteCodeGen(symbol_table)
         parser = Parser(tokens, codegen, symbol_table)
@@ -276,7 +280,7 @@ class ParserTestCase(unittest.TestCase):
         source_code = """
         otherbyte = 1
         """
-        tokens = tokenize(source_code)
+        tokens = tokenize(source_code, S_F)
         parser = Parser(tokens, codegen, symbol_table)
         parser.parse_assign_stmt()
         expected_code = [
@@ -295,7 +299,7 @@ class ParserTestCase(unittest.TestCase):
         BYTE otherbyte
         """
         # This test invokes two parsers to isolate the assignment parsing
-        tokens = tokenize(source_code)
+        tokens = tokenize(source_code, S_F)
         symbol_table = SymbolTable()
         codegen = ByteCodeGen(symbol_table)
         parser = Parser(tokens, codegen, symbol_table)
@@ -304,7 +308,7 @@ class ParserTestCase(unittest.TestCase):
         source_code = """
         DEVPRINT(otherbyte)
         """
-        tokens = tokenize(source_code)
+        tokens = tokenize(source_code, S_F)
         parser = Parser(tokens, codegen, symbol_table)
         parser.parse_simp_stmt()
         expected_code = [
@@ -331,7 +335,7 @@ class ParserTestCase(unittest.TestCase):
             proc2()
         RETURN
         """
-        tokens = tokenize(source_code)
+        tokens = tokenize(source_code, S_F)
         symbol_table = SymbolTable()
         codegen = ByteCodeGen(symbol_table)
         parser = Parser(tokens, codegen, symbol_table)
@@ -348,9 +352,11 @@ class ParserTestCase(unittest.TestCase):
         ]
         # Check that the symbol table has the correct routine indices
         for name, index in [("proc1", 0), ("proc2", 1), ("main", 2)]:
-            self.assertTrue(symbol_table.symbol_exists(name))
+            self.assertTrue(
+                symbol_table.symbol_exists(name), f"Symbol {name} not found"
+            )
             routine_index = symbol_table.routines_lookup[name]
-            self.assertEqual(routine_index, index)
+            self.assertEqual(routine_index, index, f"Routine index mismatch for {name}")
         # Check that the codegen output matches the expected code
         for i, expected_bytecode in enumerate(expected_code):
             self.assertLess(i, len(codegen.code), f"Codegen index {i} out of range")

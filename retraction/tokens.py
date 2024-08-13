@@ -76,6 +76,14 @@ class TokenType(Enum):
 # Create a reverse mapping from integers to token type strings
 INT_TO_TOKEN = {token.value: token.name for token in TokenType}
 
+PRIMITIVE_TYPES = {
+    TokenType.BYTE,
+    TokenType.CARD,
+    TokenType.CHAR,
+    TokenType.INT,
+    TokenType.POINTER,
+}
+
 TEXT_TO_TOKEN = {
     "AND": TokenType.AND,
     "ARRAY": TokenType.ARRAY,
@@ -134,8 +142,6 @@ TEXT_TO_TOKEN = {
     # TODO: Remove this after it's not needed
     "DEVPRINT": TokenType.DEVPRINT,
     # TODO: Remove the tokens after this to preprocessor
-    # Keep in mind that comments can be used as no-ops in if/elseif/else(?), so it
-    # might be better to keep them in the main parser
     "DEFINE": TokenType.DEFINE,
     "INCLUDE": TokenType.INCLUDE,
     "SET": TokenType.SET,
@@ -148,14 +154,16 @@ SYMBOL_CHARS = set([s for s in TEXT_TO_TOKEN.keys() if not s[0].isalpha()])
 
 # Token class
 class Token:
-    def __init__(self, tok_type, value):
+    def __init__(self, tok_type, value, source_filename, line_number):
         self.tok_type = tok_type
         self.value = value
+        self.source_filename = source_filename
+        self.line_number = line_number
 
-    def __repr__(self):
-        return f"Token({self.tok_type}, {self.value})"
+    def __repr__(self) -> str:
+        return f"Token({self.tok_type}, {self.value}, {self.source_filename}, {self.line_number})"
 
-    def int_value(self):
+    def int_value(self) -> int:
         """
         Helper to convert the value of a numeric token to an integer.
         """
@@ -168,15 +176,31 @@ class Token:
         else:
             raise ValueError(f"Token {self.tok_type} has no integer value")
 
+    def is_primitive_type(self) -> bool:
+        """
+        Helper to determine if the token represents a primitive type.
+        """
+        return self.tok_type in PRIMITIVE_TYPES
+
+    def source_location(self) -> str:
+        return f"{self.source_filename}:{self.line_number}"
+
 
 # Tokenizer function
-def tokenize(source_code):
+def tokenize(source_code, source_filename):
+    line_number = 0
     tokens = []
     i = 0
     length = len(source_code)
 
     while i < length:
         # Skip whitespace
+        # Check for newline
+        if source_code[i] == "\n":
+            line_number += 1
+            i += 1
+            continue
+
         if source_code[i].isspace():
             i += 1
             continue
@@ -195,7 +219,14 @@ def tokenize(source_code):
                 raise ValueError("Unterminated string constant")
             i += 1
             string_const = source_code[start:i]
-            tokens.append(Token(TokenType.STRING_LITERAL, string_const[1:-1]))
+            tokens.append(
+                Token(
+                    TokenType.STRING_LITERAL,
+                    string_const[1:-1],
+                    source_filename,
+                    line_number,
+                )
+            )
             continue
 
         # Match character literals. Unlike most languages, there's no
@@ -203,7 +234,11 @@ def tokenize(source_code):
         if source_code[i] == "'":
             if i + 1 < length:
                 char_const = source_code[i + 1]
-                tokens.append(Token(TokenType.CHAR_LITERAL, char_const))
+                tokens.append(
+                    Token(
+                        TokenType.CHAR_LITERAL, char_const, source_filename, line_number
+                    )
+                )
                 i += 2
             else:
                 raise ValueError("Invalid character constant")
@@ -215,7 +250,9 @@ def tokenize(source_code):
             while i < length and source_code[i].isdigit():
                 i += 1
             dec_num = source_code[start:i]
-            tokens.append(Token(TokenType.INT_LITERAL, dec_num))
+            tokens.append(
+                Token(TokenType.INT_LITERAL, dec_num, source_filename, line_number)
+            )
             continue
 
         # Match hexadecimal numbers
@@ -227,7 +264,9 @@ def tokenize(source_code):
             ):
                 i += 1
             hex_num = source_code[start + 1 : i]
-            tokens.append(Token(TokenType.HEX_LITERAL, hex_num))
+            tokens.append(
+                Token(TokenType.HEX_LITERAL, hex_num, source_filename, line_number)
+            )
             continue
 
         # Match keywords and identifiers
@@ -237,9 +276,13 @@ def tokenize(source_code):
                 i += 1
             word = source_code[start:i]
             if word in TEXT_TO_TOKEN:
-                tokens.append(Token(TEXT_TO_TOKEN[word], None))
+                tokens.append(
+                    Token(TEXT_TO_TOKEN[word], None, source_filename, line_number)
+                )
             else:
-                tokens.append(Token(TokenType.IDENTIFIER, word))
+                tokens.append(
+                    Token(TokenType.IDENTIFIER, word, source_filename, line_number)
+                )
             continue
 
         # Match symbols
@@ -252,7 +295,9 @@ def tokenize(source_code):
                 i += 1
 
             if symbol in TEXT_TO_TOKEN:
-                tokens.append(Token(TEXT_TO_TOKEN[symbol], None))
+                tokens.append(
+                    Token(TEXT_TO_TOKEN[symbol], None, source_filename, line_number)
+                )
             else:
                 raise ValueError(f"Invalid symbol: {symbol}")
             continue
@@ -261,6 +306,6 @@ def tokenize(source_code):
         raise ValueError(f"Invalid character: {source_code[i]}")
 
     # EOF token
-    tokens.append(Token(TokenType.EOF, None))
+    tokens.append(Token(TokenType.EOF, None, source_filename, line_number))
 
     return tokens

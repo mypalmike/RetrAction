@@ -1,4 +1,5 @@
 from enum import Enum, auto
+import sys
 
 from retraction.tokens import Token, TokenType
 from retraction.codegen import ByteCodeGen
@@ -16,7 +17,9 @@ from retraction.tipes import (
 
 
 class SyntaxError(Exception):
-    pass
+    def __init__(self, msg):
+        super().__init__()
+        self.msg = msg
 
 
 # Highest to lowest precedence:
@@ -186,12 +189,15 @@ class Parser:
     # <program> ::= <program> MODULE <prog module> | {MODULE} <prog module>
     def parse_program(self):
         # TODO: Not sure the grammar is correct here, but it's from the manual
-        while self.current_token() is not None:
-            if self.current_token().tok_type == TokenType.MODULE:
-                self.advance()
-            else:
-                break
-        return self.parse_prog_module()
+        try:
+            while self.current_token() is not None:
+                if self.current_token().tok_type == TokenType.MODULE:
+                    self.advance()
+                else:
+                    break
+            return self.parse_prog_module()
+        except SyntaxError as e:
+            self.error(e.msg)
 
     # <prog module> ::= {<system decls>} <routine list>
     def parse_prog_module(self):
@@ -207,13 +213,10 @@ class Parser:
         return result
 
     def parse_system_decl(self) -> bool:
-
         if self.parse_define_decl():
             return True
-
         if self.parse_type_decl():
             return True
-
         if self.parse_var_decl():
             return True
         return False
@@ -547,9 +550,7 @@ class Parser:
         routine = Routine(identifier, bytecode_addr, [], None)
         try:
             self.curr_routine_index = self.symbol_table.declare_routine(routine)
-
             self.parse_system_decls()
-
             self.parse_stmt_list()
         finally:
             self.curr_routine_index = None
@@ -627,13 +628,22 @@ class Parser:
     # <stmt list> ::= <stmt list> <stmt> | <stmt>
     def parse_stmt_list(self) -> bool:
         while True:
-
             if not self.parse_stmt():
-
                 break
 
     # <stmt> ::= <simp stmt> | <struc stmt> | <code block>
     def parse_stmt(self) -> bool:
+        # If in a routine and we see a PROC or FUNC decl, it's not a statement
+        # TODO: Also make sure it's a top-level statement? (e.g. not in an IF block)
+        if self.curr_routine_index is not None and (
+            self.current_token().tok_type == TokenType.PROC
+            or (
+                self.current_token().is_primitive_type()
+                and self.next_token().tok_type == TokenType.FUNC
+            )
+        ):
+            return False
+
         if self.parse_simp_stmt():
             return True
         if self.parse_struc_stmt():
@@ -738,24 +748,37 @@ class Parser:
             )
         self.advance()  # routine name
         self.advance()  # (
-        # TODO: Implement params
-        # self.parse_params()
+        self.parse_params(routine_index)
         self.consume(TokenType.OP_RPAREN)
         self.code_gen.emit_routine_call(routine_index)
         return True
 
     # <params> ::= <params>,<arith exp> | <arith exp>
-    def parse_params(self):
+    def parse_params(self, routine_index: int):
+        routine = self.symbol_table.routines[routine_index]
+        param_tipes = routine.param_tipes
+        expected_param_count = len(param_tipes)
+        param_count = 0
         try:
             self.parsing_params = True
-            self.parse_arith_exp()
-            param_count = 1
-            while self.current_token().tok_type == TokenType.OP_COMMA:
-                self.advance()
-                self.parse_arith_exp(False)
+            for _ in range(expected_param_count):
+                self.parse_arith_exp()
                 param_count += 1
-                if param_count > 8:
-                    raise SyntaxError("Too many parameters (max 8)")
+                self.code_gen.emit_push_param()
+                if param_count < expected_param_count:
+                    self.consume(TokenType.OP_COMMA)
+            if param_count > 8:
+                raise SyntaxError("Too many parameters (max 8)")
+            if param_count < expected_param_count:
+                self.warn(
+                    f"Too few parameters, expected {expected_param_count}, got {param_count} at {self.current_token().source_location()}"
+                )
+            # Fill in any missing parameters with zeros
+            while param_count < expected_param_count:
+                self.code_gen.emit_zero()
+                self.code_gen.emit_push_param()
+                param_count += 1
+
         finally:
             self.parsing_params = False
 
@@ -1099,3 +1122,9 @@ class Parser:
                 if global_index is None:
                     raise SyntaxError(f"Undefined variable: {identifier}")
                 self.code_gen.emit_get_global(global_index)
+
+    def warn(self, message: str):
+        print(f"Warning: {message} at {self.current_token().source_location()}", file=sys.stderr)
+
+    def error(self, message: str):
+        print(f"Error: {message} at {self.current_token().source_location()}", file=sys.stderr)

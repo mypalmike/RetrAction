@@ -1,11 +1,26 @@
 from retraction.tipes import RecordTipe, Tipe, Routine
 
 
+class Global:
+    def __init__(self, name: str, var_type: Tipe, value: int = 0):
+        self.name = name
+        self.var_type = var_type
+        self.value = value
+
+
+class Local:
+    def __init__(self, routine_index: int, name: str, var_type: Tipe, value: int = 0):
+        self.routine_index = routine_index
+        self.name = name
+        self.var_type = var_type
+        self.value = value
+
+
 class SymbolTable:
     def __init__(self):
         self.constants: list[str | int] = []
-        self.globals: list[tuple[str, Tipe, int]] = []
-        self.locals: list[tuple[int, str, Tipe, int]] = []
+        self.globals: list[Global] = []
+        self.locals: list[Local] = []
         self.routines: list[Routine] = []
         self.types: list[RecordTipe] = []
         self.globals_lookup: dict[str, int] = {}

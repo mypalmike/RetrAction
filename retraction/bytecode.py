@@ -28,6 +28,15 @@ class ByteCodeOp(Enum):
     RETURN = auto()
     GET_GLOBAL = auto()
     SET_GLOBAL = auto()
+    GET_ADDR_GLOBAL = auto()
+    GET_LOCAL = auto()
+    SET_LOCAL = auto()
+    GET_ADDR_LOCAL = auto()
+    GET_PARAM = auto()
+    SET_PARAM = auto()
+    GET_ADDR_PARAM = auto()
+    PUSH_PARAM = auto()
+    ZERO = auto()
     # TODO: Remove when not needed
     DEVPRINT = auto()
 

@@ -24,7 +24,8 @@ def main():
     symbol_table = SymbolTable()
     codegen = ByteCodeGen(symbol_table)
     parser = Parser(tokens, codegen, symbol_table)
-    parser.parse_dev()
+    # parser.parse_dev()
+    parser.parse_program()
     vm = VirtualMachine(codegen.code, symbol_table)
     vm.run()
 

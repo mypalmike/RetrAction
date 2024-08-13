@@ -114,6 +114,12 @@ class ByteCodeGen:
     def emit_set_global(self, global_index):
         self.code.append(ByteCode(ByteCodeOp.SET_GLOBAL, global_index))
 
+    def emit_push_param(self):
+        self.code.append(ByteCode(ByteCodeOp.PUSH_PARAM))
+
+    def emit_zero(self):
+        self.code.append(ByteCode(ByteCodeOp.ZERO))
+
     def emit_devprint(self):
         self.code.append(ByteCode(ByteCodeOp.DEVPRINT))
 

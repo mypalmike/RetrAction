@@ -46,13 +46,17 @@ However, there are some errors and oversights in the published grammar, and I am
 >
 > Another story about manuals lacking in useful information... In college, I took a course in computer architecture. A lot of the homework involved 8086 assembly language, and the preferred tooling was Borland Turbo assembler. My college bookstore had this for sale, and also had Borland Turbo C++ for sale at only a slightly higher price, and this included the assembler. So I decided to splurge because I was pretty sure I wanted to learn C and C++ soon. So I bought this rather huge, heavy Turbo C++ box containing all sorts of disks and manuals. There may have been a dozen books in there, comprising 6-8 inches stacked of paper, literally thousands of pages. Great, I thought. I can learn C and C++ from this! And once again, I was wrong. These books covered how to operate the tools, references for the Borland C++ frameworks, etc. But nothing was in there about how to code in C or C++ (or 8086 assembly for that matter, though now I had coursework which taught me that).
 
+### Statement lists
+
+The published grammar would suggest that a statement list requires at least one statement. The original compiler allows empty statement lists, seemingly in all contexts.
+
 ### RETURN statements
 
 A couple things here.
 
 The published grammar shows routine declarations ending in a RETURN, and for no other places where RETURN can happen. But the language actually allows any number of RETURN statements within a routine. This includes having no RETURNs at all, which leads to falling through to the next proc an old trick on 6502 processors).
 
-It seems that adding RETURN as a rule for `<simp stmt>` makes the most sense. But there's some context-awareness needed for parsing RETURN as a simple statement: a function must include a value with its return statement (i.e. `RETURN (x + 3)`).
+It seems that adding RETURN as a rule for `<simp stmt>` makes the most sense. But there's some context-awareness needed for parsing RETURN as a simple statement: a function must include a value with its return statement (i.e. `RETURN (x + 3)`). While a routine can be called without all parameters, a return will not compile for a function without the
 
 ### Equivalence of `<cond exp>` and `<complex rel>`
 

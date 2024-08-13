@@ -111,17 +111,17 @@ class Routine:
     def __init__(
         self,
         name: str,
-        bytecode_addr: int,
+        entry_point: int,
         param_tipes: list[Tipe],
         return_tipe: Tipe | None,
     ):
         self.name = name
-        self.bytecode_addr = bytecode_addr
+        self.entry_point = entry_point
         self.param_tipes = param_tipes
         self.return_tipe = return_tipe
 
     def __repr__(self) -> str:
-        return f"<<Routine {self.name} at addr {self.bytecode_addr}>>"
+        return f"Routine({self.name}, {self.entry_point}, {self.param_tipes}, {self.return_tipe})"
 
     def is_function(self):
         return self.return_tipe is not None
