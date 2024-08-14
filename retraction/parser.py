@@ -198,6 +198,8 @@ class Parser:
             return self.parse_prog_module()
         except SyntaxError as e:
             self.error(e.msg)
+        except Exception as e:
+            self.error(str(e))
 
     # <prog module> ::= {<system decls>} <routine list>
     def parse_prog_module(self):
@@ -480,7 +482,7 @@ class Parser:
         if self.current_token().tok_type != TokenType.IDENTIFIER:
             return False
         # Make sure it's a record.
-        record_type_index = self.symbol_table.types_lookup.get(
+        record_type_index = self.symbol_table.tipes_lookup.get(
             self.current_token().value
         )
         if record_type_index is None:
@@ -698,6 +700,7 @@ class Parser:
         if global_index is None:
             raise SyntaxError(f"Undefined variable: {identifier}")
         self.code_gen.emit_set_global(global_index)
+        return True
 
     # <EXIT stmt> ::= EXIT
     def parse_exit_stmt(self) -> bool:
@@ -1102,7 +1105,10 @@ class Parser:
         ):
             self.advance()
             identifier = self.consume(TokenType.IDENTIFIER).value
-            self.code_gen.emit_get_global_ref(identifier)
+            global_index = self.symbol_table.globals_lookup.get(identifier)
+            if global_index is None:
+                raise SyntaxError(f"Undefined variable: {identifier}")
+            self.code_gen.emit_get_addr_global(global_index)
         elif (
             self.current_token().tok_type == TokenType.IDENTIFIER
             and self.current_token().value in self.symbol_table.globals_lookup
@@ -1114,7 +1120,17 @@ class Parser:
                 # Handle record reference
                 raise NotImplementedError()
             elif self.next_token().tok_type == TokenType.CARET:
-                raise NotImplementedError()
+                # Handle pointer reference
+                identifier = self.consume(TokenType.IDENTIFIER).value
+                # TODO: Deal with locals and parameters
+                global_index = self.symbol_table.globals_lookup.get(identifier)
+                if global_index is None:
+                    raise SyntaxError(f"Undefined variable: {identifier}")
+                global_val = self.symbol_table.globals[global_index]
+                if not global_val.var_type.is_pointer():
+                    raise SyntaxError(f"Variable {identifier} is not a pointer")
+                self.code_gen.emit_get_ptr_global(global_index)
+                self.advance()
             else:
                 # TODO: Deal with locals. Just do globals for now
                 identifier = self.consume(TokenType.IDENTIFIER).value
@@ -1124,7 +1140,13 @@ class Parser:
                 self.code_gen.emit_get_global(global_index)
 
     def warn(self, message: str):
-        print(f"Warning: {message} at {self.current_token().source_location()}", file=sys.stderr)
+        print(
+            f"Warning: {message} at {self.current_token().source_location()}",
+            file=sys.stderr,
+        )
 
     def error(self, message: str):
-        print(f"Error: {message} at {self.current_token().source_location()}", file=sys.stderr)
+        print(
+            f"Error: {message} at {self.current_token().source_location()}",
+            file=sys.stderr,
+        )

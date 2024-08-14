@@ -1,0 +1,8 @@
+BYTE x
+BYTE y
+
+PROC doGlobal()
+  x = 3
+  y = x + 2 * 7
+  DEVPRINT(y)
+RETURN

@@ -36,6 +36,9 @@ class Tipe:
             return False
         return self.base_tipe == other.base_tipe
 
+    def __repr__(self) -> str:
+        return f"Tipe({self.base_tipe})"
+
 
 # Fundamental types.
 BYTE_TIPE = Tipe(BaseTipe.BYTE)
@@ -73,6 +76,9 @@ class RecordTipe(Tipe):
             return False
         return self.name == other.name
 
+    def __repr__(self) -> str:
+        return f"RecordTipe({self.name})"
+
 
 class ArrayTipe(Tipe):
     def __init__(self, element_tipe: BaseTipe, length: int | None = None):
@@ -90,6 +96,9 @@ class ArrayTipe(Tipe):
             return False
         return self.element_tipe == other.element_tipe and self.length == other.length
 
+    def __repr__(self) -> str:
+        return f"ArrayTipe({self.element_tipe}, {self.length})"
+
 
 class PointerTipe(Tipe):
     def __init__(self, reference_tipe: BaseTipe):
@@ -105,6 +114,9 @@ class PointerTipe(Tipe):
         if not super().__eq__(other):
             return False
         return self.reference_tipe == other.reference_tipe
+
+    def __repr__(self) -> str:
+        return f"PointerTipe({self.reference_tipe})"
 
 
 class Routine:

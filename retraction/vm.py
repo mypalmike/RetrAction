@@ -98,11 +98,11 @@ class VirtualMachine:
             elif instr.op == ByteCodeOp.JUMP:
                 self.pc = instr.value
             elif instr.op == ByteCodeOp.GET_GLOBAL:
-                global_value = self.symbol_table.globals[instr.value]
-                self.work_stack.append(global_value[2])
+                global_obj = self.symbol_table.globals[instr.value]
+                self.work_stack.append(global_obj.value)
             elif instr.op == ByteCodeOp.SET_GLOBAL:
-                global_value = self.symbol_table.globals[instr.value]
-                global_value[2] = self.work_stack.pop()
+                global_obj = self.symbol_table.globals[instr.value]
+                global_obj.value = self.work_stack.pop()
             elif instr.op == ByteCodeOp.PUSH_PARAM:
                 self.call_params.append(self.work_stack.pop())
             elif instr.op == ByteCodeOp.ROUTINE_CALL:
@@ -113,7 +113,8 @@ class VirtualMachine:
                     self.params.append(param)
                 self.call_params.clear()
             elif instr.op == ByteCodeOp.RETURN:
-                self.pc = self.routine_stack.pop()
+                if self.routine_stack:
+                    self.pc = self.routine_stack.pop()
             elif instr.op == ByteCodeOp.POP:
                 self.work_stack.pop()
             elif instr.op == ByteCodeOp.ZERO:

@@ -111,8 +111,17 @@ class ByteCodeGen:
     def emit_get_global(self, global_index):
         self.code.append(ByteCode(ByteCodeOp.GET_GLOBAL, global_index))
 
+    def emit_get_addr_global(self, global_index):
+        self.code.append(ByteCode(ByteCodeOp.GET_ADDR_GLOBAL, global_index))
+
+    def emit_get_ptr_global(self, global_index):
+        self.code.append(ByteCode(ByteCodeOp.GET_PTR_GLOBAL, global_index))
+
     def emit_set_global(self, global_index):
         self.code.append(ByteCode(ByteCodeOp.SET_GLOBAL, global_index))
+
+    def emit_set_ptr_global(self, global_index):
+        self.code.append(ByteCode(ByteCodeOp.SET_PTR_GLOBAL, global_index))
 
     def emit_push_param(self):
         self.code.append(ByteCode(ByteCodeOp.PUSH_PARAM))

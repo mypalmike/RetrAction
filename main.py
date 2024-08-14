@@ -20,7 +20,7 @@ def main():
     source_file = args.source_file
     with open(source_file) as f:
         source_code = f.read()
-    tokens = tokenize(source_code)
+    tokens = tokenize(source_code, source_file)
     symbol_table = SymbolTable()
     codegen = ByteCodeGen(symbol_table)
     parser = Parser(tokens, codegen, symbol_table)
