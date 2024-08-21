@@ -4,6 +4,7 @@ import sys
 from retraction.tokens import Token, TokenType
 from retraction.codegen import ByteCodeGen
 from retraction.bytecode import ByteCode
+from retraction.error import InternalError, SyntaxError
 from retraction.symtab import SymbolTable
 from retraction.tipes import (
     BYTE_TIPE,
@@ -14,12 +15,6 @@ from retraction.tipes import (
     Tipe,
     Routine,
 )
-
-
-class SyntaxError(Exception):
-    def __init__(self, msg):
-        super().__init__()
-        self.msg = msg
 
 
 # Highest to lowest precedence:
@@ -143,6 +138,297 @@ EXPRESSION_RULES = {
     ),
     TokenType.EOF: ExprRule(ExprAction.NONE, ExprAction.NONE, ExprPrecedence.NONE),
 }
+
+
+class TypedExpressionOp(Enum):
+    ADD = auto()
+    SUBTRACT = auto()
+    MULTIPLY = auto()
+    DIVIDE = auto()
+    MOD = auto()
+    LSH = auto()
+    RSH = auto()
+    EQ = auto()
+    NE = auto()
+    GT = auto()
+    GE = auto()
+    LT = auto()
+    LE = auto()
+    XOR = auto()
+    BIT_AND = auto()
+    BIT_OR = auto()
+    BIT_XOR = auto()
+    UNARY_MINUS = auto()
+    CONSTANT = auto()
+    VARIABLE = auto()
+    VARIABLE_REF = auto()
+    VARIABLE_PTR = auto()
+    # GET_GLOBAL = auto()
+    # GET_LOCAL = auto()
+    # GET_PARAM = auto()
+    FUNCTION_CALL = auto()
+
+
+BINARY_OPS = {
+    TypedExpressionOp.ADD,
+    TypedExpressionOp.SUBTRACT,
+    TypedExpressionOp.MULTIPLY,
+    TypedExpressionOp.DIVIDE,
+    TypedExpressionOp.MOD,
+    TypedExpressionOp.LSH,
+    TypedExpressionOp.RSH,
+    TypedExpressionOp.EQ,
+    TypedExpressionOp.NE,
+    TypedExpressionOp.GT,
+    TypedExpressionOp.GE,
+    TypedExpressionOp.LT,
+    TypedExpressionOp.LE,
+    TypedExpressionOp.XOR,
+    TypedExpressionOp.BIT_AND,
+    TypedExpressionOp.BIT_OR,
+    TypedExpressionOp.BIT_XOR,
+}
+
+RELATIONAL_OPS = {
+    TypedExpressionOp.EQ,
+    TypedExpressionOp.NE,
+    TypedExpressionOp.GT,
+    TypedExpressionOp.GE,
+    TypedExpressionOp.LT,
+    TypedExpressionOp.LE,
+}
+
+
+class TypedExpressionScope(Enum):
+    GLOBAL = auto()
+    LOCAL = auto()
+    PARAM = auto()
+    ROUTINE_REFERENCE = auto()
+
+
+class TypedExpressionItem:
+    def __init__(
+        self,
+        op: TypedExpressionOp,
+        index: int | None = None,
+    ):
+        self.op = op
+        # Index is used for constants, variables, and function calls
+        self.index = index
+        # Members below are computed when the item is added to a TypedPostfixExpression
+        self.tipe: Tipe = None
+        # For binary operations
+        self.op1_const = False
+        self.op2_const = False
+        self.op1_tipe: Tipe = None
+        self.op2_tipe: Tipe = None
+        # For constants
+        self.value: int = None
+        # For variables
+        self.address: int = None
+        self.scope: TypedExpressionScope = None
+        # self.is_pointer = False
+        # self.is_reference = False
+
+
+class TypedPostfixExpression:
+    """
+    A postfix expression in the form of a list of TypedExpressionItems.
+    This is used as a temporary internal representation to generate bytecode
+    for an expression while keeping track of the types of the expression at
+    each step. This is necessary to generate the correct bytecode for things
+    like adding a BYTE to an INT, particularly when the values are intermediate
+    expression results.
+    """
+
+    def __init__(self, symbol_table: SymbolTable):
+        self.symbol_table = symbol_table
+        self.items: list[TypedExpressionItem] = []
+
+    def append(self, item: TypedExpressionItem):
+        op = item.op
+        if op == TypedExpressionOp.UNARY_MINUS:
+            # TODO: Weird case(s)? - -32768 -> 32768, which is not in INT range.
+            # Might be a VM check, should automatically be handled on real CPU.
+            item.tipe = self.items[-1].tipe
+        elif op in RELATIONAL_OPS:
+            item.tipe = BYTE_TIPE
+        elif op in BINARY_OPS:
+            item1, item2 = self.items[-2], self.items[-1]
+            self.op1_const = item1.op == TypedExpressionOp.CONSTANT
+            self.op2_const = item2.op == TypedExpressionOp.CONSTANT
+            tipe1, tipe2 = item1.tipe, item2.tipe
+            self.op1_tipe, self.op2_tipe = tipe1, tipe2
+            pri1, pri2 = tipe1.cast_priority(), tipe2.cast_priority()
+            result_priority = max(pri1, pri2)
+            if result_priority == 1:
+                item.tipe = BYTE_TIPE
+            elif result_priority == 2:
+                item.tipe = INT_TIPE
+            elif result_priority == 3:
+                item.tipe = CARD_TIPE
+            else:
+                raise InternalError(f"Invalid cast priority: {result_priority}")
+        elif op == TypedExpressionOp.CONSTANT:
+            item.tipe = self.constant_type(item.index)
+            item.value = self.symbol_table.constants[item.index]
+        elif op == TypedExpressionOp.VARIABLE:
+            scope = item.scope
+            if scope == TypedExpressionScope.GLOBAL:
+                item.tipe = self.symbol_table.globals[item.index].var_tipe
+                item.address = self.symbol_table.globals[item.index].address
+            elif scope == TypedExpressionScope.LOCAL:
+                item.tipe = self.symbol_table.locals[item.index].var_tipe
+                item.address = self.symbol_table.locals[item.index].address
+            elif scope == TypedExpressionScope.PARAM:
+                item.tipe = self.symbol_table.params[item.index].var_tipe
+                item.address = self.symbol_table.params[item.index].address
+            elif scope == TypedExpressionScope.ROUTINE_REFERENCE:
+                item.tipe = CARD_TIPE
+                item.address = self.symbol_table.routines[item.index].address
+            else:
+                raise InternalError(f"Unknown scope: {scope}")
+
+        #     item.tipe = self.symbol_table.globals[item.value][1]
+        # elif op == TypedExpressionOp.GET_LOCAL:
+        #     item.tipe = self.symbol_table.locals[item.value][1]
+        # elif op == TypedExpressionOp.GET_PARAM:
+        #     item.tipe = self.symbol_table.params[item.value][1]
+        elif op == TypedExpressionOp.FUNCTION_CALL:
+            item.tipe = self.symbol_table.routines[item.index].return_tipe
+        else:
+            raise InternalError(f"Unknown operation: {op}")
+        self.items.append(item)
+
+    def optimize(self):
+        """
+        Perform optimizations on the expression, such as constant folding.
+        TODO:
+        - Move constants to second operand for commutative and comparison operations,
+            which is faster on many processors, including 6502.
+        - Convert multiplication and division by powers of 2 to shifts.
+        """
+        curr_index = 0
+        while curr_index < len(self.items):
+            item = self.items[curr_index]
+            op, tipe, _ = item.op, item.tipe, item.index
+
+            if op in BINARY_OPS:
+                item1 = self.items[curr_index - 2]
+                item2 = self.items[curr_index - 1]
+                # tipe1, tipe2 = item1.tipe, item2.tipe
+                op1, op2, value1, value2 = item1.op, item2.op, item1.index, item2.index
+                # Constant folding
+                if (
+                    op1 == TypedExpressionOp.CONSTANT
+                    and op2 == TypedExpressionOp.CONSTANT
+                ):
+                    result, tipe = self.fold_constants(op, value1, value2)
+                    # Create new constant and shift all following items down to fill in the gap.
+                    self.items[curr_index - 2] = TypedExpressionItem(
+                        TypedExpressionOp.CONSTANT, tipe, result
+                    )
+                    self.items[curr_index - 1 :] = self.items[curr_index + 1 :]
+                    curr_index -= 2
+            elif op == TypedExpressionOp.UNARY_MINUS:
+                # Apply unary minus to constant. Many compilers do this during tokenization,
+                # but the manual specifies it as a separate operation.
+                item1 = self.items[curr_index - 1]
+                op1, value1 = item1.op, item1.index
+
+                if op1 == TypedExpressionOp.CONSTANT:
+                    result = -value1
+                    result = self.constant_normalize(result)
+                    tipe = self.constant_type(result)
+                    # Create new constant and shift all following items down to fill in the gap.
+                    self.items[curr_index - 1] = TypedExpressionItem(
+                        TypedExpressionOp.CONSTANT, tipe, result
+                    )
+                    self.items[curr_index:] = self.items[curr_index + 1 :]
+                    curr_index -= 1
+
+    def constant_normalize(self, value: int) -> int:
+        if value < -32768 or value >= 65536:
+            return value % 65536
+        return value
+
+    def constant_type(self, value: int) -> Tipe:
+        if value >= 0 and value < 256:
+            return BYTE_TIPE
+        elif value >= -32768 and value < 32768:
+            return INT_TIPE
+        else:
+            return CARD_TIPE
+
+    def fold_constants(
+        self, op: TypedExpressionOp, value1: int, value2: int
+    ) -> tuple[int, Tipe]:
+        if op == TypedExpressionOp.ADD:
+            combined_result = value1 + value2
+        elif op == TypedExpressionOp.SUBTRACT:
+            combined_result = value1 - value2
+        elif op == TypedExpressionOp.MULTIPLY:
+            combined_result = value1 * value2
+        elif op == TypedExpressionOp.DIVIDE:
+            combined_result = value1 // value2
+        elif op == TypedExpressionOp.MOD:
+            combined_result = value1 % value2
+        elif op == TypedExpressionOp.LSH:
+            combined_result = value1 << value2
+        elif op == TypedExpressionOp.RSH:
+            combined_result = value1 >> value2
+        elif op == TypedExpressionOp.EQ:
+            combined_result = 1 if value1 == value2 else 0
+        elif op == TypedExpressionOp.NE:
+            combined_result = 1 if value1 != value2 else 0
+        elif op == TypedExpressionOp.GT:
+            combined_result = 1 if value1 > value2 else 0
+        elif op == TypedExpressionOp.GE:
+            combined_result = 1 if value1 >= value2 else 0
+        elif op == TypedExpressionOp.LT:
+            combined_result = 1 if value1 < value2 else 0
+        elif op == TypedExpressionOp.LE:
+            combined_result = 1 if value1 <= value2 else 0
+        elif op == TypedExpressionOp.XOR:
+            combined_result = int(bool(value1) ^ bool(value2))
+        elif op == TypedExpressionOp.BIT_AND:
+            combined_result = value1 & value2
+        elif op == TypedExpressionOp.BIT_OR:
+            combined_result = value1 | value2
+        elif op == TypedExpressionOp.BIT_XOR:
+            combined_result = value1 ^ value2
+        else:
+            raise InternalError(f"Unknown operation: {op}")
+
+        # Computed result may be outside of 16-bit range, so normalize it.
+        combined_result = self.constant_normalize(combined_result)
+
+        # Select type most appropriate for range of result
+        combined_tipe = self.constant_type(combined_result)
+
+        return combined_result, combined_tipe
+
+    def emit(self, code_gen: ByteCodeGen):
+        for curr_index, item in enumerate(self.items):
+            op, tipe, value = item.op, item.tipe, item.index
+            if op == TypedExpressionOp.CONSTANT:
+                code_gen.emit_constant(value, tipe)
+            elif op == TypedExpressionOp.GET_GLOBAL:
+                code_gen.emit_get_global(value, tipe)
+            elif op == TypedExpressionOp.GET_LOCAL:
+                code_gen.emit_get_local(value, tipe)
+            elif op == TypedExpressionOp.GET_PARAM:
+                code_gen.emit_get_param(value, tipe)
+            elif op == TypedExpressionOp.FUNCTION_CALL:
+                code_gen.emit_function_call(value, tipe)
+            elif op in BINARY_OPS:
+                op1_tipe, op2_tipe = item.op1_tipe, item.op2_tipe
+                op1_const, op2_const = item.op1_const, item.op2_const
+                code_gen.emit_binary_op(
+                    op, tipe, op1_tipe, op2_tipe, op1_const, op2_const
+                )
+            elif op == TypedExpressionOp.UNARY_MINUS:
+                code_gen.emit_unary_minus(tipe)
 
 
 class Parser:

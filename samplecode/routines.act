@@ -1,0 +1,16 @@
+BYTE x
+
+PROC r1()
+  x = 2
+RETURN
+
+PROC r2()
+  x = 3
+  DEVPRINT(x)
+  r1()
+  DEVPRINT(x)
+RETURN
+
+PROC main()
+  r2()
+RETURN
