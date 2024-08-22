@@ -9,13 +9,11 @@ from retraction.symtab import SymbolTable
 from retraction.tipes import CARD_TIPE, CAST_PRIORITY, INT_TIPE, SIZE_BYTES, Tipe, Type
 
 
-# Memory layout:
+# Virtualized 8-bit computer memory layout:
 # +---------------------------------------------------------+
 # + 2K (unused/reserved)                                    + 0x0000 - 0x07FF (2048 bytes)
 # +---------------------------------------------------------+
-# + 5K locals/work stack                                    + 0x0800 - 0x1BFF (5120 bytes)
-# +---------------------------------------------------------+
-# + 1K parameter stack                                      + 0x1C00 - 0x1FFF (1024 bytes)
+# + 6K stack                                                + 0x0800 - 0x1FFF (6144 bytes)
 # +---------------------------------------------------------+
 # + 40K program space                                       + 0x2000 - 0xBFFF (40960 bytes)
 # +---------------------------------------------------------+
@@ -24,14 +22,49 @@ from retraction.tipes import CARD_TIPE, CAST_PRIORITY, INT_TIPE, SIZE_BYTES, Tip
 
 START_RESERVED = 0x0000
 END_RESERVED = 0x07FF
-START_LOCALS = 0x0800
-END_LOCALS = 0x1BFF
-START_PARAMS = 0x1C00
-END_PARAMS = 0x1FFF
+START_STACK = 0x0800
+END_STACK = 0x1FFF
+# START_PARAMS = 0x1C00
+# END_PARAMS = 0x1FFF
 START_PROGRAM = 0x2000
 END_PROGRAM = 0xBFFF
 START_ROM = 0xC000
 END_ROM = 0xFFFF
+
+
+# Action! does not use a stack for parameters, locals, and return addresses,
+# as an optimization for the 6502. But we do use a stack for this VM.
+#
+# Stack layout: Stack grows upwards
+# +----------------------------------------------------------+
+# + CALLED ROUTINE                                           +
+# + stack pointer (top) -->                                  +
+# +                          work area         (dynamic)     +
+# + frame pointer -->        local variables   (per routine) +
+# +                          calling frame ptr (2 bytes)     +
+# +                          return address    (2 bytes)     +
+# +                          parameters size   (2 bytes)     +
+# +                          parameters        (per routine) +
+# +----------------------------------------------------------+
+# + CALLING ROUTINE                                          +
+# +                          work area for computation       +
+# +                          local variables                 +
+# +                          calling frame ptr               +
+# +                          return address                  +
+# +                          parameters size                 +
+# +                          parameters                      +
+# +----------------------------------------------------------+
+# + (etc)                                                    +
+# +----------------------------------------------------------+
+
+# This is fairly typical of frame-pointer based stack management.
+# However, the "parameters size" is needed here because the parameters are
+# pushed onto the stack in the order they are declared, and the called routine
+# references them by offset in the same order. So the parameters
+# can't be a simple negative offset from the frame pointer as is
+# commonly done by pushing parameters in reverse order. The order
+# of parameters was chosen to match the Action! parameter layout on the
+# 6502, which is not stack-based.
 
 
 def binary_op_result_type(op1_t: Type, op2_t: Type) -> Type:
@@ -159,38 +192,22 @@ BINARY_OPS = {
 
 
 class VirtualMachine:
-    def __init__(self, code: bytearray, symbol_table: SymbolTable):
+    def __init__(self, code: bytearray, symbol_table: SymbolTable = None):
         self.symbol_table = symbol_table
         self.memory = bytearray(0x10000)  # 64K memory
         # Copy code to memory
         self.initial_pc = 0x2000
         self.memory[self.initial_pc : self.initial_pc + len(code)] = code
-        self.param_ptr = START_PARAMS
-        self.frame_ptr = START_LOCALS
-        self.work_ptr = END_LOCALS + 1
+        self.frame_ptr = START_STACK
+        self.params_size = 0
         # TODO : Maybe define VM to start at address near end of memory, or maybe at start of ROM space
-        # For now, start at Program Space. Still, this requires jumping to the start of the program,
+        # For now, start at Program Space. Still, this will require jumping to the start of the program,
         # which is the beginning of the last defined routine.
-
-        # self.call_params = []
-        # self.params = []
-        # self.work_stack = []
-        # self.routine_stack = []
-
-    # def push(self, value):
-    #     self.stack.append(value)
-
-    # def pop(self):
-    #     return self.stack.pop()
-
-    # def top(self):
-    #     return self.stack[-1]
 
     def read_byte(self, address: int) -> int:
         return self.memory[address]
 
     def write_byte(self, address: int, value: int):
-        # Little-endian
         # TODO: May be unnecessary eventually, but ensure value is positive
         if value < 0:
             value = value % 0x100
@@ -208,77 +225,65 @@ class VirtualMachine:
         self.memory[address] = value & 0xFF
         self.memory[address + 1] = value >> 8
 
-    def push_work(self, value: int, t: Type):
+    def push(self, value: int, t: Type):
         size_bytes = SIZE_BYTES(t)
-        if self.work_ptr - size_bytes < self.frame_ptr:
-            raise InternalError("Work stack overflow")
+        if self.stack_ptr + size_bytes > END_STACK + 1:
+            raise InternalError("Stack overflow")
         if size_bytes == 2:
-            self.work_ptr -= 2
-            self.write_card(self.work_ptr, value)
+            self.write_card(self.stack_ptr, value)
+            self.stack_ptr += 2
         elif size_bytes == 1:
-            self.work_ptr -= 1
-            self.write_byte(self.work_ptr, value)
+            self.write_byte(self.stack_ptr, value)
+            self.stack_ptr += 1
         else:
             raise InternalError(f"Invalid size for type {t}")
 
-    def pop_work(self, t: Type) -> int:
+    def pop(self, t: Type) -> int:
         size_bytes = SIZE_BYTES(t)
-        if (self.work_ptr + size_bytes) > (END_LOCALS + 1):
-            raise InternalError("Work stack underflow")
+        if self.stack_ptr - size_bytes < START_STACK:
+            raise InternalError("Stack underflow")
         if SIZE_BYTES(t) == 2:
-            value = self.read_card(self.work_ptr)
-            self.work_ptr += 2
+            self.stack_ptr -= 2
+            value = self.read_card(self.stack_ptr)
         elif SIZE_BYTES(t) == 1:
-            value = self.read_byte(self.work_ptr)
-            self.work_ptr += 1
+            self.stack_ptr -= 1
+            value = self.read_byte(self.stack_ptr)
         else:
             raise InternalError(f"Invalid size for type {t}")
         return value
 
-    def push_param(self, value: int, t: Type):
-        size_bytes = SIZE_BYTES(t)
-        if (self.param_ptr + size_bytes) > (END_PARAMS + 1):
-            raise InternalError("Parameter stack overflow")
-        if size_bytes == 2:
-            self.write_card(self.param_ptr, value)
-            self.param_ptr += 2
-        elif size_bytes == 1:
-            self.write_byte(self.param_ptr, value)
-            self.param_ptr += 1
-        else:
-            raise InternalError(f"Invalid size for type {t}")
-
     def extract_binary_operands(self) -> tuple[Tipe, Tipe, int, int]:
         operand1_t = self.memory[self.pc + 1]
         operand2_t = self.memory[self.pc + 2]
-        operand2 = self.pop_work(operand2_t)
-        operand1 = self.pop_work(operand1_t)
+        operand2 = self.pop(operand2_t)
+        operand1 = self.pop(operand1_t)
         return operand1_t, operand2_t, operand1, operand2
 
     def run(self):
         self.pc = self.initial_pc
         while True:
+            # TODO: Optimize by reading the instruction and then dispatching
             instr = self.memory[self.pc]
             op = ByteCodeOp(instr)
             if op in BINARY_OPS:
                 op1_t, op2_t, op1, op2 = self.extract_binary_operands()
                 result, result_t = BINARY_OPS[op](op1, op2, op1_t, op2_t)
-                self.push_work(result, result_t)
+                self.push(result, result_t)
                 self.pc += 3
             elif op == ByteCodeOp.UNARY_MINUS:
                 operand_t = Type(self.memory[self.pc + 1])
-                operand = self.pop_work(operand_t)
+                operand = self.pop(operand_t)
                 result = -operand
-                self.push_work(result, operand_t)
+                self.push(result, operand_t)
                 self.pc += 2
             elif op == ByteCodeOp.NUMERICAL_CONSTANT:
                 constant_t = Type(self.memory[self.pc + 1])
                 const_value = self.read_card(self.pc + 2)
-                self.push_work(const_value, constant_t)
+                self.push(const_value, constant_t)
                 self.pc += 3
             elif op == ByteCodeOp.JUMP_IF_FALSE:
                 operand_t = Type(self.memory[self.pc + 1])
-                operand = self.pop_work(operand_t)
+                operand = self.pop(operand_t)
                 if operand == 0:
                     jump_addr = self.read_card(self.pc + 2)
                     self.pc = jump_addr
@@ -294,9 +299,11 @@ class VirtualMachine:
                 address = self.read_card(self.pc + 4)
                 # Adjust address based on scope
                 if scope == ByteCodeVariableScope.LOCAL:
+                    # Skip return address and calling frame pointer
                     address += self.frame_ptr
                 elif scope == ByteCodeVariableScope.PARAM:
-                    address += self.param_ptr
+                    param_size = self.read_card(self.frame_ptr - 6)
+                    address += self.frame_ptr - 6 - param_size
                 # Get value from address based on address mode
                 value = None
                 if address_mode == ByteCodeVariableAddressMode.DEFAULT:
@@ -319,40 +326,62 @@ class VirtualMachine:
                         value = self.read_byte(address + offset)
                 if value is None:
                     raise InternalError("Invalid value")
-                self.push_work(value, value_t)
+                self.push(value, value_t)
                 self.pc += (
                     8 if address_mode == ByteCodeVariableAddressMode.OFFSET else 6
                 )
             elif op == ByteCodeOp.PUSH_PARAM:
                 value_t = Type(self.memory[self.pc + 1])
-                size_bytes = SIZE_BYTES(value_t)
-                if size_bytes == 2:
-                    value = self.read_card(self.pc + 2)
-                elif size_bytes == 1:
-                    value = self.read_byte(self.pc + 2)
-                else:
-                    raise InternalError(f"Invalid size for type {value_t}")
-                self.push_param(value, value_t)
-                self.pc += 3 if size_bytes == 2 else 2
-
+                # In theory, we pop this and then push it. But since the value is already on the
+                # stack, we just count the size.
+                self.params_size += SIZE_BYTES(value_t)
             elif op == ByteCodeOp.ROUTINE_CALL:
-                # routine = self.symbol_table.routines[instr.value]
-                # self.routine_stack.append(self.pc)
-                # self.pc = routine.entry_point
-                # for param in self.call_params:
-                #     self.params.append(param)
-                # self.call_params.clear()
+                return_t = Type(self.memory[self.pc + 1])  # TODO: Unused?
+                params_size = self.read_card(self.pc + 2)
+                locals_size = self.read_card(self.pc + 4)
+                routine_addr = self.read_card(self.pc + 6)
+                self.push(params_size, Type.CARD)
+                # Push return address
+                self.push(self.pc + 8, Type.CARD)
+                # Push frame pointer
+                self.push(self.frame_ptr, Type.CARD)
+                # Set new frame pointer to top of stack
+                self.frame_ptr = self.stack_ptr
+                # Advance stack pointer to work area
+                self.stack_ptr += locals_size
+                # Jump to routine
+                self.pc = routine_addr
             elif op == ByteCodeOp.RETURN:
-                if self.routine_stack:
-                    self.pc = self.routine_stack.pop()
-                else:
-                    break
+                # TODO: Make sure to add a cast in the parser to ensure that the actual return type
+                # matches the routine's declared return type
+                return_t = Type(self.memory[self.pc + 1])
+                return_value = None
+                if return_t != Type.VOID_T:
+                    return_value = self.pop(return_t)
+                # Pop frame pointer
+                self.frame_ptr = self.pop(Type.CARD)
+                # Pop return address
+                self.pc = self.pop(Type.CARD)
+                # Pop params size
+                self.pop(Type.CARD)
+                # Push return value
+                if return_t != Type.VOID_T:
+                    self.push(return_value, return_t)
+            elif op == ByteCodeOp.CAST:
+                from_t = Type(self.memory[self.pc + 1])
+                to_t = Type(self.memory[self.pc + 2])
+                value = self.pop(from_t)
+                self.push(value, to_t)
+                self.pc += 3
+            elif op == ByteCodeOp.NOP:
+                self.pc += 1
             elif op == ByteCodeOp.POP:
-                self.work_stack.pop()
-            elif op == ByteCodeOp.ZERO:
-                self.work_stack.append(0)
+                pop_t = Type(self.memory[self.pc + 1])
+                self.pop(pop_t)
+                self.pc += 2
             elif op == ByteCodeOp.DEVPRINT:
-                print(self.work_stack.pop())
+                value_t = Type(self.memory[self.pc + 1])
+                value = self.pop(value_t)
+                print(value)
             else:
                 raise ValueError(f"Unknown instruction {instr.op}")
-            self.pc += 1

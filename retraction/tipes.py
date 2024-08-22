@@ -19,6 +19,7 @@ class Type(Enum):
     CARD_ARRAY_T = 11
     RECORD_T = 12
     BOOL_INTERNAL_T = 13
+    VOID_T = 14
 
 
 FUNDAMENAL_TYPES = {

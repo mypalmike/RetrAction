@@ -24,9 +24,12 @@ class ByteCodeOp(Enum):
     JUMP = 19
     POP = 20
     NUMERICAL_CONSTANT = 21
-    ROUTINE_CALL = 22
-    RETURN = 23
-    GET_VARIABLE = 24
+    GET_VARIABLE = 22
+    PUSH_PARAM = 23
+    ROUTINE_CALL = 24
+    RETURN = 25
+    CAST = 26
+    NOP = 27
     # GET_GLOBAL = 24
     # GET_ADDR_GLOBAL = 25
     # GET_PTR_GLOBAL = 26
@@ -38,8 +41,6 @@ class ByteCodeOp(Enum):
     # GET_PARAM = 32
     # SET_PARAM = 33
     # GET_ADDR_PARAM = 34
-    PUSH_PARAM = 35
-    ZERO = 36  # ?
     # TODO: Remove when not needed
     DEVPRINT = 200
 
