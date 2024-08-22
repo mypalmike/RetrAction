@@ -9,34 +9,35 @@ class ByteCodeOp(Enum):
     MOD = 4
     LSH = 5
     RSH = 6
-    OP_EQ = 7
-    OP_NE = 8
-    OP_GT = 9
-    OP_GE = 10
-    OP_LT = 11
-    OP_LE = 12
+    EQ = 7
+    NE = 8
+    GT = 9
+    GE = 10
+    LT = 11
+    LE = 12
     XOR = 13
-    OP_BIT_AND = 14
-    OP_BIT_OR = 15
-    OP_BIT_XOR = 16
+    BIT_AND = 14
+    BIT_OR = 15
+    BIT_XOR = 16
     UNARY_MINUS = 17
     JUMP_IF_FALSE = 18
     JUMP = 19
     POP = 20
-    CONSTANT = 21
+    NUMERICAL_CONSTANT = 21
     ROUTINE_CALL = 22
     RETURN = 23
-    GET_GLOBAL = 24
-    GET_ADDR_GLOBAL = 25
-    GET_PTR_GLOBAL = 26
-    SET_GLOBAL = 27
-    SET_PTR_GLOBAL = 28
-    GET_LOCAL = 29
-    SET_LOCAL = 30
-    GET_ADDR_LOCAL = 31
-    GET_PARAM = 32
-    SET_PARAM = 33
-    GET_ADDR_PARAM = 34
+    GET_VARIABLE = 24
+    # GET_GLOBAL = 24
+    # GET_ADDR_GLOBAL = 25
+    # GET_PTR_GLOBAL = 26
+    # SET_GLOBAL = 27
+    # SET_PTR_GLOBAL = 28
+    # GET_LOCAL = 29
+    # SET_LOCAL = 30
+    # GET_ADDR_LOCAL = 31
+    # GET_PARAM = 32
+    # SET_PARAM = 33
+    # GET_ADDR_PARAM = 34
     PUSH_PARAM = 35
     ZERO = 36  # ?
     # TODO: Remove when not needed
@@ -68,3 +69,16 @@ class ByteCodeOp(Enum):
 #         if not isinstance(other, ByteCode):
 #             return False
 #         return (self.value, self.op) == (other.value, other.op)
+
+
+class ByteCodeVariableScope(Enum):
+    GLOBAL = 0
+    LOCAL = 1
+    PARAM = 2
+
+
+class ByteCodeVariableAddressMode(Enum):
+    DEFAULT = 0
+    POINTER = 1
+    REFERENCE = 2
+    OFFSET = 3

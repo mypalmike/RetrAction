@@ -74,34 +74,34 @@ class ByteCodeGen:
         self.code.append(ByteCode(ByteCodeOp.RSH))
 
     def emit_eq(self):
-        self.code.append(ByteCode(ByteCodeOp.OP_EQ))
+        self.code.append(ByteCode(ByteCodeOp.EQ))
 
     def emit_ne(self):
-        self.code.append(ByteCode(ByteCodeOp.OP_NE))
+        self.code.append(ByteCode(ByteCodeOp.NE))
 
     def emit_gt(self):
-        self.code.append(ByteCode(ByteCodeOp.OP_GT))
+        self.code.append(ByteCode(ByteCodeOp.GT))
 
     def emit_ge(self):
-        self.code.append(ByteCode(ByteCodeOp.OP_GE))
+        self.code.append(ByteCode(ByteCodeOp.GE))
 
     def emit_lt(self):
-        self.code.append(ByteCode(ByteCodeOp.OP_LT))
+        self.code.append(ByteCode(ByteCodeOp.LT))
 
     def emit_le(self):
-        self.code.append(ByteCode(ByteCodeOp.OP_LE))
+        self.code.append(ByteCode(ByteCodeOp.LE))
 
     def emit_xor(self):
         self.code.append(ByteCode(ByteCodeOp.XOR))
 
     def emit_bit_and(self):
-        self.code.append(ByteCode(ByteCodeOp.OP_BIT_AND))
+        self.code.append(ByteCode(ByteCodeOp.BIT_AND))
 
     def emit_bit_or(self):
-        self.code.append(ByteCode(ByteCodeOp.OP_BIT_OR))
+        self.code.append(ByteCode(ByteCodeOp.BIT_OR))
 
     def emit_bit_xor(self):
-        self.code.append(ByteCode(ByteCodeOp.OP_BIT_XOR))
+        self.code.append(ByteCode(ByteCodeOp.BIT_XOR))
 
     def emit_unary_minus(self):
         self.code.append(ByteCode(ByteCodeOp.UNARY_MINUS))
@@ -120,8 +120,8 @@ class ByteCodeGen:
         self.code.append(ByteCode(ByteCodeOp.POP))
 
     def emit_constant(self, const_index):
-        # CONSTANT, TYPE, INDEX
-        self.append_byte(ByteCodeOp.CONSTANT)
+        # CONSTANT,
+        self.append_byte(ByteCodeOp.NUMERICAL_CONSTANT)
         constant_value = self.symbol_table.constants[const_index]
         self.append_short(constant_value)
         if isinstance(constant_value, str):

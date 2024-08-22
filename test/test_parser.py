@@ -20,16 +20,16 @@ class ParserTestCase(unittest.TestCase):
         parser = Parser(tokens, codegen, symbol_table)
         parser.parse_expression()
         expected_code = [
-            ByteCode(ByteCodeOp.CONSTANT, 0),
-            ByteCode(ByteCodeOp.CONSTANT, 1),
-            ByteCode(ByteCodeOp.CONSTANT, 2),
+            ByteCode(ByteCodeOp.NUMERICAL_CONSTANT, 0),
+            ByteCode(ByteCodeOp.NUMERICAL_CONSTANT, 1),
+            ByteCode(ByteCodeOp.NUMERICAL_CONSTANT, 2),
             ByteCode(ByteCodeOp.MULTIPLY),
             ByteCode(ByteCodeOp.ADD),
         ]
         self.assertEqual(codegen.code, expected_code)
         self.assertEqual(parser.current_token().tok_type, TokenType.EOF)
         expected_const_indices = [
-            b.value for b in expected_code if b.op == ByteCodeOp.CONSTANT
+            b.value for b in expected_code if b.op == ByteCodeOp.NUMERICAL_CONSTANT
         ]
         expected_const_values = [1, 2, 3]
         for i, index in enumerate(expected_const_indices):
@@ -43,18 +43,18 @@ class ParserTestCase(unittest.TestCase):
         parser = Parser(tokens, codegen, symbol_table)
         parser.parse_expression()
         expected_code = [
-            ByteCode(ByteCodeOp.CONSTANT, 0),
-            ByteCode(ByteCodeOp.CONSTANT, 1),
+            ByteCode(ByteCodeOp.NUMERICAL_CONSTANT, 0),
+            ByteCode(ByteCodeOp.NUMERICAL_CONSTANT, 1),
             ByteCode(ByteCodeOp.ADD),
-            ByteCode(ByteCodeOp.CONSTANT, 2),
-            ByteCode(ByteCodeOp.CONSTANT, 3),
+            ByteCode(ByteCodeOp.NUMERICAL_CONSTANT, 2),
+            ByteCode(ByteCodeOp.NUMERICAL_CONSTANT, 3),
             ByteCode(ByteCodeOp.ADD),
             ByteCode(ByteCodeOp.MULTIPLY),
         ]
         self.assertEqual(codegen.code, expected_code)
         self.assertEqual(parser.current_token().tok_type, TokenType.EOF)
         expected_const_indices = [
-            b.value for b in expected_code if b.op == ByteCodeOp.CONSTANT
+            b.value for b in expected_code if b.op == ByteCodeOp.NUMERICAL_CONSTANT
         ]
         expected_const_values = [1, 2, 3, 0x1B]
         for i, index in enumerate(expected_const_indices):
@@ -68,7 +68,7 @@ class ParserTestCase(unittest.TestCase):
         parser = Parser(tokens, codegen, symbol_table)
         parser.parse_expression()
         expected_code = [
-            ByteCode(ByteCodeOp.CONSTANT, 0),
+            ByteCode(ByteCodeOp.NUMERICAL_CONSTANT, 0),
         ]
         self.assertEqual(codegen.code, expected_code, "Should only parse first number")
 
@@ -89,21 +89,21 @@ class ParserTestCase(unittest.TestCase):
         parser = Parser(tokens, codegen, symbol_table)
         parser.parse_if_stmt()
         expected_code = [
-            ByteCode(ByteCodeOp.CONSTANT, 0),  # 1
-            ByteCode(ByteCodeOp.CONSTANT, 1),  # 3
-            ByteCode(ByteCodeOp.OP_LT),  # 1 < 3
+            ByteCode(ByteCodeOp.NUMERICAL_CONSTANT, 0),  # 1
+            ByteCode(ByteCodeOp.NUMERICAL_CONSTANT, 1),  # 3
+            ByteCode(ByteCodeOp.LT),  # 1 < 3
             ByteCode(ByteCodeOp.JUMP_IF_FALSE, 7),  # Jump to ELSEIF
-            ByteCode(ByteCodeOp.CONSTANT, 2),  # 1
+            ByteCode(ByteCodeOp.NUMERICAL_CONSTANT, 2),  # 1
             ByteCode(ByteCodeOp.DEVPRINT),  # DEVPRINT(1)
             ByteCode(ByteCodeOp.JUMP, 16),  # Jump to FI
-            ByteCode(ByteCodeOp.CONSTANT, 3),  # 2
-            ByteCode(ByteCodeOp.CONSTANT, 4),  # 3
-            ByteCode(ByteCodeOp.OP_LT),  # 2 < 3
+            ByteCode(ByteCodeOp.NUMERICAL_CONSTANT, 3),  # 2
+            ByteCode(ByteCodeOp.NUMERICAL_CONSTANT, 4),  # 3
+            ByteCode(ByteCodeOp.LT),  # 2 < 3
             ByteCode(ByteCodeOp.JUMP_IF_FALSE, 14),  # Jump to ELSE
-            ByteCode(ByteCodeOp.CONSTANT, 5),  # 2
+            ByteCode(ByteCodeOp.NUMERICAL_CONSTANT, 5),  # 2
             ByteCode(ByteCodeOp.DEVPRINT),  # DEVPRINT(2)
             ByteCode(ByteCodeOp.JUMP, 16),  # Jump to FI
-            ByteCode(ByteCodeOp.CONSTANT, 6),  # 3
+            ByteCode(ByteCodeOp.NUMERICAL_CONSTANT, 6),  # 3
             ByteCode(ByteCodeOp.DEVPRINT),  # DEVPRINT(3)
         ]
         for i, expected_bytecode in enumerate(expected_code):
@@ -124,9 +124,9 @@ class ParserTestCase(unittest.TestCase):
         parser = Parser(tokens, codegen, symbol_table)
         parser.parse_if_stmt()
         expected_code = [
-            ByteCode(ByteCodeOp.CONSTANT, 0),  # 1
+            ByteCode(ByteCodeOp.NUMERICAL_CONSTANT, 0),  # 1
             ByteCode(ByteCodeOp.JUMP_IF_FALSE, 5),  # Jump to ELSE
-            ByteCode(ByteCodeOp.CONSTANT, 1),  # 1
+            ByteCode(ByteCodeOp.NUMERICAL_CONSTANT, 1),  # 1
             ByteCode(ByteCodeOp.DEVPRINT),  # DEVPRINT(1)
             ByteCode(ByteCodeOp.JUMP, 5),  # Jump to FI
         ]
@@ -149,9 +149,9 @@ class ParserTestCase(unittest.TestCase):
         parser = Parser(tokens, codegen, symbol_table)
         parser.parse_do_loop()
         expected_code = [
-            ByteCode(ByteCodeOp.CONSTANT, 0),  # 1
+            ByteCode(ByteCodeOp.NUMERICAL_CONSTANT, 0),  # 1
             ByteCode(ByteCodeOp.DEVPRINT),  # DEVPRINT(1)
-            ByteCode(ByteCodeOp.CONSTANT, 1),  # 2
+            ByteCode(ByteCodeOp.NUMERICAL_CONSTANT, 1),  # 2
             ByteCode(ByteCodeOp.JUMP_IF_FALSE, 0),  # Jump to DO
         ]
         for i, expected_bytecode in enumerate(expected_code):
@@ -173,9 +173,9 @@ class ParserTestCase(unittest.TestCase):
         parser = Parser(tokens, codegen, symbol_table)
         parser.parse_while_loop()
         expected_code = [
-            ByteCode(ByteCodeOp.CONSTANT, 0),  # 1
+            ByteCode(ByteCodeOp.NUMERICAL_CONSTANT, 0),  # 1
             ByteCode(ByteCodeOp.JUMP_IF_FALSE, 5),  # Jump to OD
-            ByteCode(ByteCodeOp.CONSTANT, 1),  # 2
+            ByteCode(ByteCodeOp.NUMERICAL_CONSTANT, 1),  # 2
             ByteCode(ByteCodeOp.DEVPRINT),  # DEVPRINT(2)
             ByteCode(ByteCodeOp.JUMP, 0),  # Jump to WHILE
         ]
@@ -212,27 +212,27 @@ class ParserTestCase(unittest.TestCase):
         parser = Parser(tokens, codegen, symbol_table)
         parser.parse_while_loop()
         expected_code = [
-            ByteCode(ByteCodeOp.CONSTANT, 0),  # 1 [0]
+            ByteCode(ByteCodeOp.NUMERICAL_CONSTANT, 0),  # 1 [0]
             ByteCode(ByteCodeOp.JUMP_IF_FALSE, 23),  # Jump to OD [1]
-            ByteCode(ByteCodeOp.CONSTANT, 1),  # 2 [2]
+            ByteCode(ByteCodeOp.NUMERICAL_CONSTANT, 1),  # 2 [2]
             ByteCode(ByteCodeOp.JUMP_IF_FALSE, 10),  # Jump to DO [3]
-            ByteCode(ByteCodeOp.CONSTANT, 2),  # 3 [4]
+            ByteCode(ByteCodeOp.NUMERICAL_CONSTANT, 2),  # 3 [4]
             ByteCode(ByteCodeOp.DEVPRINT),  # DEVPRINT(3) [5]
             ByteCode(ByteCodeOp.JUMP, 23),  # Jump to OD [6]
-            ByteCode(ByteCodeOp.CONSTANT, 3),  # 4 [7]
+            ByteCode(ByteCodeOp.NUMERICAL_CONSTANT, 3),  # 4 [7]
             ByteCode(ByteCodeOp.DEVPRINT),  # DEVPRINT(4) [8]
             ByteCode(ByteCodeOp.JUMP, 10),  # Jump to OD [9]
-            ByteCode(ByteCodeOp.CONSTANT, 4),  # 5 [10]
+            ByteCode(ByteCodeOp.NUMERICAL_CONSTANT, 4),  # 5 [10]
             ByteCode(ByteCodeOp.DEVPRINT),  # DEVPRINT(5) [11]
-            ByteCode(ByteCodeOp.CONSTANT, 5),  # 6 [12]
+            ByteCode(ByteCodeOp.NUMERICAL_CONSTANT, 5),  # 6 [12]
             ByteCode(ByteCodeOp.DEVPRINT),  # DEVPRINT(6) [13]
             ByteCode(ByteCodeOp.JUMP, 18),  # Jump to OD [14]
-            ByteCode(ByteCodeOp.CONSTANT, 6),  # 7 [15]
+            ByteCode(ByteCodeOp.NUMERICAL_CONSTANT, 6),  # 7 [15]
             ByteCode(ByteCodeOp.DEVPRINT),  # DEVPRINT(7) [16]
             ByteCode(ByteCodeOp.JUMP, 12),  # Jump to OD [17]
             ByteCode(ByteCodeOp.JUMP, 10),  # Jump to OD [18]
             ByteCode(ByteCodeOp.JUMP, 23),  # 8 [19]
-            ByteCode(ByteCodeOp.CONSTANT, 7),  # 9 [20]
+            ByteCode(ByteCodeOp.NUMERICAL_CONSTANT, 7),  # 9 [20]
             ByteCode(ByteCodeOp.DEVPRINT),  # DEVPRINT(8) [21]
             ByteCode(ByteCodeOp.JUMP, 0),  # Jump to WHILE [22]
         ]
@@ -284,7 +284,7 @@ class ParserTestCase(unittest.TestCase):
         parser = Parser(tokens, codegen, symbol_table)
         parser.parse_assign_stmt()
         expected_code = [
-            ByteCode(ByteCodeOp.CONSTANT, 0),  # 1
+            ByteCode(ByteCodeOp.NUMERICAL_CONSTANT, 0),  # 1
             ByteCode(ByteCodeOp.SET_GLOBAL, 1),  # otherbyte
         ]
         for i, expected_bytecode in enumerate(expected_code):
@@ -341,11 +341,11 @@ class ParserTestCase(unittest.TestCase):
         parser = Parser(tokens, codegen, symbol_table)
         parser.parse_program()
         expected_code = [
-            ByteCode(ByteCodeOp.CONSTANT, 0),  # 1
+            ByteCode(ByteCodeOp.NUMERICAL_CONSTANT, 0),  # 1
             ByteCode(ByteCodeOp.DEVPRINT),  # DEVPRINT(1)
             ByteCode(ByteCodeOp.RETURN),
             ByteCode(ByteCodeOp.ROUTINE_CALL, 0),  # proc1
-            ByteCode(ByteCodeOp.CONSTANT, 1),  # 2
+            ByteCode(ByteCodeOp.NUMERICAL_CONSTANT, 1),  # 2
             ByteCode(ByteCodeOp.DEVPRINT),  # DEVPRINT(2)
             ByteCode(ByteCodeOp.ROUTINE_CALL, 1),  # proc2
             ByteCode(ByteCodeOp.RETURN),
@@ -385,10 +385,10 @@ class ParserTestCase(unittest.TestCase):
         print(symbol_table.constants)
         print(symbol_table.globals)
         expected_code = [
-            ByteCode(ByteCodeOp.CONSTANT, 0),  # 10
+            ByteCode(ByteCodeOp.NUMERICAL_CONSTANT, 0),  # 10
             ByteCode(ByteCodeOp.SET_GLOBAL, 0),  # somebyte
             ByteCode(ByteCodeOp.GET_GLOBAL, 0),  # somebyte
-            ByteCode(ByteCodeOp.CONSTANT, 1),  # 36
+            ByteCode(ByteCodeOp.NUMERICAL_CONSTANT, 1),  # 36
             ByteCode(ByteCodeOp.ADD),
             ByteCode(ByteCodeOp.SET_GLOBAL, 1),  # otherbyte
             ByteCode(ByteCodeOp.GET_GLOBAL, 1),  # otherbyte
