@@ -1,6 +1,6 @@
 from enum import Enum, auto
 
-from retraction.tipes import RecordTipe, Tipe, Routine
+from retraction.types import Type, Routine, RecordType
 
 
 class VariableScope(Enum):
@@ -13,12 +13,12 @@ class Variable:
     def __init__(
         self,
         name: str,
-        var_tipe: Tipe,
+        var_t: Type,
         address: int = 0,
         routine_index: int | None = None,
     ):
         self.name = name
-        self.var_tipe = var_tipe
+        self.var_t = var_t
         self.address = address  # Relative for locals, absolute for globals
         self.routine_index = routine_index
 
@@ -31,8 +31,8 @@ class Global(Variable):
     Global variable addresses are absolute
     """
 
-    def __init__(self, name: str, var_tipe: Tipe, address: int):
-        super().__init__(name, var_tipe, address)
+    def __init__(self, name: str, var_t: Type, address: int):
+        super().__init__(name, var_t, address)
 
     def get_scope(self):
         return VariableScope.GLOBAL
@@ -44,7 +44,7 @@ class Local(Variable):
     i.e. 0-based index
     """
 
-    def __init__(self, name: str, var_tipe: Tipe, address: int, routine_index: int):
+    def __init__(self, name: str, var_tipe: Type, address: int, routine_index: int):
         super().__init__(name, var_tipe, address, routine_index)
 
     def get_scope(self):
@@ -57,7 +57,7 @@ class Param(Variable):
     i.e. 0-based index
     """
 
-    def __init__(self, name: str, var_tipe: Tipe, address: int, routine_index: int):
+    def __init__(self, name: str, var_tipe: Type, address: int, routine_index: int):
         super().__init__(name, var_tipe, address, routine_index)
 
     def get_scope(self):
@@ -71,7 +71,7 @@ class SymbolTable:
         self.locals: list[Local] = []
         self.params: list[Param] = []
         self.routines: list[Routine] = []
-        self.tipes: list[RecordTipe] = []
+        self.tipes: list[RecordType] = []
         self.globals_lookup: dict[str, int] = {}
         self.locals_lookup: dict[tuple[int, str], int] = {}
         self.params_lookup: dict[tuple[int, str], int] = {}
@@ -95,7 +95,7 @@ class SymbolTable:
         if self.symbol_exists(name):
             raise ValueError(f"Symbol {name} already exists")
 
-    def declare_global(self, name: str, var_tipe: Tipe, initial_value: int = 0):
+    def declare_global(self, name: str, var_tipe: Type, initial_value: int = 0):
         self.check_no_symbol(name)
         next_index = len(self.globals)
         self.globals.append(Global(name, var_tipe, initial_value))
@@ -103,7 +103,7 @@ class SymbolTable:
         return next_index
 
     def declare_local(
-        self, routine_index: int, name: str, tipe: Tipe, initial_value: int = 0
+        self, routine_index: int, name: str, tipe: Type, initial_value: int = 0
     ):
         self.check_no_symbol(name)
         next_index = len(self.locals)
@@ -112,7 +112,7 @@ class SymbolTable:
         return next_index
 
     def declare_param(
-        self, routine_index: int, name: str, tipe: Tipe, initial_value: int = 0
+        self, routine_index: int, name: str, tipe: Type, initial_value: int = 0
     ):
         self.check_no_symbol(name)
         next_index = len(self.params)
@@ -127,7 +127,7 @@ class SymbolTable:
         self.routines_lookup[routine_signature.name] = next_index
         return next_index
 
-    def declare_tipe(self, record_tipe: RecordTipe) -> int:
+    def declare_tipe(self, record_tipe: RecordType) -> int:
         self.check_no_symbol(record_tipe.name)
         next_index = len(self.tipes)
         self.tipes.append(record_tipe)

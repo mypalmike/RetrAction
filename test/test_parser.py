@@ -1,10 +1,10 @@
 import unittest
 
 from retraction import Parser, Token, TokenType, tokenize
-from retraction.bytecode import ByteCode, ByteCodeOp
+from retraction.bytecode import ByteCodeOp
 from retraction.codegen import ByteCodeGen
 from retraction.symtab import SymbolTable
-from retraction.tipes import BYTE_TIPE, CARD_TIPE, INT_TIPE
+from retraction.types import Type
 
 
 # Dummy source filename for tests
@@ -262,7 +262,7 @@ class ParserTestCase(unittest.TestCase):
             g_index = symbol_table.globals_lookup[name]
             global_obj = symbol_table.globals[g_index]
             self.assertEqual(global_obj.name, name)
-            self.assertEqual(global_obj.var_tipe, type)
+            self.assertEqual(global_obj.var_t, type)
             self.assertEqual(global_obj.value, value)
 
     def test_assignment(self):

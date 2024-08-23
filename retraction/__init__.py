@@ -5,4 +5,4 @@ from .expression import *
 from .symtab import *
 from .bytecode import *
 from .vm import *
-from .tipes import *
+from .types import *

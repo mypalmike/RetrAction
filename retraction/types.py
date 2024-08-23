@@ -91,6 +91,36 @@ class RecordType:
         return f"RecordType({self.name}, {self.fields})"
 
 
+class Routine:
+    def __init__(
+        self,
+        name: str,
+        entry_point: int,
+        param_ts: list[Type],
+        return_t: Type,
+    ):
+        self.name = name
+        self.entry_point = entry_point
+        self.param_ts = param_ts
+        self.return_t = return_t
+
+    def __repr__(self) -> str:
+        return f"Routine({self.name}, {self.entry_point}, {self.param_ts}, {self.return_t})"
+
+    def is_function(self):
+        return self.return_t is not None
+
+    def is_procedure(self):
+        return self.return_t is None
+
+    def get_params_size(self):
+        return sum(SIZE_BYTES[param_t] for param_t in self.param_ts)
+
+    def get_locals_size(self):
+        # TODO: Implement this
+        return 0
+
+
 # class ArrayTipe:
 #     def __init__(self, element_type: Type, length: int | None = None):
 #         # Arrays must be of fundamental types
@@ -252,26 +282,3 @@ class RecordType:
 
 #     def __repr__(self) -> str:
 #         return f"PointerTipe({self.reference_tipe})"
-
-
-# class Routine:
-#     def __init__(
-#         self,
-#         name: str,
-#         entry_point: int,
-#         param_tipes: list[Tipe],
-#         return_tipe: Tipe | None,
-#     ):
-#         self.name = name
-#         self.entry_point = entry_point
-#         self.param_tipes = param_tipes
-#         self.return_tipe = return_tipe
-
-#     def __repr__(self) -> str:
-#         return f"Routine({self.name}, {self.entry_point}, {self.param_tipes}, {self.return_tipe})"
-
-#     def is_function(self):
-#         return self.return_tipe is not None
-
-#     def is_procedure(self):
-#         return self.return_tipe is None

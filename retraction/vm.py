@@ -6,7 +6,7 @@ from retraction.bytecode import (
 )
 from retraction.error import InternalError
 from retraction.symtab import SymbolTable
-from retraction.tipes import CARD_TIPE, CAST_PRIORITY, INT_TIPE, SIZE_BYTES, Tipe, Type
+from retraction.types import CARD_TIPE, CAST_PRIORITY, INT_TIPE, SIZE_BYTES, Tipe, Type
 
 
 # Virtualized 8-bit computer memory layout:
@@ -225,6 +225,14 @@ class VirtualMachine:
         self.memory[address] = value & 0xFF
         self.memory[address + 1] = value >> 8
 
+    def read(self, t: Type, address: int) -> int:
+        if SIZE_BYTES(t) == 2:
+            return self.read_card(address)
+        elif SIZE_BYTES(t) == 1:
+            return self.read_byte(address)
+        else:
+            raise InternalError(f"Invalid size for type {t}")
+
     def push(self, value: int, t: Type):
         size_bytes = SIZE_BYTES(t)
         if self.stack_ptr + size_bytes > END_STACK + 1:
@@ -252,7 +260,7 @@ class VirtualMachine:
             raise InternalError(f"Invalid size for type {t}")
         return value
 
-    def extract_binary_operands(self) -> tuple[Tipe, Tipe, int, int]:
+    def extract_binary_operands(self) -> tuple[Type, Type, int, int]:
         operand1_t = self.memory[self.pc + 1]
         operand2_t = self.memory[self.pc + 2]
         operand2 = self.pop(operand2_t)
@@ -278,9 +286,9 @@ class VirtualMachine:
                 self.pc += 2
             elif op == ByteCodeOp.NUMERICAL_CONSTANT:
                 constant_t = Type(self.memory[self.pc + 1])
-                const_value = self.read_card(self.pc + 2)
+                const_value = self.read(constant_t, self.pc + 2)
                 self.push(const_value, constant_t)
-                self.pc += 3
+                self.pc += 3 if SIZE_BYTES(constant_t) == 2 else 2
             elif op == ByteCodeOp.JUMP_IF_FALSE:
                 operand_t = Type(self.memory[self.pc + 1])
                 operand = self.pop(operand_t)

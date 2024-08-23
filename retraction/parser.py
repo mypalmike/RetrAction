@@ -3,18 +3,14 @@ import sys
 
 from retraction.tokens import Token, TokenType
 from retraction.codegen import ByteCodeGen
-from retraction.bytecode import ByteCode
+from retraction.bytecode import (
+    ByteCodeOp,
+    ByteCodeVariableAddressMode,
+    ByteCodeVariableScope,
+)
 from retraction.error import InternalError, SyntaxError
 from retraction.symtab import SymbolTable
-from retraction.tipes import (
-    BYTE_TIPE,
-    CARD_TIPE,
-    CHAR_TIPE,
-    INT_TIPE,
-    BaseTipe,
-    Tipe,
-    Routine,
-)
+from retraction.types import Type, Routine, RecordType
 
 
 # Highest to lowest precedence:
@@ -160,9 +156,9 @@ class TypedExpressionOp(Enum):
     BIT_XOR = auto()
     UNARY_MINUS = auto()
     CONSTANT = auto()
-    VARIABLE = auto()
-    VARIABLE_REF = auto()
-    VARIABLE_PTR = auto()
+    LOAD_VARIABLE = auto()
+    # VARIABLE_REF = auto()
+    # VARIABLE_PTR = auto()
     # GET_GLOBAL = auto()
     # GET_LOCAL = auto()
     # GET_PARAM = auto()
@@ -216,12 +212,12 @@ class TypedExpressionItem:
         # Index is used for constants, variables, and function calls
         self.index = index
         # Members below are computed when the item is added to a TypedPostfixExpression
-        self.tipe: Tipe = None
+        self.item_t: Tipe = None
         # For binary operations
         self.op1_const = False
         self.op2_const = False
-        self.op1_tipe: Tipe = None
-        self.op2_tipe: Tipe = None
+        self.op1_t: Tipe = None
+        self.op2_t: Tipe = None
         # For constants
         self.value: int = None
         # For variables
@@ -250,41 +246,41 @@ class TypedPostfixExpression:
         if op == TypedExpressionOp.UNARY_MINUS:
             # TODO: Weird case(s)? - -32768 -> 32768, which is not in INT range.
             # Might be a VM check, should automatically be handled on real CPU.
-            item.tipe = self.items[-1].tipe
+            item.item_t = self.items[-1].item_t
         elif op in RELATIONAL_OPS:
-            item.tipe = BYTE_TIPE
+            item.item_t = Type.BYTE_T
         elif op in BINARY_OPS:
             item1, item2 = self.items[-2], self.items[-1]
             self.op1_const = item1.op == TypedExpressionOp.CONSTANT
             self.op2_const = item2.op == TypedExpressionOp.CONSTANT
-            tipe1, tipe2 = item1.tipe, item2.tipe
-            self.op1_tipe, self.op2_tipe = tipe1, tipe2
-            pri1, pri2 = tipe1.cast_priority(), tipe2.cast_priority()
+            item1_t, item2_t = item1.item_t, item2.item_t
+            self.op1_t, self.op2_t = item1_t, item2_t
+            pri1, pri2 = item1_t.cast_priority(), item2_t.cast_priority()
             result_priority = max(pri1, pri2)
             if result_priority == 1:
-                item.tipe = BYTE_TIPE
+                item.item_t = Type.BYTE_T
             elif result_priority == 2:
-                item.tipe = INT_TIPE
+                item.item_t = Type.INT_T
             elif result_priority == 3:
-                item.tipe = CARD_TIPE
+                item.item_t = Type.CARD_T
             else:
                 raise InternalError(f"Invalid cast priority: {result_priority}")
         elif op == TypedExpressionOp.CONSTANT:
-            item.tipe = self.constant_type(item.index)
+            item.item_t = self.constant_type(item.index)
             item.value = self.symbol_table.constants[item.index]
-        elif op == TypedExpressionOp.VARIABLE:
+        elif op == TypedExpressionOp.LOAD_VARIABLE:
             scope = item.scope
             if scope == TypedExpressionScope.GLOBAL:
-                item.tipe = self.symbol_table.globals[item.index].var_tipe
+                item.item_t = self.symbol_table.globals[item.index].var_tipe
                 item.address = self.symbol_table.globals[item.index].address
             elif scope == TypedExpressionScope.LOCAL:
-                item.tipe = self.symbol_table.locals[item.index].var_tipe
+                item.item_t = self.symbol_table.locals[item.index].var_tipe
                 item.address = self.symbol_table.locals[item.index].address
             elif scope == TypedExpressionScope.PARAM:
-                item.tipe = self.symbol_table.params[item.index].var_tipe
+                item.item_t = self.symbol_table.params[item.index].var_tipe
                 item.address = self.symbol_table.params[item.index].address
             elif scope == TypedExpressionScope.ROUTINE_REFERENCE:
-                item.tipe = CARD_TIPE
+                item.item_t = CARD_TIPE
                 item.address = self.symbol_table.routines[item.index].address
             else:
                 raise InternalError(f"Unknown scope: {scope}")
@@ -295,7 +291,7 @@ class TypedPostfixExpression:
         # elif op == TypedExpressionOp.GET_PARAM:
         #     item.tipe = self.symbol_table.params[item.value][1]
         elif op == TypedExpressionOp.FUNCTION_CALL:
-            item.tipe = self.symbol_table.routines[item.index].return_tipe
+            item.item_t = self.symbol_table.routines[item.index].return_tipe
         else:
             raise InternalError(f"Unknown operation: {op}")
         self.items.append(item)
@@ -307,11 +303,12 @@ class TypedPostfixExpression:
         - Move constants to second operand for commutative and comparison operations,
             which is faster on many processors, including 6502.
         - Convert multiplication and division by powers of 2 to shifts.
+        - Store followed by load of same variable can be removed.
         """
         curr_index = 0
         while curr_index < len(self.items):
             item = self.items[curr_index]
-            op, tipe, _ = item.op, item.tipe, item.index
+            op, tipe, _ = item.op, item.item_t, item.index
 
             if op in BINARY_OPS:
                 item1 = self.items[curr_index - 2]
@@ -410,9 +407,9 @@ class TypedPostfixExpression:
 
     def emit(self, code_gen: ByteCodeGen):
         for curr_index, item in enumerate(self.items):
-            op, tipe, value = item.op, item.tipe, item.index
+            op, tipe, value = item.op, item.item_t, item.index
             if op == TypedExpressionOp.CONSTANT:
-                code_gen.emit_constant(value, tipe)
+                code_gen.emit_numerical_constant(value, tipe)
             elif op == TypedExpressionOp.GET_GLOBAL:
                 code_gen.emit_get_global(value, tipe)
             elif op == TypedExpressionOp.GET_LOCAL:
@@ -422,7 +419,7 @@ class TypedPostfixExpression:
             elif op == TypedExpressionOp.FUNCTION_CALL:
                 code_gen.emit_function_call(value, tipe)
             elif op in BINARY_OPS:
-                op1_tipe, op2_tipe = item.op1_tipe, item.op2_tipe
+                op1_tipe, op2_tipe = item.op1_t, item.op2_t
                 op1_const, op2_const = item.op1_const, item.op2_const
                 code_gen.emit_binary_op(
                     op, tipe, op1_tipe, op2_tipe, op1_const, op2_const
@@ -445,7 +442,8 @@ class Parser:
 
         # Parsing state
         self.parsing_params = False
-        self.exits_to_patch: list[list[ByteCode]] = []
+        # self.exits_to_patch: list[list[ByteCode]] = []
+        self.exits_to_patch: list[list[int]] = []  # Addresses of jumps to patch
         self.curr_routine_index = None
 
     def current_token(self):
@@ -1287,7 +1285,7 @@ class Parser:
             raise SyntaxError(f"Numeric literal {value} out of range [-65535, 65535]")
         self.advance()
         const_index = self.symbol_table.declare_constant(value)
-        self.code_gen.emit_constant(const_index)
+        self.code_gen.emit_numerical_constant(const_index)
 
     def parse_grouping(self):
         self.advance()
