@@ -177,6 +177,44 @@ class TypedExpressionOp(Enum):
             return None
         return 2
 
+    def get_bytecode_op(self):
+        if self == TypedExpressionOp.ADD:
+            return ByteCodeOp.ADD
+        elif self == TypedExpressionOp.SUBTRACT:
+            return ByteCodeOp.SUBTRACT
+        elif self == TypedExpressionOp.MULTIPLY:
+            return ByteCodeOp.MULTIPLY
+        elif self == TypedExpressionOp.DIVIDE:
+            return ByteCodeOp.DIVIDE
+        elif self == TypedExpressionOp.MOD:
+            return ByteCodeOp.MOD
+        elif self == TypedExpressionOp.LSH:
+            return ByteCodeOp.LSH
+        elif self == TypedExpressionOp.RSH:
+            return ByteCodeOp.RSH
+        elif self == TypedExpressionOp.EQ:
+            return ByteCodeOp.EQ
+        elif self == TypedExpressionOp.NE:
+            return ByteCodeOp.NE
+        elif self == TypedExpressionOp.GT:
+            return ByteCodeOp.GT
+        elif self == TypedExpressionOp.GE:
+            return ByteCodeOp.GE
+        elif self == TypedExpressionOp.LT:
+            return ByteCodeOp.LT
+        elif self == TypedExpressionOp.LE:
+            return ByteCodeOp.LE
+        elif self == TypedExpressionOp.XOR:
+            return ByteCodeOp.XOR
+        elif self == TypedExpressionOp.BIT_AND:
+            return ByteCodeOp.BIT_AND
+        elif self == TypedExpressionOp.BIT_OR:
+            return ByteCodeOp.BIT_OR
+        elif self == TypedExpressionOp.BIT_XOR:
+            return ByteCodeOp.BIT_XOR
+        else:
+            raise InternalError(f"Unexpected call to get_bytecode_op: {self}")
+
 
 BINARY_OPS = {
     TypedExpressionOp.ADD,
@@ -227,8 +265,8 @@ class TypedExpressionItem:
         # Members below are computed when the item is added to a TypedPostfixExpression
         self.item_t: Type = None
         # For binary operations
-        self.op1_const = False
-        self.op2_const = False
+        # self.op1_const = False
+        # self.op2_const = False
         self.op1_t: Type = None
         self.op2_t: Type = None
         # For constants
@@ -240,6 +278,9 @@ class TypedExpressionItem:
         self.deepest_operand_index_memo: int | None = None
         # self.is_pointer = False
         # self.is_reference = False
+
+    def __repr__(self):
+        return f"TypedExpressionItem - op: {self.op}, index: {self.index}, item_t: {self.item_t}"
 
 
 class TypedPostfixExpression:
@@ -268,12 +309,15 @@ class TypedPostfixExpression:
             # -1 for current item, -1 for operand2
             operand2_index = len(self.items) - 2
             operand1_index = self.deepest_operand_index(operand2_index) - 1
+            print(
+                f"op: {op}, operand1_index: {operand1_index}, operand2_index: {operand2_index}"
+            )
             item.op1_t = self.items[operand1_index].item_t
             item.op2_t = self.items[operand2_index].item_t
             item.item_t = binary_expression_type(item.op1_t, item.op2_t)
         elif op == TypedExpressionOp.CONSTANT:
-            item.item_t = self.constant_type(item.index)
             item.value = self.symbol_table.numerical_constants[item.index]
+            item.item_t = self.constant_type(item.value)
         elif op == TypedExpressionOp.LOAD_VARIABLE:
             scope = item.scope
             if scope == TypedExpressionScope.GLOBAL:
@@ -301,6 +345,9 @@ class TypedPostfixExpression:
         else:
             raise InternalError(f"Unknown operation: {op}")
         self.items.append(item)
+        print("append:")
+        for item in self.items:
+            print(item)
 
     def deepest_operand_index(self, index: int) -> int:
         """
@@ -442,25 +489,37 @@ class TypedPostfixExpression:
 
     def emit_bytecode(self, code_gen: ByteCodeGen):
         for curr_index, item in enumerate(self.items):
-            op, tipe, value = item.op, item.item_t, item.index
+            op, item_t, index = item.op, item.item_t, item.index
             if op == TypedExpressionOp.CONSTANT:
-                code_gen.emit_numerical_constant(value, tipe)
-            elif op == TypedExpressionOp.GET_GLOBAL:
-                code_gen.emit_get_global(value, tipe)
-            elif op == TypedExpressionOp.GET_LOCAL:
-                code_gen.emit_get_local(value, tipe)
-            elif op == TypedExpressionOp.GET_PARAM:
-                code_gen.emit_get_param(value, tipe)
+                code_gen.emit_numerical_constant(index)
+            elif op == TypedExpressionOp.LOAD_VARIABLE:
+                if item.scope == TypedExpressionScope.GLOBAL:
+                    code_gen.emit_get_global(index)
+                elif item.scope == TypedExpressionScope.LOCAL:
+                    code_gen.emit_get_local(index, item_t)
+                elif item.scope == TypedExpressionScope.PARAM:
+                    code_gen.emit_get_param(index, item_t)
+                elif item.scope == TypedExpressionScope.ROUTINE_REFERENCE:
+                    code_gen.emit_get_routine_reference(index)
+            # elif op == TypedExpressionOp.GET_GLOBAL:
+            #     code_gen.emit_get_global(index)
+            # elif op == TypedExpressionOp.GET_LOCAL:
+            #     code_gen.emit_get_local(value, item_t)
+            # elif op == TypedExpressionOp.GET_PARAM:
+            #     code_gen.emit_get_param(value, item_t)
             elif op == TypedExpressionOp.FUNCTION_CALL:
-                code_gen.emit_function_call(value, tipe)
+                code_gen.emit_function_call(value, item_t)
             elif op in BINARY_OPS:
-                op1_tipe, op2_tipe = item.op1_t, item.op2_t
-                op1_const, op2_const = item.op1_const, item.op2_const
-                code_gen.emit_binary_op(
-                    op, tipe, op1_tipe, op2_tipe, op1_const, op2_const
-                )
+                bytecode_op = op.get_bytecode_op()
+                code_gen.emit_binary_op(bytecode_op, item.op1_t, item.op2_t)
+
+                # op1_tipe, op2_tipe = item.op1_t, item.op2_t
+                # op1_const, op2_const = item.op1_const, item.op2_const
+                # code_gen.emit_binary_op(
+                #     op, item_t, op1_tipe, op2_tipe, op1_const, op2_const
+                # )
             elif op == TypedExpressionOp.UNARY_MINUS:
-                code_gen.emit_unary_minus(tipe)
+                code_gen.emit_unary_minus(item_t)
 
 
 class Parser:
@@ -1350,12 +1409,16 @@ class Parser:
         self.parse_expr_precedence(ExprPrecedence(rule.precedence.value + 1))
 
         if operator_type == TokenType.OP_PLUS:
-            self.code_gen.emit_add()
+            # self.code_gen.emit_add()
+            self.typed_expression.append(TypedExpressionItem(TypedExpressionOp.ADD))
         elif operator_type == TokenType.OP_MINUS:
             self.code_gen.emit_subtract()
         elif operator_type == TokenType.OP_TIMES:
             #     def emit_binary_op(self, op: ByteCodeOp, operand1_t: Type, operand2_t: Type):
-            self.code_gen.emit_binary_op(ByteCodeOp.MULTIPLY, None, None)
+            # self.code_gen.emit_binary_op(ByteCodeOp.MULTIPLY, None, None)
+            self.typed_expression.append(
+                TypedExpressionItem(TypedExpressionOp.MULTIPLY)
+            )
         elif operator_type == TokenType.OP_DIVIDE:
             self.code_gen.emit_divide()
         elif operator_type == TokenType.MOD:

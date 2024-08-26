@@ -65,8 +65,11 @@ CAST_PRIORITY = [
 
 
 def binary_expression_type(t1: Type, t2: Type) -> Type:
-    pri1, pri2 = t1.cast_priority(), t2.cast_priority()
+    pri1, pri2 = CAST_PRIORITY[t1.value], CAST_PRIORITY[t2.value]
     result_priority = max(pri1, pri2)
+    print(
+        f"binary_expression_type... t1: {t1}, t2: {t2}, result_priority: {result_priority}"
+    )
     if result_priority == 1:
         return Type.BYTE_T
     elif result_priority == 2:

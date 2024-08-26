@@ -94,7 +94,7 @@ class ByteCodeGen:
             OPERAND1_T - 1 byte
             OPERAND2_T - 1 byte
         """
-        self.append_byte(op)
+        self.append_byte(op.value)
         self.append_byte(operand1_t.value)
         self.append_byte(operand2_t.value)
 

@@ -1,3 +1,5 @@
+from binascii import hexlify
+
 import unittest
 
 from retraction import Parser, TokenType, tokenize
@@ -75,7 +77,13 @@ class ParserTestCase(unittest.TestCase):
             ]
         )
         len_expected = len(expected_bytecode)
-        self.assertEqual(codegen.code[:len_expected], expected_bytecode)
+        for i, b in enumerate(codegen.code[:len_expected]):
+            self.assertEqual(
+                b,
+                expected_bytecode[i],
+                f"Bytecode mismatch at index {i} (\n{hexlify(codegen.code[:len_expected], '-', 2)} vs\n{hexlify(expected_bytecode, '-', 2)})",
+            )
+        # self.assertEqual(codegen.code[:len_expected], expected_bytecode)
         self.assertEqual(parser.current_token().tok_type, TokenType.EOF)
 
     # def test_arith_expr_simple(self):
