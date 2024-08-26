@@ -44,8 +44,8 @@ class Local(Variable):
     i.e. 0-based index
     """
 
-    def __init__(self, name: str, var_tipe: Type, address: int, routine_index: int):
-        super().__init__(name, var_tipe, address, routine_index)
+    def __init__(self, name: str, var_t: Type, address: int, routine_index: int):
+        super().__init__(name, var_t, address, routine_index)
 
     def get_scope(self):
         return VariableScope.LOCAL
@@ -57,8 +57,8 @@ class Param(Variable):
     i.e. 0-based index
     """
 
-    def __init__(self, name: str, var_tipe: Type, address: int, routine_index: int):
-        super().__init__(name, var_tipe, address, routine_index)
+    def __init__(self, name: str, var_t: Type, address: int, routine_index: int):
+        super().__init__(name, var_t, address, routine_index)
 
     def get_scope(self):
         return VariableScope.PARAM
@@ -66,17 +66,17 @@ class Param(Variable):
 
 class SymbolTable:
     def __init__(self):
-        self.constants: list[str | int] = []
+        self.numerical_constants: list[int] = []
         self.globals: list[Global] = []
         self.locals: list[Local] = []
         self.params: list[Param] = []
         self.routines: list[Routine] = []
-        self.tipes: list[RecordType] = []
+        self.record_types: list[RecordType] = []
         self.globals_lookup: dict[str, int] = {}
         self.locals_lookup: dict[tuple[int, str], int] = {}
         self.params_lookup: dict[tuple[int, str], int] = {}
         self.routines_lookup: dict[str, int] = {}
-        self.tipes_lookup: dict[str, int] = {}
+        self.record_types_lookup: dict[str, int] = {}
 
     def symbol_exists(self, name):
         return (
@@ -84,7 +84,7 @@ class SymbolTable:
             or name in self.locals_lookup
             or name in self.params_lookup
             or name in self.routines_lookup
-            or name in self.tipes_lookup
+            or name in self.record_types_lookup
         )
 
     def check_symbol(self, name):
@@ -95,28 +95,28 @@ class SymbolTable:
         if self.symbol_exists(name):
             raise ValueError(f"Symbol {name} already exists")
 
-    def declare_global(self, name: str, var_tipe: Type, initial_value: int = 0):
+    def declare_global(self, name: str, var_t: Type, initial_value: int = 0):
         self.check_no_symbol(name)
         next_index = len(self.globals)
-        self.globals.append(Global(name, var_tipe, initial_value))
+        self.globals.append(Global(name, var_t, initial_value))
         self.globals_lookup[name] = next_index
         return next_index
 
     def declare_local(
-        self, routine_index: int, name: str, tipe: Type, initial_value: int = 0
+        self, routine_index: int, name: str, local_t: Type, initial_value: int = 0
     ):
         self.check_no_symbol(name)
         next_index = len(self.locals)
-        self.locals.append(Local(routine_index, name, tipe, initial_value))
+        self.locals.append(Local(routine_index, name, local_t, initial_value))
         self.locals_lookup[(next_index, name)] = next_index
         return next_index
 
     def declare_param(
-        self, routine_index: int, name: str, tipe: Type, initial_value: int = 0
+        self, routine_index: int, name: str, param_t: Type, initial_value: int = 0
     ):
         self.check_no_symbol(name)
         next_index = len(self.params)
-        self.params.append(Param(routine_index, name, tipe, initial_value))
+        self.params.append(Param(routine_index, name, param_t, initial_value))
         self.params_lookup[(next_index, name)] = next_index
         return next_index
 
@@ -127,14 +127,14 @@ class SymbolTable:
         self.routines_lookup[routine_signature.name] = next_index
         return next_index
 
-    def declare_tipe(self, record_tipe: RecordType) -> int:
-        self.check_no_symbol(record_tipe.name)
-        next_index = len(self.tipes)
-        self.tipes.append(record_tipe)
-        self.tipes_lookup[record_tipe.name] = next_index
+    def declare_record_type(self, record_t: RecordType) -> int:
+        self.check_no_symbol(record_t.name)
+        next_index = len(self.record_types)
+        self.record_types.append(record_t)
+        self.record_types_lookup[record_t.name] = next_index
         return next_index
 
     def declare_constant(self, value: str | int):
-        index = len(self.constants)
-        self.constants.append(value)
+        index = len(self.numerical_constants)
+        self.numerical_constants.append(value)
         return index

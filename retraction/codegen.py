@@ -149,24 +149,17 @@ class ByteCodeGen:
             TYPE               - 1 byte
             VALUE              - 1 or 2 bytes
         """
-        self.append_byte(ByteCodeOp.NUMERICAL_CONSTANT)
-        constant_value = self.symbol_table.constants[const_index]
-        constant_t = self.symbol_table.constants[const_index].type
-        self.append(constant_t, constant_value)
-
-        # # CONSTANT,
-        # self.append_byte(ByteCodeOp.NUMERICAL_CONSTANT)
-        # constant_value = self.symbol_table.constants[const_index]
-        # self.append_short(constant_value)
-        # if isinstance(constant_value, str):
-        #     raise NotImplementedError
-        # else:
-        #     if constant_value < 256:
-        #         self.append_byte(BaseTipe.BYTE)
-        #     elif constant_value > -32768 and constant_value < 32768:
-        #         self.append_byte(BaseTipe.INT)
-        #     else:
-        #         self.append_byte(BaseTipe.CARD)
+        self.append_byte(ByteCodeOp.NUMERICAL_CONSTANT.value)
+        constant_value = self.symbol_table.numerical_constants[const_index]
+        if constant_value < 256:
+            self.append_byte(Type.BYTE_T.value)
+            self.append_byte(constant_value)
+        elif constant_value > -32768 and constant_value < 32768:
+            self.append_byte(Type.INT_T.value)
+            self.append_short(constant_value)
+        else:
+            self.append_byte(Type.CARD_T.value)
+            self.append_short(constant_value)
 
     def emit_get_global(self, global_index):
         # GET_GLOBAL, TYPE, INDEX

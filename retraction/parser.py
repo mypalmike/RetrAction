@@ -10,7 +10,7 @@ from retraction.bytecode import (
 )
 from retraction.error import InternalError, SyntaxError
 from retraction.symtab import SymbolTable
-from retraction.types import Type, Routine, RecordType
+from retraction.types import Type, Routine, RecordType, binary_expression_type
 
 
 # Highest to lowest precedence:
@@ -35,7 +35,7 @@ class ExprPrecedence(Enum):
 
 class ExprAction(Enum):
     NONE = auto()
-    NUMBER = auto()
+    NUMERIC_LITERAL = auto()
     GROUPING = auto()
     UNARY = auto()
     BINARY = auto()
@@ -121,13 +121,13 @@ EXPRESSION_RULES = {
         ExprAction.NONE, ExprAction.BINARY, ExprPrecedence.XOR
     ),
     TokenType.INT_LITERAL: ExprRule(
-        ExprAction.NUMBER, ExprAction.NONE, ExprPrecedence.NONE
+        ExprAction.NUMERIC_LITERAL, ExprAction.NONE, ExprPrecedence.NONE
     ),
     TokenType.HEX_LITERAL: ExprRule(
-        ExprAction.NUMBER, ExprAction.NONE, ExprPrecedence.NONE
+        ExprAction.NUMERIC_LITERAL, ExprAction.NONE, ExprPrecedence.NONE
     ),
     TokenType.CHAR_LITERAL: ExprRule(
-        ExprAction.NUMBER, ExprAction.NONE, ExprPrecedence.NONE
+        ExprAction.NUMERIC_LITERAL, ExprAction.NONE, ExprPrecedence.NONE
     ),
     TokenType.IDENTIFIER: ExprRule(
         ExprAction.IDENTIFIER, ExprAction.NONE, ExprPrecedence.NONE
@@ -163,6 +163,19 @@ class TypedExpressionOp(Enum):
     # GET_LOCAL = auto()
     # GET_PARAM = auto()
     FUNCTION_CALL = auto()
+
+    def num_operands(self) -> int | None:
+        """
+        Return the number of operands for the operation.
+        None means the number of operands is variable.
+        """
+        if self in [TypedExpressionOp.CONSTANT, TypedExpressionOp.LOAD_VARIABLE]:
+            return 0
+        elif self in [TypedExpressionOp.UNARY_MINUS]:
+            return 1
+        elif self in [TypedExpressionOp.FUNCTION_CALL]:
+            return None
+        return 2
 
 
 BINARY_OPS = {
@@ -212,17 +225,19 @@ class TypedExpressionItem:
         # Index is used for constants, variables, and function calls
         self.index = index
         # Members below are computed when the item is added to a TypedPostfixExpression
-        self.item_t: Tipe = None
+        self.item_t: Type = None
         # For binary operations
         self.op1_const = False
         self.op2_const = False
-        self.op1_t: Tipe = None
-        self.op2_t: Tipe = None
+        self.op1_t: Type = None
+        self.op2_t: Type = None
         # For constants
         self.value: int = None
         # For variables
         self.address: int = None
         self.scope: TypedExpressionScope = None
+        # Memoization for deepest_operand_index
+        self.deepest_operand_index_memo: int | None = None
         # self.is_pointer = False
         # self.is_reference = False
 
@@ -250,28 +265,19 @@ class TypedPostfixExpression:
         elif op in RELATIONAL_OPS:
             item.item_t = Type.BYTE_T
         elif op in BINARY_OPS:
-            item1, item2 = self.items[-2], self.items[-1]
-            self.op1_const = item1.op == TypedExpressionOp.CONSTANT
-            self.op2_const = item2.op == TypedExpressionOp.CONSTANT
-            item1_t, item2_t = item1.item_t, item2.item_t
-            self.op1_t, self.op2_t = item1_t, item2_t
-            pri1, pri2 = item1_t.cast_priority(), item2_t.cast_priority()
-            result_priority = max(pri1, pri2)
-            if result_priority == 1:
-                item.item_t = Type.BYTE_T
-            elif result_priority == 2:
-                item.item_t = Type.INT_T
-            elif result_priority == 3:
-                item.item_t = Type.CARD_T
-            else:
-                raise InternalError(f"Invalid cast priority: {result_priority}")
+            # -1 for current item, -1 for operand2
+            operand2_index = len(self.items) - 2
+            operand1_index = self.deepest_operand_index(operand2_index) - 1
+            item.op1_t = self.items[operand1_index].item_t
+            item.op2_t = self.items[operand2_index].item_t
+            item.item_t = binary_expression_type(item.op1_t, item.op2_t)
         elif op == TypedExpressionOp.CONSTANT:
             item.item_t = self.constant_type(item.index)
-            item.value = self.symbol_table.constants[item.index]
+            item.value = self.symbol_table.numerical_constants[item.index]
         elif op == TypedExpressionOp.LOAD_VARIABLE:
             scope = item.scope
             if scope == TypedExpressionScope.GLOBAL:
-                item.item_t = self.symbol_table.globals[item.index].var_tipe
+                item.item_t = self.symbol_table.globals[item.index].var_t
                 item.address = self.symbol_table.globals[item.index].address
             elif scope == TypedExpressionScope.LOCAL:
                 item.item_t = self.symbol_table.locals[item.index].var_tipe
@@ -280,7 +286,7 @@ class TypedPostfixExpression:
                 item.item_t = self.symbol_table.params[item.index].var_tipe
                 item.address = self.symbol_table.params[item.index].address
             elif scope == TypedExpressionScope.ROUTINE_REFERENCE:
-                item.item_t = CARD_TIPE
+                item.item_t = Type.CARD_T
                 item.address = self.symbol_table.routines[item.index].address
             else:
                 raise InternalError(f"Unknown scope: {scope}")
@@ -295,6 +301,35 @@ class TypedPostfixExpression:
         else:
             raise InternalError(f"Unknown operation: {op}")
         self.items.append(item)
+
+    def deepest_operand_index(self, index: int) -> int:
+        """
+        Recursively find the deepest (leftmost) operand. Used to determine the type of a binary operation.
+        e.g. for the stack 1,2,3,+,*, the leftmost operand of + is 2, the leftmost operand of * is 1.
+        """
+        if index < 0:
+            raise InternalError("No operand found for binary operation.")
+
+        # Short-circuit if the result is already memoized.
+        if self.items[index].deepest_operand_index_memo is not None:
+            return self.items[index].deepest_operand_index_memo
+
+        n_operands = self.items[index].op.num_operands()
+        if n_operands == None:
+            # Function call. Look up the number of arguments in the routine from the symbol table.
+            function_item = self.items[index]
+            function_item_index = function_item.index
+            routine = self.symbol_table.routines[function_item_index]
+            n_operands = len(routine.param_ts)
+        # Recurse to the leftmost operand. This is the heavy lifting of the algorithm.
+        for _ in range(n_operands):
+            index = index - 1
+            index = self.deepest_operand_index(index)
+
+        # Memoize the result.
+        self.items[index].deepest_operand_index_memo = index
+
+        return index
 
     def optimize(self):
         """
@@ -349,17 +384,17 @@ class TypedPostfixExpression:
             return value % 65536
         return value
 
-    def constant_type(self, value: int) -> Tipe:
+    def constant_type(self, value: int) -> Type:
         if value >= 0 and value < 256:
-            return BYTE_TIPE
+            return Type.BYTE_T
         elif value >= -32768 and value < 32768:
-            return INT_TIPE
+            return Type.INT_T
         else:
-            return CARD_TIPE
+            return Type.CARD_T
 
     def fold_constants(
         self, op: TypedExpressionOp, value1: int, value2: int
-    ) -> tuple[int, Tipe]:
+    ) -> tuple[int, Type]:
         if op == TypedExpressionOp.ADD:
             combined_result = value1 + value2
         elif op == TypedExpressionOp.SUBTRACT:
@@ -405,7 +440,7 @@ class TypedPostfixExpression:
 
         return combined_result, combined_tipe
 
-    def emit(self, code_gen: ByteCodeGen):
+    def emit_bytecode(self, code_gen: ByteCodeGen):
         for curr_index, item in enumerate(self.items):
             op, tipe, value = item.op, item.item_t, item.index
             if op == TypedExpressionOp.CONSTANT:
@@ -445,6 +480,7 @@ class Parser:
         # self.exits_to_patch: list[list[ByteCode]] = []
         self.exits_to_patch: list[list[int]] = []  # Addresses of jumps to patch
         self.curr_routine_index = None
+        self.typed_expression = None
 
     def current_token(self):
         if self.current_token_index < len(self.tokens):
@@ -766,7 +802,7 @@ class Parser:
         if self.current_token().tok_type != TokenType.IDENTIFIER:
             return False
         # Make sure it's a record.
-        record_type_index = self.symbol_table.tipes_lookup.get(
+        record_type_index = self.symbol_table.record_types_lookup.get(
             self.current_token().value
         )
         if record_type_index is None:
@@ -1232,8 +1268,14 @@ class Parser:
 
     # We implement the precedence climbing algorithm to parse expressions
     def parse_expression(self):
-        # Start at lowest precedence
+        self.typed_expression = TypedPostfixExpression(self.symbol_table)
+
         self.parse_expr_precedence(ExprPrecedence.XOR)
+
+        # TODO: Run the optimization code here. Probably add a parser flag to enable this.
+        # self.typed_expression.optimize()
+
+        self.typed_expression.emit_bytecode(self.code_gen)
 
     def parse_expr_precedence(self, precedence: ExprPrecedence):
         if self.current_token().tok_type not in EXPRESSION_RULES:
@@ -1256,8 +1298,8 @@ class Parser:
                 return
 
     def parse_expr_action(self, action: ExprAction):
-        if action == ExprAction.NUMBER:
-            self.parse_number()
+        if action == ExprAction.NUMERIC_LITERAL:
+            self.parse_numeric_literal()
         elif action == ExprAction.GROUPING:
             self.parse_grouping()
         elif action == ExprAction.UNARY:
@@ -1271,7 +1313,7 @@ class Parser:
         elif action == ExprAction.IDENTIFIER:
             self.parse_identifier_expr()
 
-    def parse_number(self):
+    def parse_numeric_literal(self):
         value = None
         if self.current_token().tok_type == TokenType.INT_LITERAL:
             value = int(self.current_token().value)
@@ -1285,7 +1327,9 @@ class Parser:
             raise SyntaxError(f"Numeric literal {value} out of range [-65535, 65535]")
         self.advance()
         const_index = self.symbol_table.declare_constant(value)
-        self.code_gen.emit_numerical_constant(const_index)
+        typed_expression = TypedExpressionItem(TypedExpressionOp.CONSTANT, const_index)
+        self.typed_expression.append(typed_expression)
+        # self.code_gen.emit_numerical_constant(const_index)
 
     def parse_grouping(self):
         self.advance()
@@ -1310,7 +1354,8 @@ class Parser:
         elif operator_type == TokenType.OP_MINUS:
             self.code_gen.emit_subtract()
         elif operator_type == TokenType.OP_TIMES:
-            self.code_gen.emit_multiply()
+            #     def emit_binary_op(self, op: ByteCodeOp, operand1_t: Type, operand2_t: Type):
+            self.code_gen.emit_binary_op(ByteCodeOp.MULTIPLY, None, None)
         elif operator_type == TokenType.OP_DIVIDE:
             self.code_gen.emit_divide()
         elif operator_type == TokenType.MOD:

@@ -64,6 +64,19 @@ CAST_PRIORITY = [
 ]
 
 
+def binary_expression_type(t1: Type, t2: Type) -> Type:
+    pri1, pri2 = t1.cast_priority(), t2.cast_priority()
+    result_priority = max(pri1, pri2)
+    if result_priority == 1:
+        return Type.BYTE_T
+    elif result_priority == 2:
+        return Type.INT_T
+    elif result_priority == 3:
+        return Type.CARD_T
+    else:
+        raise InternalError(f"Invalid cast priority: {result_priority}")
+
+
 class RecordType:
     def __init__(self, name: str):
         self.name = name

@@ -1,12 +1,11 @@
 from retraction.bytecode import (
     ByteCodeOp,
-    ByteCode,
     ByteCodeVariableAddressMode,
     ByteCodeVariableScope,
 )
 from retraction.error import InternalError
 from retraction.symtab import SymbolTable
-from retraction.types import CARD_TIPE, CAST_PRIORITY, INT_TIPE, SIZE_BYTES, Tipe, Type
+from retraction.types import CAST_PRIORITY, SIZE_BYTES, Type
 
 
 # Virtualized 8-bit computer memory layout:
