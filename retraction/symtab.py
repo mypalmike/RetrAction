@@ -103,11 +103,11 @@ class SymbolTable:
         return next_index
 
     def declare_local(
-        self, routine_index: int, name: str, local_t: Type, initial_value: int = 0
+        self, local_index: int, name: str, local_t: Type, initial_value: int = 0
     ):
         self.check_no_symbol(name)
         next_index = len(self.locals)
-        self.locals.append(Local(routine_index, name, local_t, initial_value))
+        self.locals.append(Local(name, local_t, initial_value, local_index))
         self.locals_lookup[(next_index, name)] = next_index
         return next_index
 
@@ -116,7 +116,7 @@ class SymbolTable:
     ):
         self.check_no_symbol(name)
         next_index = len(self.params)
-        self.params.append(Param(routine_index, name, param_t, initial_value))
+        self.params.append(Param(name, param_t, initial_value, routine_index))
         self.params_lookup[(next_index, name)] = next_index
         return next_index
 
