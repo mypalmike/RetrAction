@@ -306,8 +306,7 @@ class TypedPostfixExpression:
         elif op in RELATIONAL_OPS:
             item.item_t = Type.BYTE_T
         elif op in BINARY_OPS:
-            # -1 for current item, -1 for operand2
-            operand2_index = len(self.items) - 2
+            operand2_index = len(self.items) - 1
             operand1_index = self.deepest_operand_index(operand2_index) - 1
             print(
                 f"op: {op}, operand1_index: {operand1_index}, operand2_index: {operand2_index}"
