@@ -200,7 +200,7 @@ class ParserTestCase(unittest.TestCase):
                 ByteCodeOp.JUMP.value,
                 jmp_end,
                 0,  # High byte of jump address
-                ByteCodeOp.NUMERICAL_CONSTANT.value,
+                ByteCodeOp.NUMERICAL_CONSTANT.value,  # jmp1
                 Type.BYTE_T.value,
                 2,
                 ByteCodeOp.NUMERICAL_CONSTANT.value,
@@ -221,11 +221,11 @@ class ParserTestCase(unittest.TestCase):
                 ByteCodeOp.JUMP.value,
                 jmp_end,
                 0,  # High byte of jump address
-                ByteCodeOp.NUMERICAL_CONSTANT.value,
+                ByteCodeOp.NUMERICAL_CONSTANT.value,  # jmp2
                 Type.BYTE_T.value,
                 3,
                 ByteCodeOp.DEVPRINT.value,
-                Type.BYTE_T.value,
+                Type.BYTE_T.value,  # jmp_end - 1
             ]
         )
         len_expected = len(expected_code)
