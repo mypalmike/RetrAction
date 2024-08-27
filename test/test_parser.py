@@ -401,62 +401,121 @@ class ParserTestCase(unittest.TestCase):
             )
         self.assertEqual(parser.current_token().tok_type, TokenType.EOF)
 
-    # def test_exit_stmt(self):
-    #     source_code = """
-    #     WHILE 1
-    #     DO
-    #       IF 2 THEN
-    #         DEVPRINT (3)
-    #         EXIT
-    #         DEVPRINT (4)
-    #       FI
-    #       DO
-    #         DEVPRINT (5)
-    #         DO
-    #           DEVPRINT (6)
-    #           EXIT
-    #           DEVPRINT (7)
-    #         OD
-    #       OD
-    #       EXIT
-    #       DEVPRINT (8)
-    #     OD
-    #     """
-    #     tokens = tokenize(source_code, S_F)
-    #     symbol_table = SymbolTable()
-    #     codegen = ByteCodeGen(symbol_table)
-    #     parser = Parser(tokens, codegen, symbol_table)
-    #     parser.parse_while_loop()
-    #     expected_code = [
-    #         ByteCode(ByteCodeOp.NUMERICAL_CONSTANT, 0),  # 1 [0]
-    #         ByteCode(ByteCodeOp.JUMP_IF_FALSE, 23),  # Jump to OD [1]
-    #         ByteCode(ByteCodeOp.NUMERICAL_CONSTANT, 1),  # 2 [2]
-    #         ByteCode(ByteCodeOp.JUMP_IF_FALSE, 10),  # Jump to DO [3]
-    #         ByteCode(ByteCodeOp.NUMERICAL_CONSTANT, 2),  # 3 [4]
-    #         ByteCode(ByteCodeOp.DEVPRINT),  # DEVPRINT(3) [5]
-    #         ByteCode(ByteCodeOp.JUMP, 23),  # Jump to OD [6]
-    #         ByteCode(ByteCodeOp.NUMERICAL_CONSTANT, 3),  # 4 [7]
-    #         ByteCode(ByteCodeOp.DEVPRINT),  # DEVPRINT(4) [8]
-    #         ByteCode(ByteCodeOp.JUMP, 10),  # Jump to OD [9]
-    #         ByteCode(ByteCodeOp.NUMERICAL_CONSTANT, 4),  # 5 [10]
-    #         ByteCode(ByteCodeOp.DEVPRINT),  # DEVPRINT(5) [11]
-    #         ByteCode(ByteCodeOp.NUMERICAL_CONSTANT, 5),  # 6 [12]
-    #         ByteCode(ByteCodeOp.DEVPRINT),  # DEVPRINT(6) [13]
-    #         ByteCode(ByteCodeOp.JUMP, 18),  # Jump to OD [14]
-    #         ByteCode(ByteCodeOp.NUMERICAL_CONSTANT, 6),  # 7 [15]
-    #         ByteCode(ByteCodeOp.DEVPRINT),  # DEVPRINT(7) [16]
-    #         ByteCode(ByteCodeOp.JUMP, 12),  # Jump to OD [17]
-    #         ByteCode(ByteCodeOp.JUMP, 10),  # Jump to OD [18]
-    #         ByteCode(ByteCodeOp.JUMP, 23),  # 8 [19]
-    #         ByteCode(ByteCodeOp.NUMERICAL_CONSTANT, 7),  # 9 [20]
-    #         ByteCode(ByteCodeOp.DEVPRINT),  # DEVPRINT(8) [21]
-    #         ByteCode(ByteCodeOp.JUMP, 0),  # Jump to WHILE [22]
-    #     ]
-    #     for i, expected_bytecode in enumerate(expected_code):
-    #         self.assertEqual(
-    #             codegen.code[i], expected_bytecode, f"Bytecode mismatch at index {i}"
-    #         )
-    #     self.assertEqual(parser.current_token().tok_type, TokenType.EOF)
+    def test_exit_stmt(self):
+        source_code = """
+        WHILE 1
+        DO
+          IF 2 THEN
+            DEVPRINT (3)
+            EXIT
+            DEVPRINT (4)
+          FI
+          DO
+            DEVPRINT (5)
+            DO
+              DEVPRINT (6)
+              EXIT
+              DEVPRINT (7)
+            OD
+          OD
+          EXIT
+          DEVPRINT (8)
+        OD
+        """
+        tokens = tokenize(source_code, S_F)
+        symbol_table = SymbolTable()
+        codegen = ByteCodeGen(symbol_table)
+        parser = Parser(tokens, codegen, symbol_table)
+        parser.parse_while_loop()
+        jmp_start, jmp_end = 0, 65
+        jmp0, jmp1, jmp2, jmp3, jmp4, jmp5, jmp6, jmp7 = (30, 51, 51, 0, 0, 0, 0, 0)
+        expected_code = bytearray(
+            [
+                ByteCodeOp.NUMERICAL_CONSTANT.value,  # WHILE 1 DO
+                Type.BYTE_T.value,
+                1,
+                ByteCodeOp.JUMP_IF_FALSE.value,
+                Type.BYTE_T.value,
+                jmp_end,
+                0,  # High byte of jump address
+                ByteCodeOp.NUMERICAL_CONSTANT.value,  # IF 2 THEN
+                Type.BYTE_T.value,
+                2,
+                ByteCodeOp.JUMP_IF_FALSE.value,
+                Type.BYTE_T.value,
+                jmp0,
+                0,  # High byte of jump address
+                ByteCodeOp.NUMERICAL_CONSTANT.value,  # DEVPRINT (3)
+                Type.BYTE_T.value,
+                3,
+                ByteCodeOp.DEVPRINT.value,
+                Type.BYTE_T.value,
+                ByteCodeOp.JUMP.value,  # EXIT  ; Outermost DO loop
+                jmp_end,
+                0,  # High byte of jump address
+                ByteCodeOp.NUMERICAL_CONSTANT.value,  # DEVPRINT (4)
+                Type.BYTE_T.value,
+                4,
+                ByteCodeOp.DEVPRINT.value,
+                Type.BYTE_T.value,
+                ByteCodeOp.JUMP.value,  # FI  ; Jump to end of IF, this could be optimized.
+                jmp0,
+                0,  # High byte of jump address
+                ByteCodeOp.NUMERICAL_CONSTANT.value,  # DO DEVPRINT (5)  ; jmp0
+                Type.BYTE_T.value,
+                5,
+                ByteCodeOp.DEVPRINT.value,
+                Type.BYTE_T.value,
+                ByteCodeOp.NUMERICAL_CONSTANT.value,  # DO DEVPRINT (6)
+                Type.BYTE_T.value,
+                6,
+                ByteCodeOp.DEVPRINT.value,
+                Type.BYTE_T.value,
+                ByteCodeOp.JUMP.value,  # EXIT  ; Innermost DO loop
+                jmp2,
+                0,  # High byte of jump address
+                ByteCodeOp.NUMERICAL_CONSTANT.value,  # DEVPRINT (7)
+                Type.BYTE_T.value,
+                7,
+                ByteCodeOp.DEVPRINT.value,
+                Type.BYTE_T.value,
+                ByteCodeOp.JUMP.value,  # OD
+                jmp1,
+                0,  # High byte of jump address
+                ByteCodeOp.JUMP.value,  # OD
+                jmp0,
+                0,  # High byte of jump address
+                ByteCodeOp.JUMP.value,  # EXIT  ; Outermost DO loop
+                jmp_end,
+                ByteCodeOp.NUMERICAL_CONSTANT.value,  # DEVPRINT (8)
+                Type.BYTE_T.value,
+                8,
+                ByteCodeOp.DEVPRINT.value,
+                Type.BYTE_T.value,
+                ByteCodeOp.JUMP.value,  # OD
+                jmp_start,
+                0,  # High byte of jump address
+            ]
+        )
+        for i, b in enumerate(codegen.code):
+            opcode = None
+            try:
+                opcode = ByteCodeOp(b)
+            except ValueError:
+                pass
+
+            self.assertEqual(
+                b,
+                expected_code[i],
+                f"Bytecode mismatch at index {i} (opcode:{opcode}) (\n{hexlify(codegen.code, '-', 2)} vs\n{hexlify(expected_code, '-', 2)})",
+            )
+        len_expected = len(expected_code)
+        self.assertEqual(
+            len_expected,
+            len(codegen.code),
+            f"Wrong code length. Expected {len_expected} but got {len(codegen.code)}",
+        )
+        self.assertEqual(parser.current_token().tok_type, TokenType.EOF)
 
     # def test_system_decls(self):
     #     source_code = """

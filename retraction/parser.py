@@ -611,8 +611,8 @@ class Parser:
         if len(self.exits_to_patch) == 0:
             raise SyntaxError("EXIT statement outside of loop")
         # This gets patched at the end of the loop with the address following the loop
-        jump_exit = self.code_gen.emit_jump()
-        self.exits_to_patch[-1].append(jump_exit)
+        jump_exit_addr = self.code_gen.emit_jump()
+        self.exits_to_patch[-1].append(jump_exit_addr)
         return True
 
     def parse_return_stmt(self) -> bool:
@@ -779,7 +779,7 @@ class Parser:
         if exits_to_patch:
             next_addr = self.code_gen.get_next_addr()
             for jump_exit in exits_to_patch:
-                jump_exit.value = next_addr
+                self.code_gen.fixup_jump(jump_exit, next_addr)
 
     def parse_do_loop(self) -> bool:
         """
