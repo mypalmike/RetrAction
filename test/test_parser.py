@@ -428,7 +428,7 @@ class ParserTestCase(unittest.TestCase):
         parser = Parser(tokens, codegen, symbol_table)
         parser.parse_while_loop()
         jmp_start, jmp_end = 0, 65
-        jmp0, jmp1, jmp2, jmp3, jmp4, jmp5, jmp6, jmp7 = (30, 51, 51, 0, 0, 0, 0, 0)
+        jmp0, jmp1, jmp2, jmp3, jmp4, jmp5, jmp6, jmp7 = (30, 35, 51, 0, 0, 0, 0, 0)
         expected_code = bytearray(
             [
                 ByteCodeOp.NUMERICAL_CONSTANT.value,  # WHILE 1 DO
@@ -466,7 +466,7 @@ class ParserTestCase(unittest.TestCase):
                 5,
                 ByteCodeOp.DEVPRINT.value,
                 Type.BYTE_T.value,
-                ByteCodeOp.NUMERICAL_CONSTANT.value,  # DO DEVPRINT (6)
+                ByteCodeOp.NUMERICAL_CONSTANT.value,  # DO DEVPRINT (6)  ; jmp1
                 Type.BYTE_T.value,
                 6,
                 ByteCodeOp.DEVPRINT.value,
@@ -482,11 +482,12 @@ class ParserTestCase(unittest.TestCase):
                 ByteCodeOp.JUMP.value,  # OD
                 jmp1,
                 0,  # High byte of jump address
-                ByteCodeOp.JUMP.value,  # OD
+                ByteCodeOp.JUMP.value,  # OD  ; jmp2
                 jmp0,
                 0,  # High byte of jump address
                 ByteCodeOp.JUMP.value,  # EXIT  ; Outermost DO loop
                 jmp_end,
+                0,  # High byte of jump address
                 ByteCodeOp.NUMERICAL_CONSTANT.value,  # DEVPRINT (8)
                 Type.BYTE_T.value,
                 8,
@@ -507,7 +508,7 @@ class ParserTestCase(unittest.TestCase):
             self.assertEqual(
                 b,
                 expected_code[i],
-                f"Bytecode mismatch at index {i} (opcode:{opcode}) (\n{hexlify(codegen.code, '-', 2)} vs\n{hexlify(expected_code, '-', 2)})",
+                f"Bytecode mismatch at index {i} (opcode:{opcode}) (\n{hexlify(codegen.code, '-', -2)} vs\n{hexlify(expected_code, '-', 2)})",
             )
         len_expected = len(expected_code)
         self.assertEqual(
