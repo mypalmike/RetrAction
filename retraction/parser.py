@@ -42,6 +42,7 @@ class Parser:
         self.exits_to_patch: list[list[int]] = []  # Addresses of jumps to patch
         self.curr_routine_index = None
         self.typed_expression = None
+        self.last_t: Type | None = None
 
     def current_token(self):
         if self.current_token_index < len(self.tokens):
@@ -570,7 +571,7 @@ class Parser:
         self.consume(TokenType.OP_LPAREN)
         self.parse_arith_exp()
         self.consume(TokenType.OP_RPAREN)
-        self.code_gen.emit_devprint()
+        self.code_gen.emit_devprint(self.last_t)
         return True
 
     def parse_assign_stmt(self) -> bool:
@@ -730,26 +731,26 @@ class Parser:
         """
         if self.current_token().tok_type != TokenType.IF:
             return False
-        jump_ends: list[ByteCode] = []
+        jump_end_addrs: list[int] = []
 
         # If
         self.advance()
         self.parse_cond_exp()
         self.consume(TokenType.THEN)
-        jump_over = self.code_gen.emit_jump_if_false()
+        jump_over_addr = self.code_gen.emit_jump_if_false(self.last_t)
         self.parse_stmt_list()
-        jump_ends.append(self.code_gen.emit_jump())
-        jump_over.value = self.code_gen.get_next_addr()
+        jump_end_addrs.append(self.code_gen.emit_jump())
+        self.code_gen.fixup_jump(jump_over_addr, self.code_gen.get_next_addr())
 
         # Elseif
         while self.current_token().tok_type == TokenType.ELSEIF:
             self.advance()
             self.parse_cond_exp()
             self.consume(TokenType.THEN)
-            jump_over = self.code_gen.emit_jump_if_false()
+            jump_over_addr = self.code_gen.emit_jump_if_false(self.last_t)
             self.parse_stmt_list()
-            jump_ends.append(self.code_gen.emit_jump())
-            jump_over.value = self.code_gen.get_next_addr()
+            jump_end_addrs.append(self.code_gen.emit_jump())
+            self.code_gen.fixup_jump(jump_over_addr, self.code_gen.get_next_addr())
 
         # Else
         if self.current_token().tok_type == TokenType.ELSE:
@@ -759,8 +760,8 @@ class Parser:
         # Fi
         self.consume(TokenType.FI)
         end_addr = self.code_gen.get_next_addr()
-        for jump_end in jump_ends:
-            jump_end.value = end_addr
+        for jump_end_addr in jump_end_addrs:
+            self.code_gen.fixup_jump(jump_end_addr, end_addr)
 
         return True
 
@@ -893,6 +894,7 @@ class Parser:
 
         if not is_inner_expression:
             self.typed_expression.emit_bytecode(self.code_gen)
+            self.last_t = self.typed_expression.items[-1].item_t
 
     def parse_expr_precedence(self, precedence: ExprPrecedence):
         if self.current_token().tok_type not in EXPRESSION_RULES:
@@ -982,44 +984,43 @@ class Parser:
         self.parse_expr_precedence(ExprPrecedence(rule.precedence.value + 1))
 
         if operator_type == TokenType.OP_PLUS:
-            # self.code_gen.emit_add()
             self.typed_expression.append(TypedExpressionItem(TypedExpressionOp.ADD))
         elif operator_type == TokenType.OP_MINUS:
-            self.code_gen.emit_subtract()
+            self.typed_expression.append(
+                TypedExpressionItem(TypedExpressionOp.SUBTRACT)
+            )
         elif operator_type == TokenType.OP_TIMES:
-            #     def emit_binary_op(self, op: ByteCodeOp, operand1_t: Type, operand2_t: Type):
-            # self.code_gen.emit_binary_op(ByteCodeOp.MULTIPLY, None, None)
             self.typed_expression.append(
                 TypedExpressionItem(TypedExpressionOp.MULTIPLY)
             )
         elif operator_type == TokenType.OP_DIVIDE:
-            self.code_gen.emit_divide()
+            self.typed_expression.append(TypedExpressionItem(TypedExpressionOp.DIVIDE))
         elif operator_type == TokenType.MOD:
-            self.code_gen.emit_mod()
+            self.typed_expression.append(TypedExpressionItem(TypedExpressionOp.MOD))
         elif operator_type == TokenType.LSH:
-            self.code_gen.emit_lsh()
+            self.typed_expression.append(TypedExpressionItem(TypedExpressionOp.LSH))
         elif operator_type == TokenType.RSH:
-            self.code_gen.emit_rsh()
+            self.typed_expression.append(TypedExpressionItem(TypedExpressionOp.RSH))
         elif operator_type == TokenType.OP_EQ:
-            self.code_gen.emit_eq()
+            self.typed_expression.append(TypedExpressionItem(TypedExpressionOp.EQ))
         elif operator_type == TokenType.OP_NE:
-            self.code_gen.emit_ne()
+            self.typed_expression.append(TypedExpressionItem(TypedExpressionOp.NE))
         elif operator_type == TokenType.OP_GT:
-            self.code_gen.emit_gt()
+            self.typed_expression.append(TypedExpressionItem(TypedExpressionOp.GT))
         elif operator_type == TokenType.OP_GE:
-            self.code_gen.emit_ge()
+            self.typed_expression.append(TypedExpressionItem(TypedExpressionOp.GE))
         elif operator_type == TokenType.OP_LT:
-            self.code_gen.emit_lt()
+            self.typed_expression.append(TypedExpressionItem(TypedExpressionOp.LT))
         elif operator_type == TokenType.OP_LE:
-            self.code_gen.emit_le()
+            self.typed_expression.append(TypedExpressionItem(TypedExpressionOp.LE))
         elif operator_type == TokenType.XOR:
-            self.code_gen.emit_xor()
+            self.typed_expression.append(TypedExpressionItem(TypedExpressionOp.XOR))
         elif operator_type == TokenType.OP_BIT_AND:
-            self.code_gen.emit_bit_and()
+            self.typed_expression.append(TypedExpressionItem(TypedExpressionOp.BIT_AND))
         elif operator_type == TokenType.OP_BIT_OR:
-            self.code_gen.emit_bit_or()
+            self.typed_expression.append(TypedExpressionItem(TypedExpressionOp.BIT_OR))
         elif operator_type == TokenType.OP_BIT_XOR:
-            self.code_gen.emit_bit_xor()
+            self.typed_expression.append(TypedExpressionItem(TypedExpressionOp.BIT_XOR))
 
     def parse_and(self):
         """

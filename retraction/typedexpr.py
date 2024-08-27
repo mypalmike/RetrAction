@@ -170,6 +170,7 @@ class TypedPostfixExpression:
 
     def append(self, item: TypedExpressionItem):
         op = item.op
+        print(f"Appending item: {item}")
         curr_index = len(self.items)
         if op == TypedExpressionOp.UNARY_MINUS:
             # From Action! manual:
@@ -179,12 +180,12 @@ class TypedPostfixExpression:
             item.deepest_operand_index = self.compute_deepest_operand_index(
                 curr_index, 1
             )
-        elif op in RELATIONAL_OPS:
-            # TODO: Should maintain internal boolean type for relational operations?
-            item.item_t = Type.BYTE_T
-            item.deepest_operand_index = self.compute_deepest_operand_index(
-                curr_index, 2
-            )
+        # elif op in RELATIONAL_OPS:
+        #     # TODO: Should maintain internal boolean type for relational operations?
+        #     item.item_t = Type.BYTE_T
+        #     item.deepest_operand_index = self.compute_deepest_operand_index(
+        #         curr_index, 2
+        #     )
         elif op in BINARY_OPS:
             operand2_index = curr_index - 1
             operand1_index = self.compute_deepest_operand_index(curr_index, 1) - 1
@@ -193,7 +194,7 @@ class TypedPostfixExpression:
             # operand1 = self.items[operand1_index]
             # operand1_index = self.deepest_operand_index(operand2_index) - 1
             print(
-                f"op: {op}, operand1_index: {operand1_index}, operand2_index: {operand2_index}"
+                f"Binary op: {op}, operand1_index: {operand1_index}, operand2_index: {operand2_index}"
             )
             item.op1_t = self.items[operand1_index].item_t
             item.op2_t = self.items[operand2_index].item_t
@@ -207,6 +208,8 @@ class TypedPostfixExpression:
                 TypedExpressionOp.MOD,
             ]:
                 item.item_t = Type.INT_T
+            elif op in RELATIONAL_OPS:
+                item.item_t = Type.BYTE_T
             else:
                 item.item_t = binary_expression_type(item.op1_t, item.op2_t)
             item.deepest_operand_index = self.compute_deepest_operand_index(
@@ -415,6 +418,9 @@ class TypedPostfixExpression:
                 code_gen.emit_function_call(index, item_t)
             elif op in BINARY_OPS:
                 bytecode_op = op.get_bytecode_op()
+                print(
+                    f"Emitting bytecode for binary op {op}, {bytecode_op}, {item.op1_t}, {item.op2_t}"
+                )
                 code_gen.emit_binary_op(bytecode_op, item.op1_t, item.op2_t)
 
                 # op1_tipe, op2_tipe = item.op1_t, item.op2_t
