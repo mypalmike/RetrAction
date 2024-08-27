@@ -877,15 +877,22 @@ class Parser:
             self.code_gen.emit_comp_const(comp_const)
         return True
 
-    def parse_expression(self):
+    def parse_expression(self, is_inner_expression=False):
         """
         Expression parsing uses the Pratt method.
         """
-        self.typed_expression = TypedPostfixExpression(self.symbol_table)
+        if not is_inner_expression:
+            self.typed_expression = TypedPostfixExpression(self.symbol_table)
+
         self.parse_expr_precedence(ExprPrecedence.XOR)
         # TODO: Run the optimization code here. Probably add a parser flag to enable this.
         # self.typed_expression.optimize()
-        self.typed_expression.emit_bytecode(self.code_gen)
+        print("Typed expression:")
+        for item in self.typed_expression.items:
+            print(item)
+
+        if not is_inner_expression:
+            self.typed_expression.emit_bytecode(self.code_gen)
 
     def parse_expr_precedence(self, precedence: ExprPrecedence):
         if self.current_token().tok_type not in EXPRESSION_RULES:
@@ -952,7 +959,7 @@ class Parser:
         Action method for parsing a grouping
         """
         self.advance()
-        self.parse_expression()
+        self.parse_expression(True)
         self.consume(TokenType.OP_RPAREN)
 
     def parse_unary(self):

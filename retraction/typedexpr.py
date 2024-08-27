@@ -145,8 +145,8 @@ class TypedExpressionItem:
         # For variables
         self.address: int = None
         self.scope: TypedExpressionScope = None
-        # Memoization for deepest_operand_index
-        self.deepest_operand_index_memo: int | None = None
+        # Deepest_operand_index is needed for type inference for intermediate expressions.
+        self.deepest_operand_index: int | None = None
         # self.is_pointer = False
         # self.is_reference = False
 
@@ -170,24 +170,52 @@ class TypedPostfixExpression:
 
     def append(self, item: TypedExpressionItem):
         op = item.op
+        curr_index = len(self.items)
         if op == TypedExpressionOp.UNARY_MINUS:
-            # TODO: Weird case(s)? - -32768 -> 32768, which is not in INT range.
-            # Might be a VM check, should automatically be handled on real CPU.
-            item.item_t = self.items[-1].item_t
+            # From Action! manual:
+            # "NOTE: using the unary minus (negative sign '-') results in
+            # an implied INT type"
+            item.item_t = Type.INT_T
+            item.deepest_operand_index = self.compute_deepest_operand_index(
+                curr_index, 1
+            )
         elif op in RELATIONAL_OPS:
+            # TODO: Should maintain internal boolean type for relational operations?
             item.item_t = Type.BYTE_T
+            item.deepest_operand_index = self.compute_deepest_operand_index(
+                curr_index, 2
+            )
         elif op in BINARY_OPS:
-            operand2_index = len(self.items) - 1
-            operand1_index = self.deepest_operand_index(operand2_index) - 1
+            operand2_index = curr_index - 1
+            operand1_index = self.compute_deepest_operand_index(curr_index, 1) - 1
+            # operand2 = self.items[operand2_index]
+            # operand1_index = operand2.deepest_operand_index - 1
+            # operand1 = self.items[operand1_index]
+            # operand1_index = self.deepest_operand_index(operand2_index) - 1
             print(
                 f"op: {op}, operand1_index: {operand1_index}, operand2_index: {operand2_index}"
             )
             item.op1_t = self.items[operand1_index].item_t
             item.op2_t = self.items[operand2_index].item_t
-            item.item_t = binary_expression_type(item.op1_t, item.op2_t)
+            # From Action! manual:
+            # "TECHNICAL NOTE: using the '*', '/' or 'MOD' operand results
+            # in an INT type, so processing of very large CARD values (>
+            # 32767) will not work properly."
+            if op in [
+                TypedExpressionOp.MULTIPLY,
+                TypedExpressionOp.DIVIDE,
+                TypedExpressionOp.MOD,
+            ]:
+                item.item_t = Type.INT_T
+            else:
+                item.item_t = binary_expression_type(item.op1_t, item.op2_t)
+            item.deepest_operand_index = self.compute_deepest_operand_index(
+                curr_index, 2
+            )
         elif op == TypedExpressionOp.CONSTANT:
             item.value = self.symbol_table.numerical_constants[item.index]
             item.item_t = self.constant_type(item.value)
+            item.deepest_operand_index = curr_index
         elif op == TypedExpressionOp.LOAD_VARIABLE:
             scope = item.scope
             if scope == TypedExpressionScope.GLOBAL:
@@ -204,49 +232,55 @@ class TypedPostfixExpression:
                 item.address = self.symbol_table.routines[item.index].address
             else:
                 raise InternalError(f"Unknown scope: {scope}")
-
-        #     item.tipe = self.symbol_table.globals[item.value][1]
-        # elif op == TypedExpressionOp.GET_LOCAL:
-        #     item.tipe = self.symbol_table.locals[item.value][1]
-        # elif op == TypedExpressionOp.GET_PARAM:
-        #     item.tipe = self.symbol_table.params[item.value][1]
+            item.deepest_operand_index = curr_index
         elif op == TypedExpressionOp.FUNCTION_CALL:
-            item.item_t = self.symbol_table.routines[item.index].return_tipe
+            item.item_t = self.symbol_table.routines[item.index].return_t
+            routine = self.symbol_table.routines[item.index]
+            n_operands = len(routine.param_ts)
+            item.deepest_operand_index = self.compute_deepest_operand_index(
+                curr_index, n_operands
+            )
         else:
             raise InternalError(f"Unknown operation: {op}")
         self.items.append(item)
-        print("append:")
-        for item in self.items:
-            print(item)
 
-    def deepest_operand_index(self, index: int) -> int:
+    def compute_deepest_operand_index(self, index: int, n_operands: int):
         """
-        Recursively find the deepest (leftmost) operand. Used to determine the type of a binary operation.
-        e.g. for the stack 1,2,3,+,*, the leftmost operand of + is 2, the leftmost operand of * is 1.
+        Compute the deepest operand index for the last n_operands items.
         """
-        if index < 0:
-            raise InternalError("No operand found for binary operation.")
-
-        # Short-circuit if the result is already memoized.
-        if self.items[index].deepest_operand_index_memo is not None:
-            return self.items[index].deepest_operand_index_memo
-
-        n_operands = self.items[index].op.num_operands()
-        if n_operands == None:
-            # Function call. Look up the number of arguments in the routine from the symbol table.
-            function_item = self.items[index]
-            function_item_index = function_item.index
-            routine = self.symbol_table.routines[function_item_index]
-            n_operands = len(routine.param_ts)
-        # Recurse to the leftmost operand. This is the heavy lifting of the algorithm.
         for _ in range(n_operands):
             index = index - 1
-            index = self.deepest_operand_index(index)
-
-        # Memoize the result.
-        self.items[index].deepest_operand_index_memo = index
-
+            index = self.items[index].deepest_operand_index
         return index
+
+    # def deepest_operand_index(self, index: int) -> int:
+    #     """
+    #     Recursively find the deepest (leftmost) operand. Used to determine the type of a binary operation.
+    #     e.g. for the stack 1,2,3,+,*, the leftmost operand of + is 2, the leftmost operand of * is 1.
+    #     """
+    #     if index < 0:
+    #         raise InternalError("No operand found for binary operation.")
+
+    #     # Short-circuit if the result is already memoized.
+    #     if self.items[index].deepest_operand_index is not None:
+    #         return self.items[index].deepest_operand_index
+
+    #     n_operands = self.items[index].op.num_operands()
+    #     if n_operands == None:
+    #         # Function call. Look up the number of arguments in the routine from the symbol table.
+    #         function_item = self.items[index]
+    #         function_item_index = function_item.index
+    #         routine = self.symbol_table.routines[function_item_index]
+    #         n_operands = len(routine.param_ts)
+    #     # Recurse to the leftmost operand. This is the heavy lifting of the algorithm.
+    #     for _ in range(n_operands):
+    #         index = index - 1
+    #         index = self.deepest_operand_index(index)
+
+    #     # Memoize the result.
+    #     self.items[index].deepest_operand_index = index
+
+    #     return index
 
     def optimize(self):
         """
