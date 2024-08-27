@@ -248,102 +248,158 @@ class ParserTestCase(unittest.TestCase):
             )
         self.assertEqual(parser.current_token().tok_type, TokenType.EOF)
 
-        # expected_code = [
-        #     ByteCode(ByteCodeOp.NUMERICAL_CONSTANT, 0),  # 1
-        #     ByteCode(ByteCodeOp.NUMERICAL_CONSTANT, 1),  # 3
-        #     ByteCode(ByteCodeOp.LT),  # 1 < 3
-        #     ByteCode(ByteCodeOp.JUMP_IF_FALSE, 7),  # Jump to ELSEIF
-        #     ByteCode(ByteCodeOp.NUMERICAL_CONSTANT, 2),  # 1
-        #     ByteCode(ByteCodeOp.DEVPRINT),  # DEVPRINT(1)
-        #     ByteCode(ByteCodeOp.JUMP, 16),  # Jump to FI
-        #     ByteCode(ByteCodeOp.NUMERICAL_CONSTANT, 3),  # 2
-        #     ByteCode(ByteCodeOp.NUMERICAL_CONSTANT, 4),  # 3
-        #     ByteCode(ByteCodeOp.LT),  # 2 < 3
-        #     ByteCode(ByteCodeOp.JUMP_IF_FALSE, 14),  # Jump to ELSE
-        #     ByteCode(ByteCodeOp.NUMERICAL_CONSTANT, 5),  # 2
-        #     ByteCode(ByteCodeOp.DEVPRINT),  # DEVPRINT(2)
-        #     ByteCode(ByteCodeOp.JUMP, 16),  # Jump to FI
-        #     ByteCode(ByteCodeOp.NUMERICAL_CONSTANT, 6),  # 3
-        #     ByteCode(ByteCodeOp.DEVPRINT),  # DEVPRINT(3)
-        # ]
-        # for i, expected_bytecode in enumerate(expected_code):
-        #     self.assertEqual(
-        #         codegen.code[i], expected_bytecode, f"Bytecode mismatch at index {i}"
-        #     )
-        # self.assertEqual(parser.current_token().tok_type, TokenType.EOF)
+    def test_if_stmt_int_cond(self):
+        source_code = """
+        IF $23 THEN
+            DEVPRINT (1)
+        FI
+        """
+        tokens = tokenize(source_code, S_F)
+        symbol_table = SymbolTable()
+        codegen = ByteCodeGen(symbol_table)
+        parser = Parser(tokens, codegen, symbol_table)
+        parser.parse_if_stmt()
+        jmp_end = 15
+        expected_code = bytearray(
+            [
+                ByteCodeOp.NUMERICAL_CONSTANT.value,
+                Type.BYTE_T.value,
+                0x23,
+                ByteCodeOp.JUMP_IF_FALSE.value,
+                Type.BYTE_T.value,
+                jmp_end,
+                0,  # High byte of jump address
+                ByteCodeOp.NUMERICAL_CONSTANT.value,
+                Type.BYTE_T.value,
+                1,
+                ByteCodeOp.DEVPRINT.value,
+                Type.BYTE_T.value,
+                ByteCodeOp.JUMP.value,  # TODO: Optimization: Simple if without elses doesn't need final jump.
+                jmp_end,
+                0,  # High byte of jump address
+            ]
+        )
+        for i, b in enumerate(codegen.code):
+            opcode = None
+            try:
+                opcode = ByteCodeOp(b)
+            except ValueError:
+                pass
 
-    # def test_if_stmt_int_cond(self):
-    #     source_code = """
-    #     IF 1 THEN
-    #         DEVPRINT (1)
-    #     FI
-    #     """
-    #     tokens = tokenize(source_code, S_F)
-    #     symbol_table = SymbolTable()
-    #     codegen = ByteCodeGen(symbol_table)
-    #     parser = Parser(tokens, codegen, symbol_table)
-    #     parser.parse_if_stmt()
-    #     expected_code = [
-    #         ByteCode(ByteCodeOp.NUMERICAL_CONSTANT, 0),  # 1
-    #         ByteCode(ByteCodeOp.JUMP_IF_FALSE, 5),  # Jump to ELSE
-    #         ByteCode(ByteCodeOp.NUMERICAL_CONSTANT, 1),  # 1
-    #         ByteCode(ByteCodeOp.DEVPRINT),  # DEVPRINT(1)
-    #         ByteCode(ByteCodeOp.JUMP, 5),  # Jump to FI
-    #     ]
-    #     for i, expected_bytecode in enumerate(expected_code):
-    #         self.assertEqual(
-    #             codegen.code[i], expected_bytecode, f"Bytecode mismatch at index {i}"
-    #         )
-    #     self.assertEqual(parser.current_token().tok_type, TokenType.EOF)
+            self.assertEqual(
+                b,
+                expected_code[i],
+                f"Bytecode mismatch at index {i} (opcode:{opcode}) (\n{hexlify(codegen.code, '-', 2)} vs\n{hexlify(expected_code, '-', 2)})",
+            )
+        len_expected = len(expected_code)
+        self.assertEqual(
+            len_expected,
+            len(codegen.code),
+            f"Wrong code length. Expected {len_expected} but got {len(codegen.code)}",
+        )
 
-    # def test_do_loop(self):
-    #     source_code = """
-    #     DO
-    #         DEVPRINT (1)
-    #     UNTIL 2
-    #     OD
-    #     """
-    #     tokens = tokenize(source_code, S_F)
-    #     symbol_table = SymbolTable()
-    #     codegen = ByteCodeGen(symbol_table)
-    #     parser = Parser(tokens, codegen, symbol_table)
-    #     parser.parse_do_loop()
-    #     expected_code = [
-    #         ByteCode(ByteCodeOp.NUMERICAL_CONSTANT, 0),  # 1
-    #         ByteCode(ByteCodeOp.DEVPRINT),  # DEVPRINT(1)
-    #         ByteCode(ByteCodeOp.NUMERICAL_CONSTANT, 1),  # 2
-    #         ByteCode(ByteCodeOp.JUMP_IF_FALSE, 0),  # Jump to DO
-    #     ]
-    #     for i, expected_bytecode in enumerate(expected_code):
-    #         self.assertEqual(
-    #             codegen.code[i], expected_bytecode, f"Bytecode mismatch at index {i}"
-    #         )
-    #     self.assertEqual(parser.current_token().tok_type, TokenType.EOF)
+        self.assertEqual(parser.current_token().tok_type, TokenType.EOF)
 
-    # def test_while_loop(self):
-    #     source_code = """
-    #     WHILE 1
-    #     DO
-    #         DEVPRINT (2)
-    #     OD
-    #     """
-    #     tokens = tokenize(source_code, S_F)
-    #     symbol_table = SymbolTable()
-    #     codegen = ByteCodeGen(symbol_table)
-    #     parser = Parser(tokens, codegen, symbol_table)
-    #     parser.parse_while_loop()
-    #     expected_code = [
-    #         ByteCode(ByteCodeOp.NUMERICAL_CONSTANT, 0),  # 1
-    #         ByteCode(ByteCodeOp.JUMP_IF_FALSE, 5),  # Jump to OD
-    #         ByteCode(ByteCodeOp.NUMERICAL_CONSTANT, 1),  # 2
-    #         ByteCode(ByteCodeOp.DEVPRINT),  # DEVPRINT(2)
-    #         ByteCode(ByteCodeOp.JUMP, 0),  # Jump to WHILE
-    #     ]
-    #     for i, expected_bytecode in enumerate(expected_code):
-    #         self.assertEqual(
-    #             codegen.code[i], expected_bytecode, f"Bytecode mismatch at index {i}"
-    #         )
-    #     self.assertEqual(parser.current_token().tok_type, TokenType.EOF)
+    def test_do_loop(self):
+        source_code = """
+        DO
+            DEVPRINT ($23)
+        UNTIL 2
+        OD
+        """
+        tokens = tokenize(source_code, S_F)
+        symbol_table = SymbolTable()
+        codegen = ByteCodeGen(symbol_table)
+        parser = Parser(tokens, codegen, symbol_table)
+        parser.parse_do_loop()
+        jmp0 = 0
+        expected_code = bytearray(
+            [
+                ByteCodeOp.NUMERICAL_CONSTANT.value,
+                Type.BYTE_T.value,
+                0x23,
+                ByteCodeOp.DEVPRINT.value,
+                Type.BYTE_T.value,
+                ByteCodeOp.NUMERICAL_CONSTANT.value,
+                Type.BYTE_T.value,
+                2,
+                ByteCodeOp.JUMP_IF_FALSE.value,
+                Type.BYTE_T.value,
+                jmp0,
+                0,  # High byte of jump address
+            ]
+        )
+        len_expected = len(expected_code)
+        self.assertEqual(
+            len_expected,
+            len(codegen.code),
+            f"Wrong code length. Expected {len_expected} but got {len(codegen.code)}",
+        )
+        for i, b in enumerate(codegen.code[:len_expected]):
+            opcode = None
+            try:
+                opcode = ByteCodeOp(b)
+            except ValueError:
+                pass
+
+            self.assertEqual(
+                b,
+                expected_code[i],
+                f"Bytecode mismatch at index {i} (opcode:{opcode}) (\n{hexlify(codegen.code[:len_expected], '-', 2)} vs\n{hexlify(expected_code, '-', 2)})",
+            )
+        self.assertEqual(parser.current_token().tok_type, TokenType.EOF)
+
+    def test_while_loop(self):
+        source_code = """
+        WHILE 1
+        DO
+            DEVPRINT (2)
+        OD
+        """
+        tokens = tokenize(source_code, S_F)
+        symbol_table = SymbolTable()
+        codegen = ByteCodeGen(symbol_table)
+        parser = Parser(tokens, codegen, symbol_table)
+        parser.parse_while_loop()
+        jmp_start, jmp_end = 0, 15
+        expected_code = bytearray(
+            [
+                ByteCodeOp.NUMERICAL_CONSTANT.value,
+                Type.BYTE_T.value,
+                1,
+                ByteCodeOp.JUMP_IF_FALSE.value,
+                Type.BYTE_T.value,
+                jmp_end,
+                0,  # High byte of jump address
+                ByteCodeOp.NUMERICAL_CONSTANT.value,
+                Type.BYTE_T.value,
+                2,
+                ByteCodeOp.DEVPRINT.value,
+                Type.BYTE_T.value,
+                ByteCodeOp.JUMP.value,
+                jmp_start,
+                0,  # High byte of jump address
+            ]
+        )
+        len_expected = len(expected_code)
+        self.assertEqual(
+            len_expected,
+            len(codegen.code),
+            f"Wrong code length. Expected {len_expected} but got {len(codegen.code)}",
+        )
+        for i, b in enumerate(codegen.code[:len_expected]):
+            opcode = None
+            try:
+                opcode = ByteCodeOp(b)
+            except ValueError:
+                pass
+
+            self.assertEqual(
+                b,
+                expected_code[i],
+                f"Bytecode mismatch at index {i} (opcode:{opcode}) (\n{hexlify(codegen.code[:len_expected], '-', 2)} vs\n{hexlify(expected_code, '-', 2)})",
+            )
+        self.assertEqual(parser.current_token().tok_type, TokenType.EOF)
 
     # def test_exit_stmt(self):
     #     source_code = """

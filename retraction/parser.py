@@ -790,16 +790,16 @@ class Parser:
             return False
         self.advance()
         self.prepare_exits()
-        jump_start = self.code_gen.get_next_addr()
+        jump_start_addr = self.code_gen.get_next_addr()
         self.parse_stmt_list()
         if self.current_token().tok_type == TokenType.UNTIL:
             self.advance()
             self.parse_cond_exp()
-            self.code_gen.emit_jump_if_false(jump_start)
+            self.code_gen.emit_jump_if_false(self.last_t, jump_start_addr)
             self.consume(TokenType.OD)
         else:
             self.consume(TokenType.OD)
-            self.code_gen.emit_jump(jump_start)
+            self.code_gen.emit_jump(jump_start_addr)
         self.patch_exits()
         return True
 
@@ -815,19 +815,19 @@ class Parser:
             return False
         self.advance()
         self.prepare_exits()
-        jump_start = self.code_gen.get_next_addr()
+        jump_start_addr = self.code_gen.get_next_addr()
         self.parse_cond_exp()
-        jump_end = self.code_gen.emit_jump_if_false()
+        jump_end_addr = self.code_gen.emit_jump_if_false(self.last_t)
         self.consume(TokenType.DO)
         self.parse_stmt_list()
         if self.current_token().tok_type == TokenType.UNTIL:
             self.advance()
             self.parse_cond_exp()
-            self.code_gen.emit_jump_if_false(jump_start)
+            self.code_gen.emit_jump_if_false(self.last_t, jump_start_addr)
         else:
-            self.code_gen.emit_jump(jump_start)
+            self.code_gen.emit_jump(jump_start_addr)
         self.consume(TokenType.OD)
-        jump_end.value = self.code_gen.get_next_addr()
+        self.code_gen.fixup_jump(jump_end_addr, self.code_gen.get_next_addr())
         self.patch_exits()
 
         return True
