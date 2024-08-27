@@ -14,77 +14,77 @@ S_F = "<test>"
 
 
 class ParserTestCase(unittest.TestCase):
-    # def test_arith_expr_numerical_constants(self):
-    #     source_code = "33"
-    #     tokens = tokenize(source_code, S_F)
-    #     symbol_table = SymbolTable()
-    #     codegen = ByteCodeGen(symbol_table)
-    #     parser = Parser(tokens, codegen, symbol_table)
-    #     parser.parse_expression()
-    #     expected_bytecode = bytearray(
-    #         [
-    #             ByteCodeOp.NUMERICAL_CONSTANT.value,
-    #             Type.BYTE_T.value,
-    #             33,
-    #         ]
-    #     )
-    #     len_expected = len(expected_bytecode)
-    #     self.assertEqual(codegen.code[:len_expected], expected_bytecode)
-    #     self.assertEqual(parser.current_token().tok_type, TokenType.EOF)
+    def test_arith_expr_numerical_constants(self):
+        source_code = "33"
+        tokens = tokenize(source_code, S_F)
+        symbol_table = SymbolTable()
+        codegen = ByteCodeGen(symbol_table)
+        parser = Parser(tokens, codegen, symbol_table)
+        parser.parse_expression()
+        expected_bytecode = bytearray(
+            [
+                ByteCodeOp.NUMERICAL_CONSTANT.value,
+                Type.BYTE_T.value,
+                33,
+            ]
+        )
+        len_expected = len(expected_bytecode)
+        self.assertEqual(codegen.code[:len_expected], expected_bytecode)
+        self.assertEqual(parser.current_token().tok_type, TokenType.EOF)
 
-    #     source_code = "$33"
-    #     tokens = tokenize(source_code, S_F)
-    #     symbol_table = SymbolTable()
-    #     codegen = ByteCodeGen(symbol_table)
-    #     parser = Parser(tokens, codegen, symbol_table)
-    #     parser.parse_expression()
-    #     expected_bytecode = bytearray(
-    #         [
-    #             ByteCodeOp.NUMERICAL_CONSTANT.value,
-    #             Type.BYTE_T.value,
-    #             0x33,
-    #         ]
-    #     )
-    #     len_expected = len(expected_bytecode)
-    #     self.assertEqual(codegen.code[:len_expected], expected_bytecode)
-    #     self.assertEqual(parser.current_token().tok_type, TokenType.EOF)
+        source_code = "$33"
+        tokens = tokenize(source_code, S_F)
+        symbol_table = SymbolTable()
+        codegen = ByteCodeGen(symbol_table)
+        parser = Parser(tokens, codegen, symbol_table)
+        parser.parse_expression()
+        expected_bytecode = bytearray(
+            [
+                ByteCodeOp.NUMERICAL_CONSTANT.value,
+                Type.BYTE_T.value,
+                0x33,
+            ]
+        )
+        len_expected = len(expected_bytecode)
+        self.assertEqual(codegen.code[:len_expected], expected_bytecode)
+        self.assertEqual(parser.current_token().tok_type, TokenType.EOF)
 
-    # def test_arith_expr_simple(self):
-    #     source_code = "23 + $45 * $678"
-    #     tokens = tokenize(source_code, S_F)
-    #     symbol_table = SymbolTable()
-    #     codegen = ByteCodeGen(symbol_table)
-    #     parser = Parser(tokens, codegen, symbol_table)
-    #     parser.parse_expression()
-    #     expected_bytecode = bytearray(
-    #         [
-    #             ByteCodeOp.NUMERICAL_CONSTANT.value,
-    #             Type.BYTE_T.value,
-    #             23,
-    #             ByteCodeOp.NUMERICAL_CONSTANT.value,
-    #             Type.BYTE_T.value,
-    #             0x45,
-    #             ByteCodeOp.NUMERICAL_CONSTANT.value,
-    #             Type.INT_T.value,
-    #             0x78,
-    #             0x6,
-    #             ByteCodeOp.MULTIPLY.value,
-    #             Type.BYTE_T.value,
-    #             Type.INT_T.value,
-    #             ByteCodeOp.ADD.value,
-    #             Type.BYTE_T.value,
-    #             Type.INT_T.value,
-    #         ]
-    #     )
-    #     len_expected = len(expected_bytecode)
-    #     for i, b in enumerate(codegen.code[:len_expected]):
-    #         self.assertEqual(
-    #             b,
-    #             expected_bytecode[i],
-    #             f"Bytecode mismatch at index {i} (\n{hexlify(codegen.code[:len_expected], '-', 2)} vs\n{hexlify(expected_bytecode, '-', 2)})",
-    #         )
-    #     # self.assertEqual(codegen.code[:len_expected], expected_bytecode)
-    #     self.assertEqual(parser.current_token().tok_type, TokenType.EOF)
+    def test_arith_expr_simple(self):
+        source_code = "23 + $45 * $678"
+        tokens = tokenize(source_code, S_F)
+        symbol_table = SymbolTable()
+        codegen = ByteCodeGen(symbol_table)
+        parser = Parser(tokens, codegen, symbol_table)
+        parser.parse_expression()
+        expected_bytecode = bytearray(
+            [
+                ByteCodeOp.NUMERICAL_CONSTANT.value,
+                Type.BYTE_T.value,
+                23,
+                ByteCodeOp.NUMERICAL_CONSTANT.value,
+                Type.BYTE_T.value,
+                0x45,
+                ByteCodeOp.NUMERICAL_CONSTANT.value,
+                Type.INT_T.value,
+                0x78,
+                0x6,
+                ByteCodeOp.MULTIPLY.value,
+                Type.BYTE_T.value,
+                Type.INT_T.value,
+                ByteCodeOp.ADD.value,
+                Type.BYTE_T.value,
+                Type.INT_T.value,
+            ]
+        )
+        len_expected = len(expected_bytecode)
+        for i, b in enumerate(codegen.code[:len_expected]):
+            self.assertEqual(
+                b,
+                expected_bytecode[i],
+                f"Bytecode mismatch at index {i} (\n{hexlify(codegen.code[:len_expected], '-', 2)} vs\n{hexlify(expected_bytecode, '-', 2)})",
+            )
+        # self.assertEqual(codegen.code[:len_expected], expected_bytecode)
+        self.assertEqual(parser.current_token().tok_type, TokenType.EOF)
 
     def test_arith_expr_parens(self):
         source_code = "(87 + 65) * (43 + $1B)"
