@@ -1,6 +1,10 @@
 from enum import Enum, auto
 
-from retraction.bytecode import ByteCodeOp
+from retraction.bytecode import (
+    ByteCodeOp,
+    ByteCodeVariableAddressMode,
+    ByteCodeVariableScope,
+)
 from retraction.codegen import ByteCodeGen
 from retraction.error import InternalError
 from retraction.symtab import SymbolTable
@@ -117,11 +121,18 @@ RELATIONAL_OPS = {
 }
 
 
-class TypedExpressionScope(Enum):
-    GLOBAL = auto()
-    LOCAL = auto()
-    PARAM = auto()
-    ROUTINE_REFERENCE = auto()
+# class TypedExpressionScope(Enum):
+#     GLOBAL = auto()
+#     LOCAL = auto()
+#     PARAM = auto()
+#     ROUTINE_REFERENCE = auto()
+
+
+# class TypedExpressionVariableAddressMode(Enum):
+#     DEFAULT = 0
+#     POINTER = 1
+#     REFERENCE = 2
+#     OFFSET = 3
 
 
 class TypedExpressionItem:
@@ -134,17 +145,18 @@ class TypedExpressionItem:
         # Index is used for constants, variables, and function calls
         self.index = index
         # Members below are computed when the item is added to a TypedPostfixExpression
-        self.item_t: Type = None
+        self.item_t: Type = Type.VOID_T
         # For binary operations
         # self.op1_const = False
         # self.op2_const = False
-        self.op1_t: Type = None
-        self.op2_t: Type = None
+        self.op1_t: Type = Type.VOID_T
+        self.op2_t: Type = Type.VOID_T
         # For constants
-        self.value: int = None
+        self.value: int | None = None
         # For variables
-        self.address: int = None
-        self.scope: TypedExpressionScope = None
+        self.address: int | None = None
+        self.scope: ByteCodeVariableScope | None = None
+        self.addr_mode: ByteCodeVariableAddressMode | None = None
         # Deepest_operand_index is needed for type inference for intermediate expressions.
         self.deepest_operand_index: int | None = None
         # self.is_pointer = False
@@ -211,16 +223,16 @@ class TypedPostfixExpression:
             item.deepest_operand_index = curr_index
         elif op == TypedExpressionOp.LOAD_VARIABLE:
             scope = item.scope
-            if scope == TypedExpressionScope.GLOBAL:
+            if scope == ByteCodeVariableScope.GLOBAL:
                 item.item_t = self.symbol_table.globals[item.index].var_t
                 item.address = self.symbol_table.globals[item.index].address
-            elif scope == TypedExpressionScope.LOCAL:
+            elif scope == ByteCodeVariableScope.LOCAL:
                 item.item_t = self.symbol_table.locals[item.index].var_t
                 item.address = self.symbol_table.locals[item.index].address
-            elif scope == TypedExpressionScope.PARAM:
+            elif scope == ByteCodeVariableScope.PARAM:
                 item.item_t = self.symbol_table.params[item.index].var_t
                 item.address = self.symbol_table.params[item.index].address
-            elif scope == TypedExpressionScope.ROUTINE_REFERENCE:
+            elif scope == ByteCodeVariableScope.ROUTINE_REFERENCE:
                 item.item_t = Type.CARD_T
                 item.address = self.symbol_table.routines[item.index].address
             else:
@@ -361,14 +373,22 @@ class TypedPostfixExpression:
             if op == TypedExpressionOp.CONSTANT:
                 code_gen.emit_numerical_constant(index)
             elif op == TypedExpressionOp.LOAD_VARIABLE:
-                if item.scope == TypedExpressionScope.GLOBAL:
-                    code_gen.emit_get_global(index)
-                elif item.scope == TypedExpressionScope.LOCAL:
-                    code_gen.emit_get_local(index, item_t)
-                elif item.scope == TypedExpressionScope.PARAM:
-                    code_gen.emit_get_param(index, item_t)
-                elif item.scope == TypedExpressionScope.ROUTINE_REFERENCE:
-                    code_gen.emit_get_routine_reference(index)
+                if (
+                    item.scope is not None
+                    and item.addr_mode is not None
+                    and item.address is not None
+                ):
+                    code_gen.emit_get_variable(
+                        item.item_t, item.scope, item.addr_mode, item.address
+                    )
+                # if item.scope == TypedExpressionScope.GLOBAL:
+                #     code_gen.emit_get_global(index)
+                # elif item.scope == TypedExpressionScope.LOCAL:
+                #     code_gen.emit_get_local(index, item_t)
+                # elif item.scope == TypedExpressionScope.PARAM:
+                #     code_gen.emit_get_param(index, item_t)
+                # elif item.scope == TypedExpressionScope.ROUTINE_REFERENCE:
+                #     code_gen.emit_get_routine_reference(index)
             # elif op == TypedExpressionOp.GET_GLOBAL:
             #     code_gen.emit_get_global(index)
             # elif op == TypedExpressionOp.GET_LOCAL:

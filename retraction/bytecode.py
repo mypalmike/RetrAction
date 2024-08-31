@@ -2,34 +2,35 @@ from enum import Enum, auto
 
 
 class ByteCodeOp(Enum):
-    ADD = 0
-    SUBTRACT = 1
-    MULTIPLY = 2
-    DIVIDE = 3
-    MOD = 4
-    LSH = 5
-    RSH = 6
-    EQ = 7
-    NE = 8
-    GT = 9
-    GE = 10
-    LT = 11
-    LE = 12
-    XOR = 13
-    BIT_AND = 14
-    BIT_OR = 15
-    BIT_XOR = 16
-    UNARY_MINUS = 17
-    JUMP_IF_FALSE = 18
-    JUMP = 19
-    POP = 20
-    NUMERICAL_CONSTANT = 21
-    GET_VARIABLE = 22
-    PUSH_PARAM = 23
-    ROUTINE_CALL = 24
-    RETURN = 25
-    CAST = 26
-    NOP = 27
+    BREAK = 0
+    ADD = 1
+    SUBTRACT = 2
+    MULTIPLY = 3
+    DIVIDE = 4
+    MOD = 5
+    LSH = 6
+    RSH = 7
+    EQ = 8
+    NE = 9
+    GT = 10
+    GE = 11
+    LT = 12
+    LE = 13
+    XOR = 14
+    BIT_AND = 15
+    BIT_OR = 16
+    BIT_XOR = 17
+    UNARY_MINUS = 18
+    JUMP_IF_FALSE = 19
+    JUMP = 20
+    POP = 21
+    NUMERICAL_CONSTANT = 22
+    GET_VARIABLE = 23
+    PUSH_PARAM = 24
+    ROUTINE_CALL = 25
+    RETURN = 26
+    CAST = 27
+    NOP = 28
     # GET_GLOBAL = 24
     # GET_ADDR_GLOBAL = 25
     # GET_PTR_GLOBAL = 26
@@ -76,6 +77,7 @@ class ByteCodeVariableScope(Enum):
     GLOBAL = 0
     LOCAL = 1
     PARAM = 2
+    ROUTINE_REFERENCE = 3
 
 
 class ByteCodeVariableAddressMode(Enum):

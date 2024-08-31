@@ -83,8 +83,10 @@ class Parser:
             return self.parse_prog_module()
         except SyntaxError as e:
             self.error(e.msg)
+            raise e
         except Exception as e:
             self.error(str(e))
+            raise e
 
     def parse_prog_module(self):
         """
@@ -486,7 +488,7 @@ class Parser:
         # self.parse_param_decl()
         self.consume(TokenType.OP_RPAREN)
         bytecode_addr = self.code_gen.get_next_addr()
-        routine = Routine(identifier, bytecode_addr, [], None)
+        routine = Routine(identifier, bytecode_addr, [], Type.VOID_T)
         try:
             self.curr_routine_index = self.symbol_table.declare_routine(routine)
             self.parse_system_decls()
@@ -666,12 +668,19 @@ class Parser:
         if self.current_token().tok_type != TokenType.RETURN:
             return False
         self.advance()
-        if self.symbol_table.routines[self.curr_routine_index].return_tipe is not None:
+        if (
+            self.curr_routine_index is not None
+            and self.symbol_table.routines[self.curr_routine_index].return_t
+            != Type.VOID_T
+        ):
             self.consume(TokenType.OP_LPAREN)
             self.advance()
             self.parse_arith_exp()
             self.consume(TokenType.OP_RPAREN)
-        self.code_gen.emit_return()
+        if self.curr_routine_index is not None:
+            self.code_gen.emit_return(self.curr_routine_index)
+        else:
+            raise SyntaxError("RETURN statement outside of a routine")
 
         return True
 
@@ -932,9 +941,10 @@ class Parser:
         self.parse_expr_precedence(ExprPrecedence.XOR)
         # TODO: Run the optimization code here. Probably add a parser flag to enable this.
         # self.typed_expression.optimize()
-        print("Typed expression:")
+        print(f"Typed expression (length {len(self.typed_expression.items)}):")
         for item in self.typed_expression.items:
             print(item)
+        print("End typed expression")
 
         if not is_inner_expression:
             self.typed_expression.emit_bytecode(self.code_gen)
@@ -1103,9 +1113,21 @@ class Parser:
         # TODO: Arrays, pointers, and records
         # TODO: Locals
         identifier = self.current_token().value
-        if self.symbol_table.globals_lookup.get(identifier) is not None:
+        global_index = self.symbol_table.globals_lookup.get(identifier)
+        if global_index is not None:
             # TODO: Should call parse_mem_reference to deal with arrays.
-            self.code_gen.emit_get_global(self.symbol_table.globals_lookup[identifier])
+            global_var = self.symbol_table.globals[global_index]
+            typed_expression_item = TypedExpressionItem(
+                TypedExpressionOp.LOAD_VARIABLE, global_index
+            )
+            typed_expression_item.item_t = global_var.var_t
+            typed_expression_item.scope = ByteCodeVariableScope.GLOBAL
+            typed_expression_item.address = global_var.address
+            typed_expression_item.addr_mode = ByteCodeVariableAddressMode.DEFAULT
+            self.typed_expression.append(typed_expression_item)
+            # self.code_gen.emit_get_variable(
+            #     var_t, var_scope, ByteCodeVariableAddressMode.DEFAULT, var_addr
+            # )
             self.advance()
         else:
             raise NotImplemented("Function calls in expressions not yet implemented")

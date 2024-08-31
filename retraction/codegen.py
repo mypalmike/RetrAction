@@ -79,9 +79,9 @@ class ByteCodeGen:
             LOCALS SIZE  - 2 bytes
             ROUTINE ADDR - 2 bytes
         """
-        self.append_byte(ByteCodeOp.ROUTINE_CALL)
+        self.append_byte(ByteCodeOp.ROUTINE_CALL.value)
         routine = self.symbol_table.routines[routine_index]
-        self.append_byte(routine.return_t)
+        self.append_byte(routine.return_t.value)
         self.append_short(routine.get_params_size())
         self.append_short(routine.get_locals_size())
         self.append_short(routine.entry_point)
@@ -92,9 +92,9 @@ class ByteCodeGen:
             RETURN - 1 byte
             TYPE   - 1 byte
         """
-        self.append_byte(ByteCodeOp.RETURN)
+        self.append_byte(ByteCodeOp.RETURN.value)
         routine = self.symbol_table.routines[routine_index]
-        self.append_byte(routine.return_t)
+        self.append_byte(routine.return_t.value)
 
     def emit_binary_op(self, op: ByteCodeOp, operand1_t: Type, operand2_t: Type):
         """
@@ -189,6 +189,27 @@ class ByteCodeGen:
         elif global_var.var_t in [Type.INT_T, Type.CARD_T]:
             self.append_short(global_var.init_opts.initial_value)
         return addr
+
+    def emit_get_variable(
+        self,
+        var_t: Type,
+        var_scope: ByteCodeVariableScope,
+        var_addr_mode: ByteCodeVariableAddressMode,
+        address: int,
+    ):
+        """
+        Get variable bytecode:
+            GET_VARIABLE - 1 byte
+            TYPE         - 1 byte
+            SCOPE        - 1 byte
+            ADDR_MODE    - 1 byte
+            ADDR         - 2 bytes
+        """
+        self.append_byte(ByteCodeOp.GET_VARIABLE.value)
+        self.append_byte(var_t.value)
+        self.append_byte(var_scope.value)
+        self.append_byte(var_addr_mode.value)
+        self.append_short(address)
 
     # def emit_get_global(self, global_index):
     #     # GET_GLOBAL, TYPE, INDEX

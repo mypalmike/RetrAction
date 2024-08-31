@@ -26,8 +26,10 @@ def main():
     parser = Parser(tokens, codegen, symbol_table)
     # parser.parse_dev()
     parser.parse_program()
+    print(codegen.code)
     vm = VirtualMachine(codegen.code, symbol_table)
-    vm.run()
+    entry_point = symbol_table.routines[-1].entry_point
+    vm.run(entry_point)
 
 
 if __name__ == "__main__":
