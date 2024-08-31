@@ -10,7 +10,7 @@ from retraction.bytecode import (
     ByteCodeVariableScope,
 )
 from retraction.error import InternalError, SyntaxError
-from retraction.symtab import SymbolTable
+from retraction.symtab import InitOpts, SymbolTable
 from retraction.typedexpr import (
     TypedExpressionItem,
     TypedExpressionOp,
@@ -77,6 +77,7 @@ class Parser:
             while self.current_token() is not None:
                 if self.current_token().tok_type == TokenType.MODULE:
                     self.advance()
+                    self.curr_routine_index = None
                 else:
                     break
             return self.parse_prog_module()
@@ -213,11 +214,14 @@ class Parser:
         """
         <base var decl> ::= <fund decl> | <POINTER decl> | <ARRAY decl> | <record decl>
         """
-        if self.parse_fund_decl():
-            return True
         if self.parse_pointer_decl():
             return True
         if self.parse_array_decl():
+            return True
+        # Note: The order of these checks is important. Pointer and array declarations
+        # are checked before fund decl because they start with the same token
+        # (e.g. BYTE POINTER x vs. BYTE x)
+        if self.parse_fund_decl():
             return True
         if self.parse_record_decl():
             return True
@@ -228,11 +232,15 @@ class Parser:
         # Variable Declaration for Fundamental Data Types
         # <fund decl> ::= <fund decl> <base fund decl> | <base fund decl>
         """
-        if not self.parse_base_fund_decl():
-            return False
-        while self.parse_base_fund_decl():
-            pass
-        return True
+        # This recurrence rule seems unnecessary and potentially problematic. Higher-level rules
+        # already handle repetition. So we just parse a single base fund decl here.
+        return self.parse_base_fund_decl()
+
+        # if not self.parse_base_fund_decl():
+        #     return False
+        # while self.parse_base_fund_decl():
+        #     pass
+        # return True
 
     def parse_base_fund_decl(self) -> bool:
         """
@@ -278,46 +286,58 @@ class Parser:
             return False
         identifier = self.current_token().value
         self.advance()
-        if self.current_token().tok_type == TokenType.OP_EQ:
-            self.advance()
-            self.parse_init_opts(fund_type, identifier)
+        init_opts = self.parse_init_opts(fund_type, identifier)
+        # if self.current_token().tok_type == TokenType.OP_EQ:
+        #     self.advance()
+        #     self.parse_init_opts(fund_type, identifier)
+        identifier_t = None
+        if fund_type == TokenType.BYTE:
+            identifier_t = Type.BYTE_T
+        elif fund_type == TokenType.CHAR:
+            identifier_t = Type.CHAR_T
+        elif fund_type == TokenType.INT:
+            identifier_t = Type.INT_T
+        elif fund_type == TokenType.CARD:
+            identifier_t = Type.CARD_T
         else:
-
-            # TODO: To simplify this code, maybe use same Tipe enum for tokens and symbol table
-            # Would be like a token with type TokenType.TYPE and value BYTE_TIPE
-            tipe = None
-            if fund_type == TokenType.BYTE:
-                tipe = BYTE_TIPE
-            elif fund_type == TokenType.CHAR:
-                tipe = CHAR_TIPE
-            elif fund_type == TokenType.INT:
-                tipe = INT_TIPE
-            elif fund_type == TokenType.CARD:
-                tipe = CARD_TIPE
-            # TODO: Deal with locals
-            ident_index = self.symbol_table.declare_global(identifier, tipe)
+            raise InternalError(f"Invalid fund type {fund_type}")
+        if self.curr_routine_index is not None:
+            curr_routine = self.symbol_table.routines[self.curr_routine_index]
+            curr_routine.get_locals_size()
+            ident_index = self.symbol_table.declare_local(
+                self.curr_routine_index,
+                identifier,
+                identifier_t,
+                init_opts,
+            )
+            self.code_gen.emit_local_data(ident_index)
+        else:
+            ident_index = self.symbol_table.declare_global(
+                identifier, identifier_t, init_opts
+            )
+            self.code_gen.emit_global_data(ident_index)
         return True
 
-    def parse_init_opts(self, fund_type: TokenType, identifier: str) -> bool:
+    def parse_init_opts(self, fund_type: TokenType, identifier: str) -> InitOpts:
         """
         <init opts> ::= <addr> | [<value>]
         <addr> ::= <comp const>
         <value> ::= <num const>
         <num const> ::= <dec num> | <hex num> | <char>
         """
-        if self.current_token().tok_type == TokenType.OP_LBRACK:
+        if self.current_token().tok_type == TokenType.OP_EQ:
             self.advance()
-            value = self.current_token().int_value()
-            self.advance()
-            self.consume(TokenType.OP_RBRACK)
-            # A little hacky - set the value of the last global
-            self.symbol_table.globals[-1][2] = value
-        else:
-            raise NotImplementedError()
-            # TODO: Special flag for global showing it's tied to an address.
-            addr = self.parse_addr()
-            self.code_gen.emit_define(identifier, addr)
-        return True
+            if self.current_token().tok_type == TokenType.OP_LBRACK:
+                self.advance()
+                value = self.current_token().int_value()
+                self.advance()
+                self.consume(TokenType.OP_RBRACK)
+                return InitOpts(value)
+            else:
+                addr = self.parse_addr()
+                return InitOpts(addr, True)
+        return InitOpts()
+        # return True
 
     def parse_pointer_decl(self) -> bool:
         """
@@ -331,6 +351,7 @@ class Parser:
         self.advance()
         self.advance()
         self.parse_ptr_ident_list(ptr_type)
+        return True
 
     def parse_ptr_ident_list(self, ptr_type: str) -> bool:
         """
@@ -404,6 +425,7 @@ class Parser:
         while self.current_token().tok_type == TokenType.OP_COMMA:
             self.advance()
             self.parse_rec_ident(rec_type)
+        return True
 
     def parse_rec_ident(self, rec_type: str) -> bool:
         """
@@ -479,6 +501,27 @@ class Parser:
         """
         return self.parse_comp_const()
 
+    def parse_comp_const(self) -> int:
+        """
+        TODO: Implement this correctly, which includes allowing addition and references to function addresses...
+        For now, just parse a number
+        """
+        # This is mostly copy/pasted from parse_int_literal.
+        value = 0
+        if self.current_token().tok_type == TokenType.INT_LITERAL:
+            value = int(self.current_token().value)
+        elif self.current_token().tok_type == TokenType.HEX_LITERAL:
+            value = int(self.current_token().value, 16)
+        else:
+            raise SyntaxError(
+                f"Unexpected token in parse_number: {self.current_token()}"
+            )
+        if value < -65535 or value > 65535:
+            raise SyntaxError(f"Numeric literal {value} out of range [-65535, 65535]")
+        self.advance()
+
+        return value
+
     def parse_func_routine(self) -> bool:
         """
         <func routine> ::= <FUNC decl> {<system decls>} {<stmt list>}{RETURN (<arith exp>)}
@@ -520,6 +563,7 @@ class Parser:
         while True:
             if not self.parse_stmt():
                 break
+        return True
 
     def parse_stmt(self) -> bool:
         """

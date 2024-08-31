@@ -41,8 +41,9 @@ class ByteCodeGen:
         self.code: bytearray = bytearray()
         self.addr = start_addr
 
-    def append_byte(self, byte: int):
-        self.code.append(byte)
+    def append_byte(self, value: int):
+        value = value % 0x100
+        self.code.append(value)
 
     def append_short(self, value: int):
         value = value % 0x10000
@@ -168,6 +169,26 @@ class ByteCodeGen:
         else:
             self.append_byte(Type.CARD_T.value)
             self.append_short(constant_value)
+
+    def emit_local_data(self, local_index: int) -> int:
+        """
+        This VM bytecode does not store local data in the code stream. This method exists so
+        that other code generators can use the same interface.
+        """
+        local_var = self.symbol_table.locals[local_index]
+        return local_var.address
+
+    def emit_global_data(self, global_index: int) -> int:
+        """
+        This places raw data in the code stream, and returns the address of the data.
+        """
+        addr = len(self.code)
+        global_var = self.symbol_table.globals[global_index]
+        if global_var.var_t in [Type.BYTE_T, Type.CHAR_T]:
+            self.append_byte(global_var.init_opts.initial_value)
+        elif global_var.var_t in [Type.INT_T, Type.CARD_T]:
+            self.append_short(global_var.init_opts.initial_value)
+        return addr
 
     # def emit_get_global(self, global_index):
     #     # GET_GLOBAL, TYPE, INDEX

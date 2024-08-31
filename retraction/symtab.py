@@ -9,16 +9,24 @@ class VariableScope(Enum):
     GLOBAL = auto()
 
 
+class InitOpts:
+    def __init__(self, initial_value: int = 0, is_address: bool = False):
+        self.initial_value = initial_value
+        self.is_address = is_address
+
+
 class Variable:
     def __init__(
         self,
         name: str,
         var_t: Type,
+        init_opts: InitOpts,
         address: int = 0,
         routine_index: int | None = None,
     ):
         self.name = name
         self.var_t = var_t
+        self.init_opts = init_opts
         self.address = address  # Relative for locals, absolute for globals
         self.routine_index = routine_index
 
@@ -31,8 +39,8 @@ class Global(Variable):
     Global variable addresses are absolute
     """
 
-    def __init__(self, name: str, var_t: Type, address: int):
-        super().__init__(name, var_t, address)
+    # def __init__(self, name: str, var_t: Type, initial_value: intaddress: int):
+    #     super().__init__(name, var_t, address)
 
     def get_scope(self):
         return VariableScope.GLOBAL
@@ -44,8 +52,15 @@ class Local(Variable):
     i.e. 0-based index
     """
 
-    def __init__(self, name: str, var_t: Type, address: int, routine_index: int):
-        super().__init__(name, var_t, address, routine_index)
+    # def __init__(
+    #     self,
+    #     name: str,
+    #     var_t: Type,
+    #     initial_value: int,
+    #     address: int,
+    #     routine_index: int,
+    # ):
+    #     super().__init__(name, var_t, address, routine_index)
 
     def get_scope(self):
         return VariableScope.LOCAL
@@ -57,8 +72,8 @@ class Param(Variable):
     i.e. 0-based index
     """
 
-    def __init__(self, name: str, var_t: Type, address: int, routine_index: int):
-        super().__init__(name, var_t, address, routine_index)
+    # def __init__(self, name: str, var_t: Type, address: int, routine_index: int):
+    #     super().__init__(name, var_t, address, routine_index)
 
     def get_scope(self):
         return VariableScope.PARAM
@@ -67,6 +82,7 @@ class Param(Variable):
 class SymbolTable:
     def __init__(self):
         self.numerical_constants: list[int] = []
+        self.string_constants: list[str] = []
         self.globals: list[Global] = []
         self.locals: list[Local] = []
         self.params: list[Param] = []
@@ -95,28 +111,28 @@ class SymbolTable:
         if self.symbol_exists(name):
             raise ValueError(f"Symbol {name} already exists")
 
-    def declare_global(self, name: str, var_t: Type, initial_value: int = 0):
+    def declare_global(self, name: str, var_t: Type, init_opts: InitOpts):
         self.check_no_symbol(name)
         next_index = len(self.globals)
-        self.globals.append(Global(name, var_t, initial_value))
+        self.globals.append(Global(name, var_t, init_opts))
         self.globals_lookup[name] = next_index
         return next_index
 
     def declare_local(
-        self, local_index: int, name: str, local_t: Type, initial_value: int = 0
+        self, routine_index: int, name: str, local_t: Type, init_opts: InitOpts
     ):
         self.check_no_symbol(name)
         next_index = len(self.locals)
-        self.locals.append(Local(name, local_t, initial_value, local_index))
+        self.locals.append(Local(name, local_t, init_opts, routine_index))
         self.locals_lookup[(next_index, name)] = next_index
         return next_index
 
     def declare_param(
-        self, routine_index: int, name: str, param_t: Type, initial_value: int = 0
+        self, routine_index: int, name: str, param_t: Type, init_opts: InitOpts
     ):
         self.check_no_symbol(name)
         next_index = len(self.params)
-        self.params.append(Param(name, param_t, initial_value, routine_index))
+        self.params.append(Param(name, param_t, init_opts, routine_index))
         self.params_lookup[(next_index, name)] = next_index
         return next_index
 

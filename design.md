@@ -83,3 +83,25 @@ RETURN
 ```
 
 I'm not sure if this is very useful, but the Action! language cartridge allows it.
+
+### Register parameter notation
+
+The manual mentions the syntax `=*` as a way to tell the compiler that a routine does not use memory in parameter passing. The first 3 bytes of parameters are passed in the A, X, and Y registers, and apparently there's a benefit to using notation to indicate this to the compiler. So, for example, it appears using `PROC Foo=*(CARD x, BYTE y)` can help the compiler generate better code. This doesn't appear to be mentioned in the grammar.
+
+### Routines as raw bytes
+
+There are examples in the manual of using something similar to array notation to define routines. Here's an example from the book (note it also has the above-mentioned `=*` notation):
+
+```
+PROC Position=*(CARD c,BYTE r)
+[$5B85$5C86$5A84]
+```
+
+The raw data is treated as machine code. This syntax does not appear to be specified in the grammar, but testing it with the Action! compiler, it does work. The various examples in the book make it difficult to determine exactly how to parse the data. Here's an example from the book where the parsing rules seem hard to deduce:
+
+```
+PROC DrawTo=*(CARD c,BYTE r)
+[$20GrIO$11A0$4CXIO]
+```
+
+Here, FrIO and XIO are the names of other PROCs. It seems that the "G" in GrIO and "X" in XIO simply happen to not be hexadecimal and are thus treated as identifiers.

@@ -180,19 +180,9 @@ class TypedPostfixExpression:
             item.deepest_operand_index = self.compute_deepest_operand_index(
                 curr_index, 1
             )
-        # elif op in RELATIONAL_OPS:
-        #     # TODO: Should maintain internal boolean type for relational operations?
-        #     item.item_t = Type.BYTE_T
-        #     item.deepest_operand_index = self.compute_deepest_operand_index(
-        #         curr_index, 2
-        #     )
         elif op in BINARY_OPS:
             operand2_index = curr_index - 1
             operand1_index = self.compute_deepest_operand_index(curr_index, 1) - 1
-            # operand2 = self.items[operand2_index]
-            # operand1_index = operand2.deepest_operand_index - 1
-            # operand1 = self.items[operand1_index]
-            # operand1_index = self.deepest_operand_index(operand2_index) - 1
             print(
                 f"Binary op: {op}, operand1_index: {operand1_index}, operand2_index: {operand2_index}"
             )
@@ -255,35 +245,6 @@ class TypedPostfixExpression:
             index = index - 1
             index = self.items[index].deepest_operand_index
         return index
-
-    # def deepest_operand_index(self, index: int) -> int:
-    #     """
-    #     Recursively find the deepest (leftmost) operand. Used to determine the type of a binary operation.
-    #     e.g. for the stack 1,2,3,+,*, the leftmost operand of + is 2, the leftmost operand of * is 1.
-    #     """
-    #     if index < 0:
-    #         raise InternalError("No operand found for binary operation.")
-
-    #     # Short-circuit if the result is already memoized.
-    #     if self.items[index].deepest_operand_index is not None:
-    #         return self.items[index].deepest_operand_index
-
-    #     n_operands = self.items[index].op.num_operands()
-    #     if n_operands == None:
-    #         # Function call. Look up the number of arguments in the routine from the symbol table.
-    #         function_item = self.items[index]
-    #         function_item_index = function_item.index
-    #         routine = self.symbol_table.routines[function_item_index]
-    #         n_operands = len(routine.param_ts)
-    #     # Recurse to the leftmost operand. This is the heavy lifting of the algorithm.
-    #     for _ in range(n_operands):
-    #         index = index - 1
-    #         index = self.deepest_operand_index(index)
-
-    #     # Memoize the result.
-    #     self.items[index].deepest_operand_index = index
-
-    #     return index
 
     def optimize(self):
         """

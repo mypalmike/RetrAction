@@ -518,28 +518,43 @@ class ParserTestCase(unittest.TestCase):
         )
         self.assertEqual(parser.current_token().tok_type, TokenType.EOF)
 
-    # def test_system_decls(self):
-    #     source_code = """
-    #     BYTE somebyte
-    #     CARD somecard
-    #     INT someint
-    #     """
-    #     tokens = tokenize(source_code, S_F)
-    #     symbol_table = SymbolTable()
-    #     codegen = ByteCodeGen(symbol_table)
-    #     parser = Parser(tokens, codegen, symbol_table)
-    #     parser.parse_system_decls()
-    #     for name, type, value in [
-    #         ("somebyte", BYTE_TIPE, 0),
-    #         ("somecard", CARD_TIPE, 0),
-    #         ("someint", INT_TIPE, 0),
-    #     ]:
-    #         self.assertTrue(symbol_table.symbol_exists(name))
-    #         g_index = symbol_table.globals_lookup[name]
-    #         global_obj = symbol_table.globals[g_index]
-    #         self.assertEqual(global_obj.name, name)
-    #         self.assertEqual(global_obj.var_t, type)
-    #         self.assertEqual(global_obj.value, value)
+    def test_system_decls_basic(self):
+        source_code = """
+        BYTE somebyte = [$12]
+        CARD somecard = [$2345]
+        INT someint = [$6789]
+        """
+        tokens = tokenize(source_code, S_F)
+        symbol_table = SymbolTable()
+        codegen = ByteCodeGen(symbol_table)
+        parser = Parser(tokens, codegen, symbol_table)
+        parser.parse_system_decls()
+        for var_name, var_t, value in [
+            ("somebyte", Type.BYTE_T, 0x12),
+            ("somecard", Type.CARD_T, 0x2345),
+            ("someint", Type.INT_T, 0x6789),
+        ]:
+            self.assertTrue(symbol_table.symbol_exists(var_name))
+            g_index = symbol_table.globals_lookup[var_name]
+            global_obj = symbol_table.globals[g_index]
+            self.assertEqual(global_obj.name, var_name)
+            self.assertEqual(global_obj.var_t, var_t)
+            self.assertEqual(global_obj.init_opts.initial_value, value)
+            expected_code = bytearray(
+                [0x12, 0x45, 0x23, 0x89, 0x67]  # 1 byte, 1 card, 1 int = 5 bytes total
+            )
+            self.assertEqual(
+                len(expected_code),
+                len(codegen.code),
+                f"Wrong code length. Expected {len(expected_code)} but got {len(codegen.code)}",
+            )
+            for i, b in enumerate(codegen.code):
+                self.assertEqual(
+                    b,
+                    expected_code[i],
+                    f"Bytecode mismatch at index {i} (\n{hexlify(codegen.code, '-', 2)} vs\n{hexlify(expected_code, '-', 2)})",
+                )
+        self.assertEqual(parser.current_token().tok_type, TokenType.EOF)
 
     # def test_assignment(self):
     #     source_code = """
