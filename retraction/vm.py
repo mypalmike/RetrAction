@@ -398,6 +398,6 @@ class VirtualMachine:
                 value_t = Type(self.memory[self.pc + 1])
                 value = self.pop(value_t)
                 print(value)
-                self.pc += 3 if SIZE_BYTES[value_t.value] == 2 else 2
+                self.pc += 2
             else:
                 raise ValueError(f"Unknown instruction {op}")

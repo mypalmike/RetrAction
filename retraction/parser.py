@@ -720,8 +720,8 @@ class Parser:
         <params> ::= <params>,<arith exp> | <arith exp>
         """
         routine = self.symbol_table.routines[routine_index]
-        param_tipes = routine.param_tipes
-        expected_param_count = len(param_tipes)
+        param_ts = routine.param_ts
+        expected_param_count = len(param_ts)
         param_count = 0
         try:
             self.parsing_params = True
