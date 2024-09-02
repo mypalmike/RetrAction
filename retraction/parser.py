@@ -37,12 +37,13 @@ class Parser:
         self.symbol_table = symbol_table
 
         # Parsing state
-        self.parsing_params = False
+        self.parsing_param_decl = False
         # self.exits_to_patch: list[list[ByteCode]] = []
         self.exits_to_patch: list[list[int]] = []  # Addresses of jumps to patch
         self.curr_routine_index = None
         self.typed_expression = None
         self.last_t: Type | None = None
+        self.parsing_param_decl = False
 
     def current_token(self):
         if self.current_token_index < len(self.tokens):
@@ -303,7 +304,16 @@ class Parser:
             identifier_t = Type.CARD_T
         else:
             raise InternalError(f"Invalid fund type {fund_type}")
-        if self.curr_routine_index is not None:
+        if self.parsing_param_decl:
+            if self.curr_routine_index is None:
+                raise SyntaxError("Parameter declaration outside of routine")
+            self.symbol_table.declare_param(
+                self.curr_routine_index,
+                identifier,
+                identifier_t,
+                init_opts,
+            )
+        elif self.curr_routine_index is not None:
             curr_routine = self.symbol_table.routines[self.curr_routine_index]
             curr_routine.get_locals_size()
             ident_index = self.symbol_table.declare_local(
@@ -481,16 +491,13 @@ class Parser:
             raise NotImplementedError("PROC with routine address")
             self.advance()
             addr = self.parse_addr()
-        self.consume(TokenType.OP_LPAREN)
-
-        # TODO: Implement parameters. Current parsing code ends up declaring globals,
-        # so that needs to be avoided
-        # self.parse_param_decl()
-        self.consume(TokenType.OP_RPAREN)
-        bytecode_addr = self.code_gen.get_next_addr()
-        routine = Routine(identifier, bytecode_addr, [], Type.VOID_T)
+        routine_addr = self.code_gen.get_next_addr()
+        routine = Routine(identifier, routine_addr, [], Type.VOID_T)
         try:
             self.curr_routine_index = self.symbol_table.declare_routine(routine)
+            self.consume(TokenType.OP_LPAREN)
+            self.parse_param_decls()
+            self.consume(TokenType.OP_RPAREN)
             self.parse_system_decls()
             self.parse_stmt_list()
         finally:
@@ -547,16 +554,28 @@ class Parser:
             self.advance()
             addr = self.parse_addr()
         self.consume(TokenType.OP_LPAREN)
-        self.parse_param_decl()
+        self.parse_param_decls()
         self.consume(TokenType.OP_RPAREN)
         return True
 
-    def parse_param_decl(self) -> bool:
+    def parse_param_decls(self) -> bool:
         """
+        <param decls> ::= <param decls>,<param decl> | <param decl>  (Not in Action! manual)
         <param decl> ::= <var decl>
         TODO: Implement limit of 8 parameters
         """
-        return self.parse_var_decl()
+        if self.parsing_param_decl:
+            raise SyntaxError("Nested parameter declarations not allowed")
+        try:
+            self.parsing_param_decl = True
+            if not self.parse_var_decl():
+                return False
+            while self.current_token().tok_type == TokenType.OP_COMMA:
+                self.advance()
+                self.parse_var_decl()
+            return True
+        finally:
+            self.parsing_param_decl = False
 
     def parse_stmt_list(self) -> bool:
         """
@@ -704,7 +723,7 @@ class Parser:
         # Might be an array reference if it's not a routine
         if routine_index is None:
             return False
-        if self.parsing_params:
+        if self.parsing_param_decl:
             raise SyntaxError(
                 "A function call may not be used as a parameter in a routine call or declaration"
             )
@@ -724,7 +743,7 @@ class Parser:
         expected_param_count = len(param_ts)
         param_count = 0
         try:
-            self.parsing_params = True
+            self.parsing_param_decl = True
             for _ in range(expected_param_count):
                 self.parse_arith_exp()
                 param_count += 1
@@ -744,7 +763,7 @@ class Parser:
                 param_count += 1
 
         finally:
-            self.parsing_params = False
+            self.parsing_param_decl = False
 
     def parse_cond_exp(self) -> bool:
         """
@@ -1113,8 +1132,23 @@ class Parser:
         # TODO: Arrays, pointers, and records
         # TODO: Locals
         identifier = self.current_token().value
+        local_index = self.symbol_table.locals_lookup.get(identifier)
         global_index = self.symbol_table.globals_lookup.get(identifier)
-        if global_index is not None:
+        if local_index is not None:
+            local_var = self.symbol_table.locals[local_index]
+            typed_expression_item = TypedExpressionItem(
+                TypedExpressionOp.LOAD_VARIABLE, local_index
+            )
+            typed_expression_item.item_t = local_var.var_t
+            typed_expression_item.scope = ByteCodeVariableScope.LOCAL
+            typed_expression_item.address = local_var.address
+            typed_expression_item.addr_mode = ByteCodeVariableAddressMode.DEFAULT
+            self.typed_expression.append(typed_expression_item)
+            # self.code_gen.emit_get_variable(
+            #     var_t, var_scope, ByteCodeVariableAddressMode.DEFAULT, var_addr
+            # )
+            self.advance()
+        elif global_index is not None:
             # TODO: Should call parse_mem_reference to deal with arrays.
             global_var = self.symbol_table.globals[global_index]
             typed_expression_item = TypedExpressionItem(

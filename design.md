@@ -66,6 +66,44 @@ I believe the intent was that these are synonymous, but there is a disconnect in
 
 The grammar rules for `<complex rel>` do not allow for evaluating numerical values as relational expressions. In other words, the code `if 1 then do ...` would be syntactically incorrect by the published grammar rules. However, there are examples in the manual of this, and the original implementation allows it. The rules of the original compiler appear to be non-zero = false, zero = true, as is common in other languages.
 
+### Param decl vs. var decl, multiple issues.
+
+The grammar rules for function and proc declarations say that they optionally take a `param decl` in parentheses, e.g. `PROC foo(BYTE x, BYTE y)`. The grammar states `<param decl> ::= <var decl>`. This is certainly mistaken, as a `var decl` is a single variable declaration, and a proc or function takes a comma-delimited list of variable declarations.
+
+Furthermore, even if we were to treat parameter declarations as a comma-separated list of `var decl`, there are ways in which parameter declarations differ from local and global variable declarations.
+
+Parameter declarations do not take initial values. In some languages, this would look like setting default values, e.g. in python you can have `def foo(x=0)`. This is not allowed in Action!.
+
+Also, record types must be pointers. Action! does not support something like:
+
+```
+TYPE myrec = [BYTE b1 INT b2]
+PROC foo(myrec val)
+; etc.
+```
+
+But it does allow `PROC foo(myrec POINTER val)`, though see below about limitations in the Action! compiler.
+
+### Mixing record pointer types in parameter lists with other types
+
+The Action! compiler seems to have problems with parameter lists when record pointer types follow fundamental types.
+
+This compiles:
+
+```
+TYPE myrec = [BYTE x INT y]
+PROC foo(myrec POINTER x)
+```
+
+But this does not:
+
+```
+TYPE myrec = [BYTE b1 INT i1]
+PROC foo(BYTE b2, myrec POINTER mrp)
+```
+
+It's unclear why this is a problem for the Action! compiler, but RetrAction should accept the problematic code.
+
 ### Proc and func pointers
 
 The grammar does not seem to support treatment of routines as pointers to those routines, e.g.
@@ -82,7 +120,7 @@ RETURN
 
 ```
 
-I'm not sure if this is very useful, but the Action! language cartridge allows it.
+The original Action! language compiler allows it.
 
 ### Register parameter notation
 
@@ -97,7 +135,7 @@ PROC Position=*(CARD c,BYTE r)
 [$5B85$5C86$5A84]
 ```
 
-The raw data is treated as machine code. This syntax does not appear to be specified in the grammar, but testing it with the Action! compiler, it does work. The various examples in the book make it difficult to determine exactly how to parse the data. Here's an example from the book where the parsing rules seem hard to deduce:
+The raw data is treated as machine code. This syntax does not appear to be specified in the grammar, but testing it with the Action! compiler, it does compile. The various examples in the book make it difficult to determine exactly how to parse the data. Here's an example from the book where the parsing rules seem hard to deduce:
 
 ```
 PROC DrawTo=*(CARD c,BYTE r)
