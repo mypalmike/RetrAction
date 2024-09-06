@@ -76,6 +76,13 @@ class TokenType(Enum):
 # Create a reverse mapping from integers to token type strings
 INT_TO_TOKEN = {token.value: token.name for token in TokenType}
 
+FUND_TYPES = {
+    TokenType.BYTE,
+    TokenType.CARD,
+    TokenType.CHAR,
+    TokenType.INT,
+}
+
 PRIMITIVE_TYPES = {
     TokenType.BYTE,
     TokenType.CARD,
@@ -176,11 +183,17 @@ class Token:
         else:
             raise ValueError(f"Token {self.tok_type} has no integer value")
 
-    def is_primitive_type(self) -> bool:
+    def is_fund_type(self) -> bool:
         """
-        Helper to determine if the token represents a primitive type.
+        Helper to determine if the token represents a fundamental type.
         """
-        return self.tok_type in PRIMITIVE_TYPES
+        return self.tok_type in FUND_TYPES
+
+    # def is_primitive_type(self) -> bool:
+    #     """
+    #     Helper to determine if the token represents a primitive type.
+    #     """
+    #     return self.tok_type in PRIMITIVE_TYPES
 
     def source_location(self) -> str:
         return f"{self.source_filename}:{self.line_number}"

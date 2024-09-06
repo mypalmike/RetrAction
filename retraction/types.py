@@ -4,98 +4,42 @@ from typing import cast
 from retraction.error import InternalError
 
 
-class Type(Enum):
+class FundamentalType(Enum):
     BYTE_T = 0
     CHAR_T = 1
     INT_T = 2
     CARD_T = 3
-    BYTE_POINTER_T = 4
-    CHAR_POINTER_T = 5
-    INT_POINTER_T = 6
-    CARD_POINTER_T = 7
-    BYTE_ARRAY_T = 8
-    CHAR_ARRAY_T = 9
-    INT_ARRAY_T = 10
-    CARD_ARRAY_T = 11
-    RECORD_T = 12
-    BOOL_INTERNAL_T = 13
-    VOID_T = 14
+
+    # BYTE_POINTER_T = 4
+    # CHAR_POINTER_T = 5
+    # INT_POINTER_T = 6
+    # CARD_POINTER_T = 7
+    # BYTE_ARRAY_T = 8
+    # CHAR_ARRAY_T = 9
+    # INT_ARRAY_T = 10
+    # CARD_ARRAY_T = 11
+    # RECORD_T = 12
+    # BOOL_INTERNAL_T = 13
+    # VOID_T = 14
 
 
-FUNDAMENAL_TYPES = {
-    Type.BYTE_T,
-    Type.CHAR_T,
-    Type.INT_T,
-    Type.CARD_T,
-}
-
-SIZE_BYTES = [
-    1,  # BYTE_T
-    1,  # CHAR_T
-    2,  # INT_T
-    2,  # CARD_T
-    1,  # BYTE_POINTER_T
-    1,  # CHAR_POINTER_T
-    2,  # INT_POINTER_T
-    2,  # CARD_POINTER_T
-    1,  # BYTE_ARRAY_T
-    1,  # CHAR_ARRAY_T
-    2,  # INT_ARRAY_T
-    2,  # CARD_ARRAY_T
-    0,  # RECORD_T
-    1,  # BOOL_INTERNAL_T
-]
-
-CAST_PRIORITY = [
-    1,  # BYTE_T
-    1,  # CHAR_T
-    2,  # INT_T
-    3,  # CARD_T
-    1,  # BYTE_POINTER_T
-    1,  # CHAR_POINTER_T
-    2,  # INT_POINTER_T
-    3,  # CARD_POINTER_T
-    1,  # BYTE_ARRAY_T
-    1,  # CHAR_ARRAY_T
-    2,  # INT_ARRAY_T
-    3,  # CARD_ARRAY_T
-    0,  # RECORD_T
-    1,  # BOOL_INTERNAL_T
-]
+class ComplexType:
+    pass
 
 
-def binary_expression_type(t1: Type, t2: Type) -> Type:
-    pri1, pri2 = CAST_PRIORITY[t1.value], CAST_PRIORITY[t2.value]
-    result_priority = max(pri1, pri2)
-    print(
-        f"binary_expression_type... t1: {t1}, t2: {t2}, result_priority: {result_priority}"
-    )
-    if result_priority == 1:
-        return Type.BYTE_T
-    elif result_priority == 2:
-        return Type.INT_T
-    elif result_priority == 3:
-        return Type.CARD_T
-    else:
-        raise InternalError(f"Invalid cast priority: {result_priority}")
-
-
-class RecordType:
+class RecordType(ComplexType):
     def __init__(self, name: str):
         self.name = name
-        self.fields: list[tuple[str, Type]] = []
+        self.fields: list[tuple[str, FundamentalType]] = (
+            []
+        )  # Use list rather than just a dict to preserve order
         self.lookup: dict[str, int] = {}
 
-    def add_field(self, name: str, field_type: Type):
-        # Fields must be fundamental types
-        if not field_type in FUNDAMENAL_TYPES:
-            raise ValueError(
-                f"Field {name} must be a fundamental type, not {field_type}"
-            )
+    def add_field(self, name: str, field_type: FundamentalType):
         self.fields.append((name, field_type))
         self.lookup[name] = len(self.fields) - 1
 
-    def get_field(self, name: str) -> tuple[str, Type]:
+    def get_field(self, name: str) -> tuple[str, FundamentalType]:
         return self.fields[self.lookup[name]]
 
     def __eq__(self, other: object) -> bool:
@@ -107,34 +51,148 @@ class RecordType:
         return f"RecordType({self.name}, {self.fields})"
 
 
-class Routine:
-    def __init__(
-        self,
-        name: str,
-        entry_point: int,
-        param_ts: list[Type],
-        return_t: Type,
-    ):
-        self.name = name
-        self.entry_point = entry_point
-        self.param_ts = param_ts
-        self.return_t = return_t
+class PointerType(ComplexType):
+    def __init__(self, reference_type: FundamentalType | RecordType):
+        self.reference_type = reference_type
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, PointerType):
+            return False
+        return self.reference_type == other.reference_type
 
     def __repr__(self) -> str:
-        return f"Routine({self.name}, {self.entry_point}, {self.param_ts}, {self.return_t})"
+        return f"PointerType({self.reference_type})"
 
-    def is_function(self):
-        return self.return_t is not None
 
-    def is_procedure(self):
-        return self.return_t is None
+class ArrayType(ComplexType):
+    def __init__(self, element_type: FundamentalType, length: int | None):
+        self.element_type = element_type
+        self.length = length
 
-    def get_params_size(self):
-        return sum(SIZE_BYTES[param_t] for param_t in self.param_ts)
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, ArrayType):
+            return False
+        return self.element_type == other.element_type and self.length == other.length
 
-    def get_locals_size(self):
-        # TODO: Implement this
-        return 0
+    def __repr__(self) -> str:
+        return f"ArrayType({self.element_type}, {self.length})"
+
+
+type Type = FundamentalType | RecordType | PointerType | ArrayType
+
+# FUNDAMENTAL_TYPES = {
+#     Type.BYTE_T,
+#     Type.CHAR_T,
+#     Type.INT_T,
+#     Type.CARD_T,
+# }
+
+# SIZE_BYTES = [
+#     1,  # BYTE_T
+#     1,  # CHAR_T
+#     2,  # INT_T
+#     2,  # CARD_T
+#     1,  # BYTE_POINTER_T
+#     1,  # CHAR_POINTER_T
+#     2,  # INT_POINTER_T
+#     2,  # CARD_POINTER_T
+#     1,  # BYTE_ARRAY_T
+#     1,  # CHAR_ARRAY_T
+#     2,  # INT_ARRAY_T
+#     2,  # CARD_ARRAY_T
+#     0,  # RECORD_T
+#     1,  # BOOL_INTERNAL_T
+# ]
+
+# CAST_PRIORITY = [
+#     1,  # BYTE_T
+#     1,  # CHAR_T
+#     2,  # INT_T
+#     3,  # CARD_T
+#     1,  # BYTE_POINTER_T
+#     1,  # CHAR_POINTER_T
+#     2,  # INT_POINTER_T
+#     3,  # CARD_POINTER_T
+#     1,  # BYTE_ARRAY_T
+#     1,  # CHAR_ARRAY_T
+#     2,  # INT_ARRAY_T
+#     3,  # CARD_ARRAY_T
+#     0,  # RECORD_T
+#     1,  # BOOL_INTERNAL_T
+# ]
+
+
+# def binary_expression_type(t1: Type, t2: Type) -> Type:
+#     pri1, pri2 = CAST_PRIORITY[t1.value], CAST_PRIORITY[t2.value]
+#     result_priority = max(pri1, pri2)
+#     print(
+#         f"binary_expression_type... t1: {t1}, t2: {t2}, result_priority: {result_priority}"
+#     )
+#     if result_priority == 1:
+#         return Type.BYTE_T
+#     elif result_priority == 2:
+#         return Type.INT_T
+#     elif result_priority == 3:
+#         return Type.CARD_T
+#     else:
+#         raise InternalError(f"Invalid cast priority: {result_priority}")
+
+
+# class RecordType:
+#     def __init__(self, name: str):
+#         self.name = name
+#         self.fields: list[tuple[str, Type]] = []
+#         self.lookup: dict[str, int] = {}
+
+#     def add_field(self, name: str, field_type: Type):
+#         # Fields must be fundamental types
+#         if not field_type in FUNDAMENTAL_TYPES:
+#             raise ValueError(
+#                 f"Field {name} must be a fundamental type, not {field_type}"
+#             )
+#         self.fields.append((name, field_type))
+#         self.lookup[name] = len(self.fields) - 1
+
+#     def get_field(self, name: str) -> tuple[str, Type]:
+#         return self.fields[self.lookup[name]]
+
+#     def __eq__(self, other: object) -> bool:
+#         if not isinstance(other, RecordType):
+#             return False
+#         return self.name == other.name
+
+#     def __repr__(self) -> str:
+#         return f"RecordType({self.name}, {self.fields})"
+
+
+# class Routine:
+#     def __init__(
+#         self,
+#         name: str,
+#         entry_point: int,
+#         param_ts: list[Type],
+#         return_t: Type,
+#     ):
+#         self.name = name
+#         self.entry_point = entry_point
+#         self.param_ts = param_ts
+#         self.return_t = return_t
+
+#     def __repr__(self) -> str:
+#         return f"Routine({self.name}, {self.entry_point}, {self.param_ts}, {self.return_t})"
+
+#     def is_function(self):
+#         return self.return_t is not None
+
+#     def is_procedure(self):
+#         return self.return_t is None
+
+#     def get_params_size(self):
+#         return sum(SIZE_BYTES[param_t] for param_t in self.param_ts)
+
+#     def get_locals_size(self):
+#         # TODO: Implement this
+#         return 0
 
 
 # class ArrayTipe:

@@ -143,3 +143,14 @@ PROC DrawTo=*(CARD c,BYTE r)
 ```
 
 Here, FrIO and XIO are the names of other PROCs. It seems that the "G" in GrIO and "X" in XIO simply happen to not be hexadecimal and are thus treated as identifiers.
+
+### Apparent bug in TYPE field names and variable names
+
+The following does not compile in the original implementation:
+
+```
+TYPE foo = [BYTE x]
+INT x
+```
+
+It appears to consider this a name collision, showing error 6, "Declaration error". This would appear to be a bug(?) when considering how most languages treat record types. RetrAction allows this code to compile.
