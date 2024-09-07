@@ -32,7 +32,7 @@ class SymTab:
         self,
         name: str,
         entry_type: EntryType,
-        ast_node: ast.Node,
+        ast_node: ast.Node | None = None,
     ) -> int:
         if name in self.lookup:
             raise SyntaxError(f"Symbol {name} already exists in this scope")

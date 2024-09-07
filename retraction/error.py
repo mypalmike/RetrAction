@@ -9,6 +9,11 @@ class SyntaxError(RetractionError):
         super().__init__(msg)
 
 
+class IdentifierError(RetractionError):
+    def __init__(self, msg):
+        super().__init__(msg)
+
+
 class InternalError(RetractionError):
     def __init__(self, msg):
         super().__init__(msg)

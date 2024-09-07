@@ -3,6 +3,11 @@ from enum import Enum, auto
 from retraction.types import Type
 
 
+# Forward declaration of Visitor class handles circular dependency
+class Visitor:
+    pass
+
+
 class Op(Enum):
     ADD = auto()
     SUB = auto()
@@ -22,40 +27,22 @@ class Op(Enum):
     BIT_OR = auto()
     BIT_XOR = auto()
 
+    def is_conditional(self):
+        return self in [Op.EQ, Op.NE, Op.GT, Op.GE, Op.LT, Op.LE]
 
-class InitOpts:
+
+class Node:
+    def accept(self, visitor: Visitor):
+        raise NotImplementedError()
+
+
+class InitOpts(Node):
     def __init__(self, initial_value: int = 0, is_address: bool = False):
         self.initial_value = initial_value
         self.is_address = is_address
 
-
-class Node:
-    pass
-
-
-class Program(Node):
-    def __init__(self, modules: list[Module]):
-        self.modules = modules
-
     def __repr__(self) -> str:
-        return f"Program({self.modules})"
-
-
-class Module(Node):
-    def __init__(self, decls: DeclList, routines: list[Routine]):
-        self.decls = decls
-        self.routines = routines
-
-    def __repr__(self) -> str:
-        return f"Module({self.decls}, {self.routines})"
-
-
-class DeclList(Node):
-    def __init__(self, decls: list[Decl]):
-        self.decls = decls
-
-    def __repr__(self) -> str:
-        return f"DeclList({self.decls})"
+        return f"InitOpts({self.initial_value}, {self.is_address})"
 
 
 class Decl(Node):
@@ -74,7 +61,7 @@ class VarDecl(Decl):
 
 
 class StructDecl(Decl):
-    def __init__(self, name: str, fields: StructFieldList):
+    def __init__(self, name: str, fields: list[VarDecl]):
         self.name = name
         self.fields = fields
 
@@ -82,37 +69,67 @@ class StructDecl(Decl):
         return f"StructDecl({self.name}, {self.fields})"
 
 
-class StructFieldList(Node):
-    def __init__(self, fields: list[VarDecl]):
-        self.fields = fields
-
-    def __repr__(self) -> str:
-        return f"StructFieldList({self.fields})"
-
-
-class StatementList(Node):
-    def __init__(self, statements: list[Statement]):
-        self.statements = statements
-
-    def __repr__(self) -> str:
-        return f"StatementList({self.statements})"
-
-
 class Statement(Node):
     pass
 
 
-class Assign(Statement):
-    def __init__(self, var_node: VarDecl, expr: Expr):
-        self.var_node = var_node
+class Expr(Node):
+    pass
+
+
+class Var(Node):
+    pass
+
+
+class SimpleVar(Var):
+    def __init__(self, symbol_name: str):
+        self.symbol_name = symbol_name
+
+    def __repr__(self) -> str:
+        return f"SimpleVar({self.symbol_name})"
+
+
+class PointerVar(Var):
+    def __init__(self, symbol_name: str):
+        self.symbol_name = symbol_name
+
+    def __repr__(self) -> str:
+        return f"PointerVar({self.symbol_name})"
+
+
+class ArrayVar(Var):
+    def __init__(self, symbol_name: str, index: Expr):
+        self.symbol_name = symbol_name
+        self.index = index
+
+    def __repr__(self) -> str:
+        return f"ArrayVar({self.symbol_name}, {self.index})"
+
+
+class StructVar(Var):
+    def __init__(self, symbol_name: str, field_name: str):
+        self.symbol_name = symbol_name
+        self.field_index = field_name
+
+    def __repr__(self) -> str:
+        return f"StructVar({self.symbol_name}, {self.field_index})"
+
+
+class ReferenceVar(Var):
+    def __init__(self, symbol_name: str):
+        self.symbol_name = symbol_name
+
+    def __repr__(self) -> str:
+        return f"ReferenceVar({self.symbol_name})"
+
+
+class SetVar(Statement):
+    def __init__(self, var_target: Var, expr: Expr):
+        self.var_target = var_target
         self.expr = expr
 
     def __repr__(self) -> str:
-        return f"Assign({self.var_node.name}, {self.expr})"
-
-
-class Expr(Node):
-    pass
+        return f"Assign({self.var_target}, {self.expr})"
 
 
 class Conditional(Node):
@@ -125,7 +142,9 @@ class Conditional(Node):
 
 
 class If(Statement):
-    def __init__(self, conditionals: list[Conditional], else_body: list[Statement]):
+    def __init__(
+        self, conditionals: list[Conditional], else_body: list[Statement] | None
+    ):
         self.conditionals = conditionals
         self.else_body = else_body
 
@@ -134,20 +153,21 @@ class If(Statement):
 
 
 class Do(Statement):
-    def __init__(self, body: list[Statement]):
+    def __init__(self, body: list[Statement], until: Expr | None):
         self.body = body
+        self.until = until
 
     def __repr__(self) -> str:
-        return f"Do({self.body})"
+        return f"Do({self.body}, {self.until})"
 
 
 class While(Statement):
-    def __init__(self, condition: Expr, body: list[Statement]):
+    def __init__(self, condition: Expr, do_statement: Do):
         self.condition = condition
-        self.body = body
+        self.do_statement = do_statement
 
     def __repr__(self) -> str:
-        return f"While({self.condition}, {self.body})"
+        return f"While({self.condition}, {self.do_statement})"
 
 
 class Until(Statement):
@@ -156,6 +176,25 @@ class Until(Statement):
 
     def __repr__(self) -> str:
         return f"Until({self.condition}"
+
+
+class For(Statement):
+    def __init__(
+        self,
+        var_target: SimpleVar,
+        start_expr: Expr,
+        finish_expr: Expr,
+        inc_expr: Expr,
+        do_loop: Do,
+    ):
+        self.var_target = var_target
+        self.start_expr = start_expr
+        self.finish_expr = finish_expr
+        self.inc_expr = inc_expr
+        self.do_loop = do_loop
+
+    def __repr__(self) -> str:
+        return f"For({self.var_target}, {self.start_expr}, {self.finish_expr}, {self.inc_expr}, {self.do_loop})"
 
 
 class Exit(Statement):
@@ -209,20 +248,12 @@ class UnaryExpr(Expr):
         return f"UnaryExpr({self.op}, {self.expr})"
 
 
-class RoutineList(Node, list[Routine]):
-    def __init__(self, routines: list[Routine]):
-        self.routines = routines
-
-    def __repr__(self) -> str:
-        return f"RoutineList({self.routines})"
-
-
 class Routine(Node):
     def __init__(
         self,
         name: str,
         params: list[VarDecl],
-        decl_list: DeclList | None,
+        decls: list[Decl] | None,
         body: list[Statement] | None,
         fixed_addr: int | None,
         return_t: Type | None,
@@ -230,11 +261,118 @@ class Routine(Node):
     ):
         self.name = name
         self.params = params
-        self.decl_list = decl_list
+        self.decls = decls
         self.body = body
         self.fixed_addr = fixed_addr
         self.return_t = return_t
         self.symtab_index = symtab_index
 
     def __repr__(self) -> str:
-        return f"Routine({self.name}, {self.params}, {self.decl_list}, {self.body}, {self.return_t})"
+        return f"Routine({self.name}, {self.params}, {self.decls}, {self.body}, {self.fixed_addr}, {self.return_t}, {self.symtab_index})"
+
+
+class RoutineCall(Expr):
+    def __init__(self, name: str, args: list[Expr]):
+        self.name = name
+        self.args = args
+
+    def __repr__(self) -> str:
+        return f"RoutineCall({self.name}, {self.args})"
+
+
+class RoutineCallStmt(Statement):
+    def __init__(self, routine_call: RoutineCall):
+        self.routine_call = routine_call
+
+    def __repr__(self) -> str:
+        return f"RoutineCallStmt({self.routine_call})"
+
+
+class NumericConst(Expr):
+    def __init__(self, value: int):
+        self.value = value
+
+    def __repr__(self) -> str:
+        return f"Const({self.value})"
+
+
+class GetVar(Expr):
+    def __init__(self, var: Var):
+        self.var = var
+
+    def __repr__(self) -> str:
+        return f"GetVar({self.var})"
+
+
+class Module(Node):
+    def __init__(
+        self,
+        decls: list[Decl],
+        routines: list[Routine],
+    ):
+        self.decls = decls
+        self.routines = routines
+
+    def __repr__(self) -> str:
+        return f"Module({self.decls}, {self.routines})"
+
+
+class Program(Node):
+    def __init__(self, modules: list[Module]):
+        self.modules = modules
+
+    def __repr__(self) -> str:
+        return f"Program({self.modules})"
+
+
+class Visitor:  # type: ignore
+    def visit_program(self, program: Program):
+        raise NotImplementedError()
+
+    def visit_module(self, module: Module):
+        raise NotImplementedError()
+
+    def visit_var_decl(self, var_decl: VarDecl):
+        raise NotImplementedError()
+
+    def visit_struct_decl(self, struct_decl: StructDecl):
+        raise NotImplementedError()
+
+    def visit_assign(self, assign: SetVar):
+        raise NotImplementedError()
+
+    def visit_binary_expr(self, binary_expr: BinaryExpr):
+        raise NotImplementedError()
+
+    def visit_unary_expr(self, unary_expr: UnaryExpr):
+        raise NotImplementedError()
+
+    def visit_conditional(self, conditional: Conditional):
+        raise NotImplementedError()
+
+    def visit_if(self, if_stmt: If):
+        raise NotImplementedError()
+
+    def visit_do(self, do_stmt: Do):
+        raise NotImplementedError()
+
+    def visit_while(self, while_stmt: While):
+        raise NotImplementedError()
+
+    def visit_until(self, until_stmt: Until):
+        raise NotImplementedError()
+
+    def visit_exit(self, exit_stmt: Exit):
+        raise NotImplementedError()
+
+    def visit_code_block(self, code_block: CodeBlock):
+        raise NotImplementedError()
+
+    def visit_return(self, return_stmt: Return):
+        raise NotImplementedError()
+
+    def visit_dev_print(self, dev_print: DevPrint):
+        raise NotImplementedError()
+
+    def visit_routine(self, routine: Routine):
+        raise NotImplementedError()

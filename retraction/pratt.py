@@ -31,8 +31,8 @@ class ExprAction(Enum):
     GROUPING = auto()
     UNARY = auto()
     BINARY = auto()
-    AND = auto()
-    OR = auto()
+    # AND = auto()
+    # OR = auto()
     IDENTIFIER = auto()
 
 
@@ -80,7 +80,6 @@ EXPRESSION_RULES = {
     TokenType.OP_DIVIDE: ExprRule(
         ExprAction.NONE, ExprAction.BINARY, ExprPrecedence.FACTOR
     ),
-    # TODO: Does precedence matter for this?
     TokenType.OP_AT: ExprRule(
         ExprAction.IDENTIFIER, ExprAction.NONE, ExprPrecedence.UNARY
     ),
@@ -105,8 +104,10 @@ EXPRESSION_RULES = {
     TokenType.OP_LE: ExprRule(
         ExprAction.NONE, ExprAction.BINARY, ExprPrecedence.COMPARE
     ),
-    TokenType.AND: ExprRule(ExprAction.NONE, ExprAction.AND, ExprPrecedence.AND),
-    TokenType.OR: ExprRule(ExprAction.NONE, ExprAction.OR, ExprPrecedence.OR),
+    # TokenType.AND: ExprRule(ExprAction.NONE, ExprAction.AND, ExprPrecedence.AND),
+    # TokenType.OR: ExprRule(ExprAction.NONE, ExprAction.OR, ExprPrecedence.OR),
+    TokenType.AND: ExprRule(ExprAction.NONE, ExprAction.BINARY, ExprPrecedence.AND),
+    TokenType.OR: ExprRule(ExprAction.NONE, ExprAction.BINARY, ExprPrecedence.OR),
     TokenType.XOR: ExprRule(ExprAction.NONE, ExprAction.BINARY, ExprPrecedence.XOR),
     TokenType.OP_BIT_AND: ExprRule(
         ExprAction.NONE, ExprAction.BINARY, ExprPrecedence.AND
