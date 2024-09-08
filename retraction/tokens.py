@@ -2,6 +2,8 @@ import string
 
 from enum import Enum, auto
 
+from retraction.error import IdentifierError, InternalError, SyntaxError
+
 
 class TokenType(Enum):
     AND = auto()
@@ -181,7 +183,7 @@ class Token:
         elif self.tok_type == TokenType.CHAR_LITERAL:
             return ord(self.value)
         else:
-            raise ValueError(f"Token {self.tok_type} has no integer value")
+            raise InternalError(f"Token {self.tok_type} has no integer value")
 
     def is_fund_type(self) -> bool:
         """
@@ -224,12 +226,12 @@ def tokenize(source_code, source_filename):
             i += 1
             while i < length and source_code[i] != '"':
                 if source_code[i] not in string.printable or source_code[i] == '"':
-                    raise ValueError(
+                    raise SyntaxError(
                         f"Invalid character in string constant: {source_code[i]}"
                     )
                 i += 1
             if i >= length or source_code[i] != '"':
-                raise ValueError("Unterminated string constant")
+                raise SyntaxError("Unterminated string constant")
             i += 1
             string_const = source_code[start:i]
             tokens.append(
@@ -254,7 +256,7 @@ def tokenize(source_code, source_filename):
                 )
                 i += 2
             else:
-                raise ValueError("Invalid character constant")
+                raise SyntaxError("Invalid character constant")
             continue
 
         # Match decimal numbers
@@ -312,11 +314,11 @@ def tokenize(source_code, source_filename):
                     Token(TEXT_TO_TOKEN[symbol], None, source_filename, line_number)
                 )
             else:
-                raise ValueError(f"Invalid symbol: {symbol}")
+                raise SyntaxError(f"Invalid symbol: {symbol}")
             continue
 
         # No match
-        raise ValueError(f"Invalid character: {source_code[i]}")
+        raise SyntaxError(f"Invalid character: {source_code[i]}")
 
     # EOF token
     tokens.append(Token(TokenType.EOF, None, source_filename, line_number))

@@ -42,12 +42,12 @@ class Node:
 
 
 class InitOpts(Node):
-    def __init__(self, initial_value: int = 0, is_address: bool = False):
-        self.initial_value = initial_value
+    def __init__(self, initial_values: list[int], is_address: bool):
+        self.initial_values = initial_values
         self.is_address = is_address
 
     def __repr__(self) -> str:
-        return f"InitOpts({self.initial_value}, {self.is_address})"
+        return f"InitOpts({self.initial_values}, {self.is_address})"
 
 
 class Decl(Node):
@@ -55,7 +55,7 @@ class Decl(Node):
 
 
 class VarDecl(Decl):
-    def __init__(self, name: str, var_t: Type, init_opts: InitOpts):
+    def __init__(self, name: str, var_t: Type, init_opts: InitOpts | None):
         self.name = name
         self.var_t = var_t
         self.init_opts = init_opts

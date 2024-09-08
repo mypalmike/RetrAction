@@ -195,9 +195,57 @@ class ParserTestCase(unittest.TestCase):
         self.assertEqualIgnoreWhitespace(
             str(tree),
             """
-            [VarDecl(somebyte, FundamentalType.BYTE_T, InitOpts(18, False)),
-            VarDecl(somecard, FundamentalType.CARD_T, InitOpts(9029, False)),
-            VarDecl(someint, FundamentalType.INT_T, InitOpts(26505, False))]
+            [VarDecl(somebyte,FundamentalType.BYTE_T,InitOpts([18],False)),
+            VarDecl(somecard,FundamentalType.CARD_T,InitOpts([9029],False)),
+            VarDecl(someint,FundamentalType.INT_T,InitOpts([26505],False))]
+            """,
+        )
+        self.assertEqual(parser.current_token().tok_type, TokenType.EOF)
+
+    def test_system_decls_all_internal_types(self):
+        source_code = """
+        BYTE somebyte = [$12]
+        CHAR somechar = ['a]
+        CARD somecard = [$2345]
+        INT someint = [$6789]
+        BYTE POINTER someptr
+        CHAR POINTER somecharptr
+        CARD POINTER somecardptr
+        INT POINTER someintptr
+        BYTE POINTER someptrinit = $1000
+        BYTE ARRAY somebytearr
+        CHAR ARRAY somechararr
+        CARD ARRAY somecardarr
+        INT ARRAY someintarr
+        BYTE ARRAY somebytearrinit = [$12 $34 $56]
+        CHAR ARRAY somechararrinit = ['a 'b 'c]
+        CHAR ARRAY somechararrinit2 = "abc"
+        """
+        tokens = tokenize(source_code, S_F)
+        print(tokens)
+        symbol_table = SymTab()
+        parser = Parser(tokens, symbol_table)
+        tree = parser.parse_system_decls()
+        self.maxDiff = None
+        self.assertEqualIgnoreWhitespace(
+            str(tree),
+            """
+            [VarDecl(somebyte,FundamentalType.BYTE_T,InitOpts([18],False)),
+            VarDecl(somechar,FundamentalType.CHAR_T,InitOpts([97],False)),
+            VarDecl(somecard,FundamentalType.CARD_T,InitOpts([9029],False)),
+            VarDecl(someint,FundamentalType.INT_T,InitOpts([26505],False)),
+            VarDecl(someptr,PointerType(FundamentalType.BYTE_T),None),
+            VarDecl(somecharptr,PointerType(FundamentalType.CHAR_T),None),
+            VarDecl(somecardptr,PointerType(FundamentalType.CARD_T),None),
+            VarDecl(someintptr,PointerType(FundamentalType.INT_T),None),
+            VarDecl(someptrinit,PointerType(FundamentalType.BYTE_T),InitOpts([4096],False)),
+            VarDecl(somebytearr,ArrayType(FundamentalType.BYTE_T,None),None),
+            VarDecl(somechararr,ArrayType(FundamentalType.CHAR_T,None),None),
+            VarDecl(somecardarr,ArrayType(FundamentalType.CARD_T,None),None),
+            VarDecl(someintarr,ArrayType(FundamentalType.INT_T,None),None),
+            VarDecl(somebytearrinit,ArrayType(FundamentalType.BYTE_T,None),InitOpts([18,52,86],False)),
+            VarDecl(somechararrinit,ArrayType(FundamentalType.CHAR_T,None),InitOpts([97,98,99],False)),
+            VarDecl(somechararrinit2,ArrayType(FundamentalType.CHAR_T,None),InitOpts([97,98,99],False))]
             """,
         )
         self.assertEqual(parser.current_token().tok_type, TokenType.EOF)
@@ -222,7 +270,7 @@ class ParserTestCase(unittest.TestCase):
             str(tree),
             """
             Program([Module(
-            [VarDecl(somebyte,FundamentalType.BYTE_T,InitOpts(18,False))],
+            [VarDecl(somebyte,FundamentalType.BYTE_T,InitOpts([18],False))],
             [Routine(main,[],[],
             [DevPrint(GetVar(SimpleVar(somebyte))),Return(None)],
             None,None)])])
@@ -248,15 +296,15 @@ class ParserTestCase(unittest.TestCase):
             str(tree),
             """
             Program([Module(
-            [VarDecl(globalbyte,FundamentalType.BYTE_T,InitOpts(0,False))],
-            [Routine(main,[],[VarDecl(localbyte,FundamentalType.BYTE_T,InitOpts(0,False))],
+            [VarDecl(globalbyte,FundamentalType.BYTE_T,None)],
+            [Routine(main,[],[VarDecl(localbyte,FundamentalType.BYTE_T,None)],
             [SetVar(SimpleVar(globalbyte),Const(1)),SetVar(SimpleVar(localbyte),Const(2)),Return(None)],
             None,None)])])
             """,
         )
         self.assertEqual(parser.current_token().tok_type, TokenType.EOF)
 
-    def test_routine_callss(self):
+    def test_routine_calls(self):
         source_code = """
         PROC proc1()
             DEVPRINT(1)

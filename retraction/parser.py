@@ -21,6 +21,7 @@ from retraction.error import IdentifierError, InternalError, SyntaxError
 #     TypedPostfixExpression,
 # )
 from retraction.types import (
+    ArrayType,
     FundamentalType,
     PointerType,
     Type,
@@ -81,17 +82,14 @@ class Parser:
     def __init__(
         self,
         tokens: list[Token],
-        # code_gen: ByteCodeGen,
         symbol_table: SymTab,
     ):
         self.tokens = tokens
         self.current_token_index = 0
-        # self.code_gen = code_gen
         self.symbol_table = symbol_table
 
         # Parsing state
         self.parsing_param_decl = False
-        # self.exits_to_patch: list[list[ByteCode]] = []
         self.exits_to_patch: list[list[int]] = []  # Addresses of jumps to patch
         self.parsing_routine: RoutineCategory | None = None
         self.routine_return_type: Type | None = None
@@ -116,7 +114,7 @@ class Parser:
     def consume(self, token_type) -> Token:
         token = self.current_token()
         if token is None or token.tok_type != token_type:
-            raise SyntaxError(f"Expected token {token_type}, got {token}")
+            raise SyntaxError(f"Expected {token_type}, got {token}")
         return self.advance()
 
     def parse_dev(self):
@@ -158,6 +156,10 @@ class Parser:
         levels instead, like here.
         <system decls> ::= <DEFINE decl> | <TYPE decl> | <var decl>
         """
+        print(
+            f"In parse_system_decls: {self.current_token().tok_type} {self.current_token().value}",
+            file=sys.stderr,
+        )
         decls: list[ast.Decl] = []
         while True:
             decl = self.parse_system_decl()
@@ -416,7 +418,7 @@ class Parser:
         #     self.code_gen.emit_global_data(ident_index)
         # return True
 
-    def parse_init_opts(self, allow_init: bool) -> ast.InitOpts:
+    def parse_init_opts(self, allow_init: bool) -> ast.InitOpts | None:
         """
         <init opts> ::= <addr> | [<value>]
         <addr> ::= <comp const>
@@ -432,11 +434,23 @@ class Parser:
                 value = self.current_token().int_value()
                 self.advance()
                 self.consume(TokenType.OP_RBRACK)
-                return ast.InitOpts(value, False)
+                return ast.InitOpts([value], False)
             else:
                 addr = self.parse_addr()
-                return ast.InitOpts(addr, True)
-        return ast.InitOpts()
+                return ast.InitOpts([addr], True)
+        return None
+
+    def parse_fund_or_record_type(self) -> FundamentalType | RecordType | None:
+        """
+        <fund or record type> ::= <fund type> | <record type>
+        """
+        fund_t = self.parse_fund_type()
+        if fund_t is not None:
+            return fund_t
+        record_t = self.parse_record_type()
+        if record_t:
+            return record_t
+        return None
 
     def parse_pointer_decl(
         self,
@@ -445,28 +459,29 @@ class Parser:
         """
         <POINTER decl> ::= <ptr type> POINTER <ptr ident list>
         """
-        if not self.next_token():
+        if not self.next_token() or self.next_token().tok_type != TokenType.POINTER:
             return None
-        if self.next_token().tok_type != TokenType.POINTER:
-            return None
-        ref_type = self.current_token().value
+        ref_t = self.parse_fund_or_record_type()
+        if ref_t is None:
+            raise SyntaxError(
+                "Expected fundamental or record type in pointer declaration"
+            )
         self.advance()
-        self.advance()
-        return self.parse_ptr_ident_list(ref_type, allow_init)
+        return self.parse_ptr_ident_list(ref_t, allow_init)
 
     def parse_ptr_ident_list(
         self,
-        ref_type: FundamentalType | RecordType,
+        ref_t: FundamentalType | RecordType,
         allow_init: bool,
     ) -> list[ast.VarDecl] | None:
         """
         <ptr ident list> ::= <ptr ident list>,<ptr ident> | <ptr ident>
         """
         ptr_var_decls: list[ast.VarDecl] = []
-        ptr_var_decls.append(self.parse_ptr_ident(ref_type, allow_init))
+        ptr_var_decls.append(self.parse_ptr_ident(ref_t, allow_init))
         while self.current_token().tok_type == TokenType.OP_COMMA:
             self.advance()
-            ptr_var_decls.append(self.parse_ptr_ident(ref_type, allow_init))
+            ptr_var_decls.append(self.parse_ptr_ident(ref_t, allow_init))
         return ptr_var_decls
 
     def parse_ptr_ident(
@@ -484,26 +499,118 @@ class Parser:
                 raise SyntaxError("Declaration may not have an initial value")
             self.advance()
             value = self.parse_comp_const()
-            return ast.VarDecl(identifier, PointerType(ref_type), ast.InitOpts(value))
+            return ast.VarDecl(
+                identifier, PointerType(ref_type), ast.InitOpts([value], False)
+            )
             # self.code_gen.emit_ptr_ident_value(ptr_type, identifier, value)
-        return ast.VarDecl(identifier, PointerType(ref_type), ast.InitOpts())
+        return ast.VarDecl(identifier, PointerType(ref_type), None)
         # self.code_gen.emit_ptr_ident(ptr_type, identifier)
 
     def parse_array_decl(self, allow_init: bool) -> list[ast.VarDecl] | None:
         """
         Variable Declaration for Arrays
-        TODO: Implement arrays
         <ARRAY decl> ::= <fund type> ARRAY <arr ident list>
         <arr ident list> ::= <arr ident list>,<arr ident> |
         <arr ident>
         <arr ident> ::= <identifier>{(<dim>)}{=<arr init opts>}
-        <dim> ::= <num conat>
+        <dim> ::= <num const>
         <arr init opts> ::= <addr> | [<value>] | <str const>
         <addr> ::= <comp const>
         <value list> ::= <value list><value> | <value>
         <value> ::= <comp const>
         """
-        return None
+        if not self.next_token() or self.next_token().tok_type != TokenType.ARRAY:
+            return None
+        fund_t = self.parse_fund_type()
+        if fund_t is None:
+            raise SyntaxError("Expected fundamental type in array declaration")
+        self.consume(TokenType.ARRAY)
+        return self.parse_arr_ident_list(fund_t, allow_init)
+
+    def parse_arr_ident_list(
+        self,
+        fund_t: FundamentalType,
+        allow_init: bool,
+    ) -> list[ast.VarDecl]:
+        """
+        <arr ident list> ::= <arr ident list>,<arr ident> | <arr ident>
+        """
+        arr_var_decls: list[ast.VarDecl] = []
+        arr_var_decls.append(self.parse_arr_ident(fund_t, allow_init))
+        while self.current_token().tok_type == TokenType.OP_COMMA:
+            self.advance()
+            arr_var_decls.append(self.parse_arr_ident(fund_t, allow_init))
+        return arr_var_decls
+
+    def parse_arr_ident(
+        self,
+        fund_t: FundamentalType,
+        allow_init: bool,
+    ) -> ast.VarDecl:
+        """
+        <arr ident> ::= <identifier>{(<dim>)}{=<arr init opts>}
+        """
+        identifier = self.consume(TokenType.IDENTIFIER).value
+        dimensions = self.parse_dimensions()
+        init_opts = self.parse_arr_init_opts(allow_init)
+        return ast.VarDecl(identifier, ArrayType(fund_t, dimensions), init_opts)
+
+    def parse_dimensions(self) -> int | None:
+        """
+        <dim> ::= <num const>
+        """
+        if self.current_token().tok_type != TokenType.OP_LPAREN:
+            return None
+        self.advance()
+        dim = self.parse_comp_const()
+        self.consume(TokenType.OP_RPAREN)
+        return dim
+
+    def parse_arr_init_opts(self, allow_init: bool) -> ast.InitOpts | None:
+        """
+        Note: Grammar says <value> but it would seem to be <value list> based on the
+        examples in the manual.
+        <arr init opts> ::= <addr> | [<value list>] | <str const>
+        """
+        if self.current_token().tok_type != TokenType.OP_EQ:
+            return None
+        if not allow_init:
+            raise SyntaxError("Declaration may not have an initial value")
+        self.advance()
+        if self.current_token().tok_type == TokenType.OP_LBRACK:
+            self.advance()
+            values = self.parse_value_list()
+            self.consume(TokenType.OP_RBRACK)
+            return ast.InitOpts(values, False)
+        elif self.current_token().tok_type == TokenType.STRING_LITERAL:
+            str_literal = self.current_token().value
+            self.advance()
+            values = [ord(c) for c in str_literal]
+            return ast.InitOpts(values, False)
+        addr = self.parse_addr()
+        return ast.InitOpts([addr], True)
+
+    def parse_value_list(self) -> list[int]:
+        """
+        <value list> ::= <value list><value> | <value>
+        """
+        values = []
+        while self.current_token().tok_type != TokenType.OP_RBRACK:
+            values.append(self.parse_comp_const())
+        return values
+
+    def parse_record_type(self) -> RecordType | None:
+        """
+        <record type> ::= <identifier>
+        """
+        if self.current_token().tok_type != TokenType.IDENTIFIER:
+            return None
+        identifier = self.current_token().value
+        symtab_entry = self.symbol_table.find(identifier)
+        if symtab_entry is None or symtab_entry.entry_type != EntryType.RECORD:
+            return None
+        self.advance()
+        return RecordType(identifier)
 
     def parse_record_decl(self) -> list[ast.VarDecl] | None:
         """
@@ -521,41 +628,36 @@ class Parser:
         if symtab_entry is None or symtab_entry.entry_type != EntryType.RECORD:
             return None
         self.advance()
-        struct_decl_node = symtab_entry.ast_node
-        return self.parse_rec_ident_list(cast(ast.StructDecl, struct_decl_node))
+        return self.parse_rec_ident_list(RecordType(identifier))
 
     def parse_rec_ident_list(
         self,
-        struct_decl_node: ast.StructDecl,
+        record_t: RecordType,
     ) -> list[ast.VarDecl]:
         """
         <rec ident list> ::= <rec ident list>,<rec ident> | <rec ident>
         """
         rec_idents: list[ast.VarDecl] = []
-        rec_idents.append(self.parse_rec_ident(struct_decl_node))
+        rec_idents.append(self.parse_rec_ident(record_t))
         while self.current_token().tok_type == TokenType.OP_COMMA:
             self.advance()
-            rec_idents.append(self.parse_rec_ident(struct_decl_node))
+            rec_idents.append(self.parse_rec_ident(record_t))
         return rec_idents
 
     def parse_rec_ident(
         self,
-        struct_decl_node: ast.StructDecl,
+        record_t: RecordType,
     ) -> ast.VarDecl:
         """
         <rec ident> ::= <identifier>{=<address>}
         """
         identifier = self.consume(TokenType.IDENTIFIER).value
-        record_t = RecordType(struct_decl_node.name)
         if self.current_token().tok_type == TokenType.OP_EQ:
             self.advance()
             addr = self.parse_addr()
-            return ast.VarDecl(identifier, record_t, ast.InitOpts(addr))
-            # self.code_gen.emit_rec_ident_value(rec_type, identifier, addr)
+            return ast.VarDecl(identifier, record_t, ast.InitOpts([addr], True))
         else:
-            return ast.VarDecl(identifier, record_t, ast.InitOpts())
-            # self.code_gen.emit_rec_ident(rec_type, identifier)
-        return True
+            return ast.VarDecl(identifier, record_t, None)
 
     def parse_routine_list(self) -> list[ast.Routine]:
         """
@@ -641,12 +743,13 @@ class Parser:
         TODO: Implement this correctly, which includes allowing addition and references to function addresses...
         For now, just parse a number
         """
-        # This is mostly copy/pasted from parse_int_literal.
         value = 0
         if self.current_token().tok_type == TokenType.INT_LITERAL:
             value = int(self.current_token().value)
         elif self.current_token().tok_type == TokenType.HEX_LITERAL:
             value = int(self.current_token().value, 16)
+        elif self.current_token().tok_type == TokenType.CHAR_LITERAL:
+            value = ord(self.current_token().value)
         else:
             raise SyntaxError(
                 f"Unexpected token in parse_number: {self.current_token()}"
