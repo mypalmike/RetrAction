@@ -133,7 +133,7 @@ class SetVar(Statement):
         self.expr = expr
 
     def __repr__(self) -> str:
-        return f"Assign({self.var_target}, {self.expr})"
+        return f"SetVar({self.var_target}, {self.expr})"
 
 
 class Conditional(Node):
@@ -275,21 +275,21 @@ class Routine(Node):
         return f"Routine({self.name}, {self.params}, {self.decls}, {self.body}, {self.fixed_addr}, {self.return_t})"
 
 
-class RoutineCall(Expr):
+class Call(Expr):
     def __init__(self, name: str, args: list[Expr]):
         self.name = name
         self.args = args
 
     def __repr__(self) -> str:
-        return f"RoutineCall({self.name}, {self.args})"
+        return f"Call({self.name}, {self.args})"
 
 
-class RoutineCallStmt(Statement):
-    def __init__(self, routine_call: RoutineCall):
-        self.routine_call = routine_call
+class CallStmt(Statement):
+    def __init__(self, call: Call):
+        self.call = call
 
     def __repr__(self) -> str:
-        return f"RoutineCallStmt({self.routine_call})"
+        return f"CallStmt({self.call})"
 
 
 class NumericConst(Expr):

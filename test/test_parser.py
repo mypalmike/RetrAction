@@ -230,156 +230,58 @@ class ParserTestCase(unittest.TestCase):
         )
         self.assertEqual(parser.current_token().tok_type, TokenType.EOF)
 
-    # def test_assignment(self):
-    #     source_code = """
-    #     BYTE somebyte
-    #     BYTE otherbyte
-    #     """
-    #     # This test invokes two parsers to isolate the assignment parsing
-    #     tokens = tokenize(source_code, S_F)
-    #     symbol_table = SymbolTable()
-    #     codegen = ByteCodeGen(symbol_table)
-    #     parser = Parser(tokens, codegen, symbol_table)
-    #     parser.parse_system_decls()
+    def test_assignment(self):
+        source_code = """
+        BYTE globalbyte
+        PROC main()
+            BYTE localbyte
+            globalbyte = 1
+            localbyte = 2
+        RETURN
+        """
+        tokens = tokenize(source_code, S_F)
+        symbol_table = SymTab()
+        parser = Parser(tokens, symbol_table)
+        tree = parser.parse_program()
+        self.maxDiff = None
+        self.assertEqualIgnoreWhitespace(
+            str(tree),
+            """
+            Program([Module(
+            [VarDecl(globalbyte,FundamentalType.BYTE_T,InitOpts(0,False))],
+            [Routine(main,[],[VarDecl(localbyte,FundamentalType.BYTE_T,InitOpts(0,False))],
+            [SetVar(SimpleVar(globalbyte),Const(1)),SetVar(SimpleVar(localbyte),Const(2)),Return(None)],
+            None,None)])])
+            """,
+        )
+        self.assertEqual(parser.current_token().tok_type, TokenType.EOF)
 
-    #     source_code = """
-    #     otherbyte = 1
-    #     """
-    #     tokens = tokenize(source_code, S_F)
-    #     parser = Parser(tokens, codegen, symbol_table)
-    #     parser.parse_assign_stmt()
-    #     expected_code = [
-    #         ByteCode(ByteCodeOp.NUMERICAL_CONSTANT, 0),  # 1
-    #         ByteCode(ByteCodeOp.SET_GLOBAL, 1),  # otherbyte
-    #     ]
-    #     for i, expected_bytecode in enumerate(expected_code):
-    #         self.assertEqual(
-    #             codegen.code[i], expected_bytecode, f"Bytecode mismatch at index {i}"
-    #         )
-    #     self.assertEqual(parser.current_token().tok_type, TokenType.EOF)
+    def test_routine_callss(self):
+        source_code = """
+        PROC proc1()
+            DEVPRINT(1)
+        RETURN
 
-    # def test_global_get(self):
-    #     source_code = """
-    #     BYTE somebyte
-    #     BYTE otherbyte
-    #     """
-    #     # This test invokes two parsers to isolate the assignment parsing
-    #     tokens = tokenize(source_code, S_F)
-    #     symbol_table = SymbolTable()
-    #     codegen = ByteCodeGen(symbol_table)
-    #     parser = Parser(tokens, codegen, symbol_table)
-    #     parser.parse_system_decls()
+        PROC proc2()
+            proc1()
+            DEVPRINT(2)
 
-    #     source_code = """
-    #     DEVPRINT(otherbyte)
-    #     """
-    #     tokens = tokenize(source_code, S_F)
-    #     parser = Parser(tokens, codegen, symbol_table)
-    #     parser.parse_simp_stmt()
-    #     expected_code = [
-    #         ByteCode(ByteCodeOp.GET_GLOBAL, 1),  # otherbyte
-    #         ByteCode(ByteCodeOp.DEVPRINT),
-    #     ]
-    #     for i, expected_bytecode in enumerate(expected_code):
-    #         self.assertEqual(
-    #             codegen.code[i], expected_bytecode, f"Bytecode mismatch at index {i}"
-    #         )
-    #     self.assertEqual(parser.current_token().tok_type, TokenType.EOF)
-
-    # def test_routine_basics(self):
-    #     source_code = """
-    #     PROC proc1()
-    #         DEVPRINT(1)
-    #     RETURN
-
-    #     PROC proc2()
-    #         proc1()
-    #         DEVPRINT(2)
-
-    #     PROC main()
-    #         proc2()
-    #     RETURN
-    #     """
-    #     tokens = tokenize(source_code, S_F)
-    #     symbol_table = SymbolTable()
-    #     codegen = ByteCodeGen(symbol_table)
-    #     parser = Parser(tokens, codegen, symbol_table)
-    #     parser.parse_program()
-    #     expected_code = [
-    #         ByteCode(ByteCodeOp.NUMERICAL_CONSTANT, 0),  # 1
-    #         ByteCode(ByteCodeOp.DEVPRINT),  # DEVPRINT(1)
-    #         ByteCode(ByteCodeOp.RETURN),
-    #         ByteCode(ByteCodeOp.ROUTINE_CALL, 0),  # proc1
-    #         ByteCode(ByteCodeOp.NUMERICAL_CONSTANT, 1),  # 2
-    #         ByteCode(ByteCodeOp.DEVPRINT),  # DEVPRINT(2)
-    #         ByteCode(ByteCodeOp.ROUTINE_CALL, 1),  # proc2
-    #         ByteCode(ByteCodeOp.RETURN),
-    #     ]
-    #     # Check that the symbol table has the correct routine indices
-    #     for name, index in [("proc1", 0), ("proc2", 1), ("main", 2)]:
-    #         self.assertTrue(
-    #             symbol_table.symbol_exists(name), f"Symbol {name} not found"
-    #         )
-    #         routine_index = symbol_table.routines_lookup[name]
-    #         self.assertEqual(routine_index, index, f"Routine index mismatch for {name}")
-    #     # Check that the codegen output matches the expected code
-    #     for i, expected_bytecode in enumerate(expected_code):
-    #         self.assertLess(i, len(codegen.code), f"Codegen index {i} out of range")
-    #         self.assertEqual(
-    #             codegen.code[i], expected_bytecode, f"Bytecode mismatch at index {i}"
-    #         )
-    #     self.assertEqual(parser.current_token().tok_type, TokenType.EOF)
-
-    # def test_global_assign_and_read(self):
-    #     source_code = """
-    #     BYTE somebyte
-    #     BYTE otherbyte
-
-    #     PROC main()
-    #         somebyte = 10
-    #         otherbyte = somebyte + 36
-    #         DEVPRINT(otherbyte)
-    #     RETURN
-    #     """
-    #     tokens = tokenize(source_code, S_F)
-    #     symbol_table = SymbolTable()
-    #     codegen = ByteCodeGen(symbol_table)
-    #     parser = Parser(tokens, codegen, symbol_table)
-    #     parser.parse_program()
-    #     print(codegen.code)
-    #     print(symbol_table.constants)
-    #     print(symbol_table.globals)
-    #     expected_code = [
-    #         ByteCode(ByteCodeOp.NUMERICAL_CONSTANT, 0),  # 10
-    #         ByteCode(ByteCodeOp.SET_GLOBAL, 0),  # somebyte
-    #         ByteCode(ByteCodeOp.GET_GLOBAL, 0),  # somebyte
-    #         ByteCode(ByteCodeOp.NUMERICAL_CONSTANT, 1),  # 36
-    #         ByteCode(ByteCodeOp.ADD),
-    #         ByteCode(ByteCodeOp.SET_GLOBAL, 1),  # otherbyte
-    #         ByteCode(ByteCodeOp.GET_GLOBAL, 1),  # otherbyte
-    #         ByteCode(ByteCodeOp.DEVPRINT),
-    #         ByteCode(ByteCodeOp.RETURN),
-    #     ]
-    #     # Check that the symbol table has the correct global indices
-    #     for name, index in [("somebyte", 0), ("otherbyte", 1)]:
-    #         self.assertTrue(
-    #             symbol_table.symbol_exists(name), f"Symbol {name} not found"
-    #         )
-    #         global_index = symbol_table.globals_lookup[name]
-    #         self.assertEqual(global_index, index, f"Global index mismatch for {name}")
-
-    #     # Check that the symbol table has the correct constant values
-    #     for i, value in enumerate([10, 36]):
-    #         self.assertEqual(
-    #             symbol_table.constants[i],
-    #             value,
-    #             f"Constant value mismatch at index {i}",
-    #         )
-
-    #     # Check that the codegen output matches the expected code
-    #     for i, expected_bytecode in enumerate(expected_code):
-    #         self.assertLess(i, len(codegen.code), f"Codegen index {i} out of range")
-    #         self.assertEqual(
-    #             codegen.code[i], expected_bytecode, f"Bytecode mismatch at index {i}"
-    #         )
-    #     self.assertEqual(parser.current_token().tok_type, TokenType.EOF)
+        PROC main()
+            proc2()
+        RETURN
+        """
+        tokens = tokenize(source_code, S_F)
+        symbol_table = SymTab()
+        parser = Parser(tokens, symbol_table)
+        tree = parser.parse_program()
+        self.maxDiff = None
+        self.assertEqualIgnoreWhitespace(
+            str(tree),
+            """
+            Program([Module([],
+            [Routine(proc1,[],[],[DevPrint(Const(1)),Return(None)],None,None),
+            Routine(proc2,[],[],[CallStmt(Call(proc1,[])),DevPrint(Const(2))],None,None),
+            Routine(main,[],[],[CallStmt(Call(proc2,[])),Return(None)],None,None)])])
+            """,
+        )
+        self.assertEqual(parser.current_token().tok_type, TokenType.EOF)

@@ -764,7 +764,7 @@ class Parser:
             return exit_stmt
         routine_call = self.parse_routine_call()
         if routine_call:
-            return ast.RoutineCallStmt(routine_call)
+            return ast.CallStmt(routine_call)
         return_stmt = self.parse_return_stmt()
         if return_stmt:
             return return_stmt
@@ -900,7 +900,7 @@ class Parser:
 
         # return True
 
-    def parse_routine_call(self) -> ast.RoutineCall | None:
+    def parse_routine_call(self) -> ast.Call | None:
         """
         <routine call> ::= <FUNC call> | <PROC call>
         <FUNC call> ::= <identifier>({<params>})
@@ -929,7 +929,7 @@ class Parser:
         routine = cast(ast.Routine, symbol_table_entry.ast_node)
         params = self.parse_params(routine)
         self.consume(TokenType.OP_RPAREN)
-        return ast.RoutineCall(identifier, params)
+        return ast.Call(identifier, params)
 
         # if self.current_token().tok_type != TokenType.IDENTIFIER:
         #     return False
