@@ -3,8 +3,13 @@ from enum import Enum, auto
 from retraction.types import Type
 
 
-# Forward declaration of Visitor class handles circular dependency
+# Forward declarations to handle circular dependencies.
+# TODO: This works OK but should refactor to remove circular dependencies.
 class Visitor:
+    pass
+
+
+class SymTab:
     pass
 
 
@@ -54,7 +59,6 @@ class VarDecl(Decl):
         self.name = name
         self.var_t = var_t
         self.init_opts = init_opts
-        self.symtab_index = None
 
     def __repr__(self) -> str:
         return f"VarDecl({self.name}, {self.var_t}, {self.init_opts})"
@@ -257,7 +261,7 @@ class Routine(Node):
         body: list[Statement] | None,
         fixed_addr: int | None,
         return_t: Type | None,
-        symtab_index: int | None,
+        local_symtab: SymTab | None,
     ):
         self.name = name
         self.params = params
@@ -265,10 +269,10 @@ class Routine(Node):
         self.body = body
         self.fixed_addr = fixed_addr
         self.return_t = return_t
-        self.symtab_index = symtab_index
+        self.local_symtab = local_symtab
 
     def __repr__(self) -> str:
-        return f"Routine({self.name}, {self.params}, {self.decls}, {self.body}, {self.fixed_addr}, {self.return_t}, {self.symtab_index})"
+        return f"Routine({self.name}, {self.params}, {self.decls}, {self.body}, {self.fixed_addr}, {self.return_t})"
 
 
 class RoutineCall(Expr):

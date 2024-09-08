@@ -6,7 +6,7 @@ import unittest
 from retraction import Parser, TokenType, tokenize
 from retraction.bytecode import ByteCodeOp
 from retraction.codegen import ByteCodeGen
-from retraction.symtab import SymTab
+from retraction.symtab import EntryType, SymTab
 from retraction.types import Type
 import retraction.ast as ast
 
@@ -202,31 +202,33 @@ class ParserTestCase(unittest.TestCase):
         )
         self.assertEqual(parser.current_token().tok_type, TokenType.EOF)
 
-    # def test_simple_program(self):
-    #     source_code = """
-    #     BYTE somebyte = [$12]
-    #     CARD somecard = [$2345]
-    #     INT someint = [$6789]
+    def test_simple_program(self):
+        source_code = """
+        BYTE somebyte = [$12]
 
-    #     PROC main()
-    #         DEVPRINT (somebyte)
-    #     RETURN
-    #     """
-    #     tokens = tokenize(source_code, S_F)
-    #     symbol_table = SymTab()
-    #     parser = Parser(tokens, symbol_table)
-    #     tree = parser.parse_program()
-    #     self.maxDiff = None
-    #     self.assertEqualIgnoreWhitespace(
-    #         str(tree),
-    #         """
-    #         Program([Module([VarDecl(somebyte, FundamentalType.BYTE_T, InitOpts(18, False)),
-    #         VarDecl(somecard, FundamentalType.CARD_T, InitOpts(9029, False)),
-    #         VarDecl(someint, FundamentalType.INT_T, InitOpts(26505, False))],
-    #         [Routine(main, [], [DevPrint(Const(1)), Return()])])])
-    #         """,
-    #     )
-    #     self.assertEqual(parser.current_token().tok_type, TokenType.EOF)
+        PROC main()
+            DEVPRINT (somebyte)
+        RETURN
+        """
+        tokens = tokenize(source_code, S_F)
+        symbol_table = SymTab()
+        parser = Parser(tokens, symbol_table)
+        tree = parser.parse_program()
+        self.maxDiff = None
+        symbol_table_entry = symbol_table.find("main")
+        self.assertEqual(symbol_table_entry.name, "main")
+        self.assertEqual(symbol_table_entry.entry_type, EntryType.ROUTINE)
+        self.assertEqualIgnoreWhitespace(
+            str(tree),
+            """
+            Program([Module(
+            [VarDecl(somebyte,FundamentalType.BYTE_T,InitOpts(18,False))],
+            [Routine(main,[],[],
+            [DevPrint(GetVar(SimpleVar(somebyte))),Return(None)],
+            None,None)])])
+            """,
+        )
+        self.assertEqual(parser.current_token().tok_type, TokenType.EOF)
 
     # def test_assignment(self):
     #     source_code = """

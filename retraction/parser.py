@@ -67,6 +67,11 @@ def token_type_to_fundamental_type(token_type: TokenType) -> FundamentalType:
     raise InternalError(f"Invalid token type {token_type}")
 
 
+class RoutineCategory(Enum):
+    PROC = auto()
+    FUNC = auto()
+
+
 class Parser:
     """
     This is primarily a recursive descent parser, but expressions are parsed using
@@ -88,7 +93,8 @@ class Parser:
         self.parsing_param_decl = False
         # self.exits_to_patch: list[list[ByteCode]] = []
         self.exits_to_patch: list[list[int]] = []  # Addresses of jumps to patch
-        self.curr_routine_index: int | None = None
+        self.parsing_routine: RoutineCategory | None = None
+        self.routine_return_type: Type | None = None
         self.typed_expression = None
         self.last_t: Type | None = None
 
@@ -129,7 +135,7 @@ class Parser:
 
             while self.current_token().tok_type == TokenType.MODULE:
                 self.advance()
-                self.curr_routine_index = None
+                self.parsing_routine = None
                 modules.append(self.parse_prog_module())
 
             return ast.Program(modules)
@@ -566,17 +572,6 @@ class Parser:
     def parse_routine(self) -> ast.Routine | None:
         """
         <routine> ::= <proc routine> | <func routine>
-        """
-        return self.parse_proc_or_func_routine()
-        # if proc:
-        #     return proc
-        # func = self.parse_func_routine()
-        # if func:
-        #     return func
-        # return None
-
-    def parse_proc_or_func_routine(self) -> ast.Routine | None:
-        """
         <proc routine> ::= <PROC decl> {<system decls>} {<stmt list>}{RETURN}
         <proc decl> ::= PROC <identifier>{=<addr>}({<param decl>})
         <func routine> ::= <FUNC decl> {<system decls>} {<stmt list>}{RETURN (<arith exp>)}
@@ -597,7 +592,6 @@ class Parser:
         else:
             return None
         identifier = self.consume(TokenType.IDENTIFIER).value
-        symtab_index = self.symbol_table.add_entry(identifier, EntryType.ROUTINE)
         fixed_addr = None
         if self.current_token().tok_type == TokenType.OP_EQ:
             self.advance()
@@ -605,7 +599,12 @@ class Parser:
         # routine_addr = self.code_gen.get_next_addr()
         # routine = Routine(identifier, routine_addr, [], Type.VOID_T)
         try:
-            self.curr_routine_index = symtab_index
+            self.parsing_routine = (
+                RoutineCategory.PROC if return_t is None else RoutineCategory.FUNC
+            )
+            local_symbol_table = SymTab()
+            local_symbol_table.parent = self.symbol_table
+            self.symbol_table = local_symbol_table
             self.consume(TokenType.OP_LPAREN)
             param_decls = self.parse_param_decls()
             self.consume(TokenType.OP_RPAREN)
@@ -618,12 +617,18 @@ class Parser:
                 statements,
                 fixed_addr,
                 return_t,
-                symtab_index,
+                local_symbol_table,  # type: ignore
             )
-            self.symbol_table.set_entry_node(symtab_index, routine)
             return routine
         finally:
-            self.curr_routine_index = None
+            if self.symbol_table.parent is None:
+                raise InternalError(
+                    "Symbol table parent should not be None after parsing routine"
+                )
+            # Restore the parent symbol table and add this routine to it
+            self.symbol_table = self.symbol_table.parent
+            self.symbol_table.add_entry(identifier, EntryType.ROUTINE, routine)
+            self.parsing_routine = None
 
     def parse_addr(self):
         """
@@ -724,7 +729,7 @@ class Parser:
         """
         # If in a routine and we see a PROC or FUNC decl, it's not a statement
         # TODO: Also make sure it's a top-level statement? (e.g. not in an IF block)
-        if self.curr_routine_index is not None and (
+        if self.parsing_routine is not None and (
             self.current_token().tok_type == TokenType.PROC
             or (
                 self.current_token().is_fund_type()
@@ -870,11 +875,9 @@ class Parser:
         if self.current_token().tok_type != TokenType.RETURN:
             return None
         self.advance()
-        if self.curr_routine_index is None:
+        if self.parsing_routine is None:
             raise SyntaxError("RETURN statement outside of a routine")
-        symbol_table_entry = self.symbol_table.table[self.curr_routine_index]
-        routine = cast(ast.Routine, symbol_table_entry.ast_node)
-        if routine.return_t is None:
+        if self.parsing_routine == RoutineCategory.PROC:
             return ast.Return(None)
         self.consume(TokenType.OP_LPAREN)
         expr = self.parse_arith_exp()
