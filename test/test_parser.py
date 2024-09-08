@@ -250,6 +250,31 @@ class ParserTestCase(unittest.TestCase):
         )
         self.assertEqual(parser.current_token().tok_type, TokenType.EOF)
 
+    def test_type_decl(self):
+        source_code = """
+        TYPE rectype = [
+            BYTE field1, field2
+            CARD field3
+            INT field4
+        ]
+        """
+        tokens = tokenize(source_code, S_F)
+        symbol_table = SymTab()
+        parser = Parser(tokens, symbol_table)
+        tree = parser.parse_type_decl()
+        self.maxDiff = None
+        self.assertEqualIgnoreWhitespace(
+            str(tree),
+            """
+            StructDecl(rectype,
+            [VarDecl(field1,FundamentalType.BYTE_T,None),
+            VarDecl(field2,FundamentalType.BYTE_T,None),
+            VarDecl(field3,FundamentalType.CARD_T,None),
+            VarDecl(field4,FundamentalType.INT_T,None)])
+            """,
+        )
+        self.assertEqual(parser.current_token().tok_type, TokenType.EOF)
+
     def test_simple_program(self):
         source_code = """
         BYTE somebyte = [$12]
