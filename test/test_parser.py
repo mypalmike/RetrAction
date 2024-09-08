@@ -217,7 +217,7 @@ class ParserTestCase(unittest.TestCase):
         CHAR ARRAY somechararr
         CARD ARRAY somecardarr
         INT ARRAY someintarr
-        BYTE ARRAY somebytearrinit = [$12 $34 $56]
+        BYTE ARRAY somebytearrinit(3) = [$12 $34 $56]
         CHAR ARRAY somechararrinit = ['a 'b 'c]
         CHAR ARRAY somechararrinit2 = "abc"
         """
@@ -243,7 +243,7 @@ class ParserTestCase(unittest.TestCase):
             VarDecl(somechararr,ArrayType(FundamentalType.CHAR_T,None),None),
             VarDecl(somecardarr,ArrayType(FundamentalType.CARD_T,None),None),
             VarDecl(someintarr,ArrayType(FundamentalType.INT_T,None),None),
-            VarDecl(somebytearrinit,ArrayType(FundamentalType.BYTE_T,None),InitOpts([18,52,86],False)),
+            VarDecl(somebytearrinit,ArrayType(FundamentalType.BYTE_T,3),InitOpts([18,52,86],False)),
             VarDecl(somechararrinit,ArrayType(FundamentalType.CHAR_T,None),InitOpts([97,98,99],False)),
             VarDecl(somechararrinit2,ArrayType(FundamentalType.CHAR_T,None),InitOpts([97,98,99],False))]
             """,
