@@ -5,32 +5,14 @@ from typing import cast
 from retraction import ast
 from retraction.pratt import EXPRESSION_RULES, ExprAction, ExprPrecedence
 from retraction.tokens import Token, TokenType
-
-# from retraction.codegen import ByteCodeGen
-
-# from retraction.bytecode import (
-#     ByteCodeOp,
-#     ByteCodeVariableAddressMode,
-#     ByteCodeVariableScope,
-# )
 from retraction.error import IdentifierError, InternalError, SyntaxError
-
-# from retraction.typedexpr import (
-#     TypedExpressionItem,
-#     TypedExpressionOp,
-#     TypedPostfixExpression,
-# )
 from retraction.types import (
     ArrayType,
     FundamentalType,
     PointerType,
     Type,
-    #    Routine,
     RecordType,
-    # binary_expression_type,
 )
-
-# import retraction.ast as ast
 
 from retraction.symtab import EntryType, SymTab, Entry
 
@@ -156,10 +138,6 @@ class Parser:
         levels instead, like here.
         <system decls> ::= <DEFINE decl> | <TYPE decl> | <var decl>
         """
-        print(
-            f"In parse_system_decls: {self.current_token().tok_type} {self.current_token().value}",
-            file=sys.stderr,
-        )
         decls: list[ast.Decl] = []
         while True:
             decl = self.parse_system_decl()
@@ -191,46 +169,6 @@ class Parser:
             return var_decl
         return None
 
-    # def parse_define_decl(self) -> bool:
-    #     """
-    #     <DEFINE decl> ::= <DEFINE> <def list>
-    #     TODO: Remove this when there's a preprocessing step to handle defines
-    #     """
-    #     if self.current_token().tok_type != TokenType.DEFINE:
-    #         return False
-    #     self.advance()
-    #     self.parse_def_list()
-    #     return True
-
-    # def parse_def_list(self) -> bool:
-    #     """
-    #     <def list> ::= <def list>,<def> | <def>
-    #     TODO: Remove this when there's a preprocessing step to handle defines
-    #     """
-    #     if not self.parse_def():
-    #         return False
-    #     while self.current_token().tok_type == TokenType.COMMA:
-    #         self.advance()
-    #         self.parse_def()
-    #     return True
-
-    # def parse_def(self) -> bool:
-    #     """
-    #     <def> ::= <identifier>=<str const>
-    #     TODO: Remove this when there's a preprocessing step to handle defines
-    #     """
-    #     raise NotImplementedError()
-    # if self.current_token().tok_type != TokenType.IDENTIFIER:
-    #     return False
-    # if self.next_token().tok_type != TokenType.OP_EQ:
-    #     return False
-    # identifier = self.current_token().value
-    # self.advance()
-    # self.advance()
-    # str_const = self.current_token().value
-    # self.consume(TokenType.STRING_LITERAL)
-    # self.directives.define(identifier, str_const)
-
     def parse_type_decl(self) -> ast.StructDecl | None:
         """
         Note: The grammar specifies multiple type declarations, but this is unnecessary
@@ -249,32 +187,6 @@ class Parser:
         field_list = self.parse_field_init()
         self.consume(TokenType.OP_RBRACK)
         return ast.StructDecl(rec_name, field_list)
-
-        # field_list = self.parse_rec_ident_list()
-        # return ast.RecordDecl(name, field_list)
-
-    # def parse_rec_ident_list(self) -> ast.RecordFieldList:
-    #     """ """
-    #     if not self.parse_rec_ident():
-    #         return False
-    #     while self.parse_rec_ident():
-    #         pass
-    #     return True
-
-    # def parse_rec_ident(self) -> ast.RecordField | None:
-    #     """ """
-    #     if self.current_token().tok_type != TokenType.IDENTIFIER:
-    #         return False
-    #     if self.next_token().tok_type != TokenType.OP_EQ:
-    #         return False
-    #     rec_name = self.current_token().value
-    #     self.advance()
-    #     self.advance()
-    #     self.consume(TokenType.OP_LBRACK)
-    #     self.parse_field_init()
-    #     self.consume(TokenType.OP_RBRACK)
-
-    #     return True
 
     def parse_field_init(self) -> list[ast.VarDecl]:
         """
@@ -314,7 +226,7 @@ class Parser:
         # Note: The order of these checks is important. Pointer and array declarations
         # are checked before fund decl because they start with the same token
         # (e.g. BYTE POINTER x vs. BYTE x)
-        fund_decl = self.parse_fund_decl(True)
+        fund_decl = self.parse_fund_decl(allow_init)
         if fund_decl:
             return fund_decl
         record_decl = self.parse_record_decl()
@@ -330,12 +242,6 @@ class Parser:
         # This recurrence rule seems unnecessary and potentially problematic. Higher-level rules
         # already handle repetition. So we just parse a single base fund decl here.
         return self.parse_base_fund_decl(allow_init)
-
-        # if not self.parse_base_fund_decl():
-        #     return False
-        # while self.parse_base_fund_decl():
-        #     pass
-        # return True
 
     def parse_base_fund_decl(self, allow_init: bool) -> list[ast.VarDecl] | None:
         """
@@ -370,7 +276,10 @@ class Parser:
         """
         var_decls: list[ast.VarDecl] = []
         var_decls.append(self.parse_fund_ident(fund_t, allow_init))
-        while self.current_token().tok_type == TokenType.OP_COMMA:
+        while (
+            self.current_token().tok_type == TokenType.OP_COMMA
+            and self.next_token().tok_type == TokenType.IDENTIFIER
+        ):
             self.advance()
             var_decls.append(self.parse_fund_ident(fund_t, allow_init))
         return var_decls
@@ -387,36 +296,6 @@ class Parser:
         init_opts = self.parse_init_opts(allow_init)
 
         return ast.VarDecl(identifier, fund_t, init_opts)
-
-        # if self.current_token().tok_type == TokenType.OP_EQ:
-        #     self.advance()
-        #     self.parse_init_opts(fund_t, identifier)
-
-        # if self.parsing_param_decl:
-        #     if self.curr_routine_index is None:
-        #         raise SyntaxError("Parameter declaration outside of routine")
-        #     self.symbol_table.declare_param(
-        #         self.curr_routine_index,
-        #         identifier,
-        #         identifier_t,
-        #         init_opts,
-        #     )
-        # elif self.curr_routine_index is not None:
-        #     curr_routine = self.symbol_table.routines[self.curr_routine_index]
-        #     curr_routine.get_locals_size()
-        #     ident_index = self.symbol_table.declare_local(
-        #         self.curr_routine_index,
-        #         identifier,
-        #         identifier_t,
-        #         init_opts,
-        #     )
-        #     self.code_gen.emit_local_data(ident_index)
-        # else:
-        #     ident_index = self.symbol_table.declare_global(
-        #         identifier, identifier_t, init_opts
-        #     )
-        #     self.code_gen.emit_global_data(ident_index)
-        # return True
 
     def parse_init_opts(self, allow_init: bool) -> ast.InitOpts | None:
         """
@@ -502,9 +381,7 @@ class Parser:
             return ast.VarDecl(
                 identifier, PointerType(ref_type), ast.InitOpts([value], False)
             )
-            # self.code_gen.emit_ptr_ident_value(ptr_type, identifier, value)
         return ast.VarDecl(identifier, PointerType(ref_type), None)
-        # self.code_gen.emit_ptr_ident(ptr_type, identifier)
 
     def parse_array_decl(self, allow_init: bool) -> list[ast.VarDecl] | None:
         """
@@ -704,9 +581,10 @@ class Parser:
             self.parsing_routine = (
                 RoutineCategory.PROC if return_t is None else RoutineCategory.FUNC
             )
-            local_symbol_table = SymTab()
-            local_symbol_table.parent = self.symbol_table
-            self.symbol_table = local_symbol_table
+            # Push symbol table stack
+            outer_symbol_table = self.symbol_table
+            self.symbol_table = SymTab()
+            self.symbol_table.parent = outer_symbol_table
             self.consume(TokenType.OP_LPAREN)
             param_decls = self.parse_param_decls()
             self.consume(TokenType.OP_RPAREN)
@@ -719,17 +597,17 @@ class Parser:
                 statements,
                 fixed_addr,
                 return_t,
-                local_symbol_table,  # type: ignore
+                self.symbol_table,  # type: ignore
             )
-            return routine
-        finally:
             if self.symbol_table.parent is None:
                 raise InternalError(
                     "Symbol table parent should not be None after parsing routine"
                 )
-            # Restore the parent symbol table and add this routine to it
-            self.symbol_table = self.symbol_table.parent
-            self.symbol_table.add_entry(identifier, EntryType.ROUTINE, routine)
+            outer_symbol_table.add_entry(identifier, EntryType.ROUTINE, routine)
+            return routine
+        finally:
+            # Restore state
+            self.symbol_table = outer_symbol_table
             self.parsing_routine = None
 
     def parse_addr(self):
@@ -757,35 +635,7 @@ class Parser:
         if value < -65535 or value > 65535:
             raise SyntaxError(f"Numeric literal {value} out of range [-65535, 65535]")
         self.advance()
-
         return value
-
-    # def parse_func_routine(self) -> bool:
-    #     """
-    #     <func routine> ::= <FUNC decl> {<system decls>} {<stmt list>}{RETURN (<arith exp>)}
-    #     """
-    #     if not self.parse_func_decl():
-    #         return False
-    #     self.parse_system_decls()
-    #     self.parse_stmt_list()
-    #     return True
-
-    # def parse_func_decl(self) -> bool:
-    #     """
-    #     <FUNC decl> ::= <fund type> FUNC <identifier>{.<addr>} ({<param decl>})
-    #     """
-    #     fund_t = self.parse_fund_type()
-    #     if fund_t is None:
-    #         return False
-    #     self.consume(TokenType.FUNC)
-    #     identifier = self.consume(TokenType.IDENTIFIER).value
-    #     if self.current_token().tok_type == TokenType.OP_DOT:
-    #         self.advance()
-    #         addr = self.parse_addr()
-    #     self.consume(TokenType.OP_LPAREN)
-    #     self.parse_param_decls()
-    #     self.consume(TokenType.OP_RPAREN)
-    #     return True
 
     def parse_param_decls(self) -> list[ast.VarDecl]:
         """
@@ -801,15 +651,16 @@ class Parser:
             self.parsing_param_decl = True
             param_decls: list[ast.VarDecl] = []
 
-            var_decl = self.parse_var_decl(False)
-            if var_decl is not None:
-                param_decls = param_decls + var_decl
-            while self.current_token().tok_type == TokenType.OP_COMMA:
-                self.advance()
+            while self.current_token().tok_type != TokenType.OP_RPAREN:
                 var_decl = self.parse_var_decl(False)
                 if var_decl is None:
                     raise SyntaxError("Expected parameter declaration")
-                param_decls = param_decls + var_decl
+                param_decls += var_decl
+                if self.current_token().tok_type == TokenType.OP_COMMA:
+                    self.advance()
+            for p in param_decls:
+                # Put each param in the symbol table.
+                self.symbol_table.add_entry(p.name, EntryType.VAR, p)
             return param_decls
         finally:
             self.parsing_param_decl = False
@@ -872,17 +723,6 @@ class Parser:
         if return_stmt:
             return return_stmt
         return None
-        # if self.parse_devprint_stmt():
-        #     return True
-        # if self.parse_assign_stmt():
-        #     return True
-        # if self.parse_exit_stmt():
-        #     return True
-        # if self.parse_routine_call():
-        #     return True
-        # if self.parse_return_stmt():
-        #     return True
-        # return False
 
     def parse_devprint_stmt(self) -> ast.DevPrint | None:
         """
@@ -896,8 +736,6 @@ class Parser:
         expr = self.parse_arith_exp()
         self.consume(TokenType.OP_RPAREN)
         return ast.DevPrint(expr)
-        # self.code_gen.emit_devprint(self.last_t)
-        # return True
 
     def parse_assign_stmt(self) -> ast.SetVar | None:
         """
@@ -1061,7 +899,7 @@ class Parser:
         param_count = 0
         try:
             self.parsing_param_decl = True
-            for _ in range(expected_param_count):
+            while self.current_token().tok_type != TokenType.OP_RPAREN:
                 param_expr = self.parse_arith_exp()
                 param_exprs.append(param_expr)
                 param_count += 1
@@ -1069,6 +907,14 @@ class Parser:
                     self.advance()
                 else:
                     break
+            # for _ in range(expected_param_count):
+            #     param_expr = self.parse_arith_exp()
+            #     param_exprs.append(param_expr)
+            #     param_count += 1
+            #     if self.current_token().tok_type == TokenType.OP_COMMA:
+            #         self.advance()
+            #     else:
+            #         break
             if param_count < expected_param_count:
                 self.warn(
                     f"Too few parameters, expected {expected_param_count}, got {param_count}, filling in remainder with zeros"
@@ -1369,20 +1215,7 @@ class Parser:
         """
         Expression parsing uses the Pratt method.
         """
-        # if not is_inner_expression:
-        #     self.typed_expression = TypedPostfixExpression(self.symbol_table)
-
         return self.parse_expr_precedence(ExprPrecedence.XOR)
-        # # TODO: Run the optimization code here. Probably add a parser flag to enable this.
-        # # self.typed_expression.optimize()
-        # print(f"Typed expression (length {len(self.typed_expression.items)}):")
-        # for item in self.typed_expression.items:
-        #     print(item)
-        # print("End typed expression")
-
-        # if not is_inner_expression:
-        #     self.typed_expression.emit_bytecode(self.code_gen)
-        #     self.last_t = self.typed_expression.items[-1].item_t
 
     def parse_expr_precedence(self, precedence: ExprPrecedence) -> ast.Expr | None:
         if self.current_token().tok_type not in EXPRESSION_RULES:

@@ -310,12 +310,13 @@ class ParserTestCase(unittest.TestCase):
             DEVPRINT(1)
         RETURN
 
-        PROC proc2()
+        PROC proc2(BYTE p2arg1, p2arg2, INT p2arg3)
+            CARD p2local
             proc1()
-            DEVPRINT(2)
+            DEVPRINT(p2arg1)
 
         PROC main()
-            proc2()
+            proc2(6)
         RETURN
         """
         tokens = tokenize(source_code, S_F)
@@ -328,8 +329,11 @@ class ParserTestCase(unittest.TestCase):
             """
             Program([Module([],
             [Routine(proc1,[],[],[DevPrint(Const(1)),Return(None)],None,None),
-            Routine(proc2,[],[],[CallStmt(Call(proc1,[])),DevPrint(Const(2))],None,None),
-            Routine(main,[],[],[CallStmt(Call(proc2,[])),Return(None)],None,None)])])
+            Routine(proc2,
+            [VarDecl(p2arg1,FundamentalType.BYTE_T,None),VarDecl(p2arg2,FundamentalType.BYTE_T,None),VarDecl(p2arg3,FundamentalType.INT_T,None)],
+            [VarDecl(p2local,FundamentalType.CARD_T,None)],
+            [CallStmt(Call(proc1,[])),DevPrint(GetVar(SimpleVar(p2arg1)))],None,None),
+            Routine(main,[],[],[CallStmt(Call(proc2,[Const(6),Const(0),Const(0)])),Return(None)],None,None)])])
             """,
         )
         self.assertEqual(parser.current_token().tok_type, TokenType.EOF)
