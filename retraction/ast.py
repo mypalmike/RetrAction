@@ -322,8 +322,9 @@ class Module(Node):
 
 
 class Program(Node):
-    def __init__(self, modules: list[Module]):
+    def __init__(self, modules: list[Module], symbol_table: SymTab):
         self.modules = modules
+        self.symbol_table = symbol_table
 
     def __repr__(self) -> str:
         return f"Program({self.modules})"

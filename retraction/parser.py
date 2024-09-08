@@ -138,7 +138,7 @@ class Parser:
                 self.parsing_routine = None
                 modules.append(self.parse_prog_module())
 
-            return ast.Program(modules)
+            return ast.Program(modules, self.symbol_table)  # type: ignore
         except SyntaxError as e:
             self.error(e.msg)
             raise e
