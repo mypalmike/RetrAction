@@ -70,6 +70,17 @@ class ParserTestCase(unittest.TestCase):
         )
         self.assertEqual(parser.current_token().tok_type, TokenType.EOF)
 
+    def test_double_unary_minus(self):
+        source_code = "--$12"
+        tokens = tokenize(source_code, S_F)
+        symbol_table = SymTab()
+        parser = Parser(tokens, symbol_table)
+        tree = parser.parse_expression()
+        self.assertEqual(
+            str(tree),
+            "UnaryExpr(Op.SUB, UnaryExpr(Op.SUB, Const(18)))",
+        )
+
     def test_arith_expr_nums(self):
         source_code = "98 2 3"
         tokens = tokenize(source_code, S_F)
