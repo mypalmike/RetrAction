@@ -247,6 +247,12 @@ class Parser:
         """
         <base fund decl> ::= <fund type> <fund ident list>
         """
+        # Skip if it's a FUNC decl
+        if (
+            self.current_token().is_fund_type()
+            and self.next_token().tok_type == TokenType.FUNC
+        ):
+            return None
         fund_t = self.parse_fund_type()
         if fund_t is None:
             return None
@@ -1167,14 +1173,19 @@ class Parser:
         if self.current_token().tok_type == TokenType.OP_AT:
             is_reference = True
             self.advance()
-        identifier = self.consume(TokenType.IDENTIFIER).value
-        if self.current_token().tok_type == TokenType.OP_CARET:
-            is_pointer = True
-            self.advance()
+        if self.current_token().tok_type != TokenType.IDENTIFIER:
+            raise SyntaxError(
+                f"Expected identifier in expression: {self.current_token()}"
+            )
+        identifier = self.current_token().value
         symbol_table_entry = self.symbol_table.find(identifier)
         if symbol_table_entry is None:
             raise IdentifierError(f"Undefined identifier: {identifier}")
-        if symbol_table_entry.entry_type == EntryType.VAR:
+        elif symbol_table_entry.entry_type == EntryType.VAR:
+            self.advance()
+            if self.current_token().tok_type == TokenType.OP_CARET:
+                is_pointer = True
+                self.advance()
             var_decl = cast(ast.VarDecl, symbol_table_entry.ast_node)
             var_node = ast.Var(identifier, var_decl.var_t)
             if is_pointer:

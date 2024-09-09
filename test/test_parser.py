@@ -81,6 +81,18 @@ class ParserTestCase(unittest.TestCase):
             "UnaryExpr(Op.SUB, UnaryExpr(Op.SUB, Const(18)))",
         )
 
+    def test_subtract_unary_minus(self):
+        source_code = "1 - -$12"
+        tokens = tokenize(source_code, S_F)
+        symbol_table = SymTab()
+        parser = Parser(tokens, symbol_table)
+        tree = parser.parse_expression()
+        self.assertEqual(
+            str(tree),
+            "BinaryExpr(Op.SUB, Const(1), UnaryExpr(Op.SUB, Const(18)))",
+        )
+        self.assertEqual(parser.current_token().tok_type, TokenType.EOF)
+
     def test_arith_expr_nums(self):
         source_code = "98 2 3"
         tokens = tokenize(source_code, S_F)
@@ -420,6 +432,35 @@ class ParserTestCase(unittest.TestCase):
               DevPrint(Var(p2arg1,FundamentalType.BYTE_T))],None,None),
             Routine(main,[],[],
               [CallStmt(Call(proc2,[Const(6),Const(0),Const(0)],None)),Return(None)],None,None)])])
+            """,
+        )
+        self.assertEqual(parser.current_token().tok_type, TokenType.EOF)
+
+    def test_function_calls(self):
+        source_code = """
+        BYTE FUNC func1(BYTE f1arg)
+        RETURN (f1arg + 1)
+
+        PROC main()
+            BYTE result
+            func1(12)
+            DEVPRINT(func1(24))
+        RETURN
+        """
+        tokens = tokenize(source_code, S_F)
+        symbol_table = SymTab()
+        parser = Parser(tokens, symbol_table)
+        tree = parser.parse_program()
+        self.maxDiff = None
+        self.assertEqualIgnoreWhitespace(
+            str(tree),
+            """
+            Program([Module([],
+            [Routine(func1,[VarDecl(f1arg,FundamentalType.BYTE_T,None)],[],
+              [Return(BinaryExpr(Op.ADD,Var(f1arg,FundamentalType.BYTE_T),Const(1)))],None,FundamentalType.BYTE_T),
+            Routine(main,[],[VarDecl(result,FundamentalType.BYTE_T,None)],
+              [CallStmt(Call(func1,[Const(12)],FundamentalType.BYTE_T)),
+              DevPrint(Call(func1,[Const(24)],FundamentalType.BYTE_T)),Return(None)],None,None)])])
             """,
         )
         self.assertEqual(parser.current_token().tok_type, TokenType.EOF)
