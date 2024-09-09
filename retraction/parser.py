@@ -575,8 +575,6 @@ class Parser:
         if self.current_token().tok_type == TokenType.OP_EQ:
             self.advance()
             fixed_addr = self.parse_addr()
-        # routine_addr = self.code_gen.get_next_addr()
-        # routine = Routine(identifier, routine_addr, [], Type.VOID_T)
         try:
             self.parsing_routine = (
                 RoutineCategory.PROC if return_t is None else RoutineCategory.FUNC
@@ -800,13 +798,6 @@ class Parser:
         self.advance()
         return ast.Exit()
 
-        # if len(self.exits_to_patch) == 0:
-        #     raise SyntaxError("EXIT statement outside of loop")
-        # This gets patched at the end of the loop with the address following the loop
-        # jump_exit_addr = self.code_gen.emit_jump()
-        # self.exits_to_patch[-1].append(jump_exit_addr)
-        # return True
-
     def parse_return_stmt(self) -> ast.Return | None:
         """
         <RETURN stmt> ::= RETURN | RETURN (<arith exp>) - depending on PROC or FUNC
@@ -822,22 +813,6 @@ class Parser:
         expr = self.parse_arith_exp()
         self.consume(TokenType.OP_RPAREN)
         return ast.Return(expr)
-
-        # if (
-        #     self.curr_routine_index is not None
-        #     and self.symbol_table.routines[self.curr_routine_index].return_t
-        #     != Type.VOID_T
-        # ):
-        #     self.consume(TokenType.OP_LPAREN)
-        #     self.advance()
-        #     self.parse_arith_exp()
-        #     self.consume(TokenType.OP_RPAREN)
-        # if self.curr_routine_index is not None:
-        #     self.code_gen.emit_return(self.curr_routine_index)
-        # else:
-        #     raise SyntaxError("RETURN statement outside of a routine")
-
-        # return True
 
     def parse_routine_call(self) -> ast.Call | None:
         """
@@ -870,24 +845,6 @@ class Parser:
         self.consume(TokenType.OP_RPAREN)
         return ast.Call(identifier, params, routine.return_t)
 
-        # if self.current_token().tok_type != TokenType.IDENTIFIER:
-        #     return False
-        # if self.next_token().tok_type != TokenType.OP_LPAREN:
-        #     return False
-        # identifier = self.current_token().value
-        # routine_index = self.symbol_table.routines_lookup.get(identifier)
-        # # Might be an array reference if it's not a routine
-        # if routine_index is None:
-        #     return False
-        # if self.parsing_param_decl:
-        #     raise SyntaxError("A function call may not be used as a parameter.")
-        # self.advance()  # routine name
-        # self.advance()  # (
-        # self.parse_params(routine_index)
-        # self.consume(TokenType.OP_RPAREN)
-        # self.code_gen.emit_routine_call(routine_index)
-        # return True
-
     def parse_params(self, routine: ast.Routine) -> list[ast.Expr]:
         """
         <params> ::= <params>,<arith exp> | <arith exp>
@@ -905,14 +862,6 @@ class Parser:
                     self.advance()
                 else:
                     break
-            # for _ in range(expected_param_count):
-            #     param_expr = self.parse_arith_exp()
-            #     param_exprs.append(param_expr)
-            #     param_count += 1
-            #     if self.current_token().tok_type == TokenType.OP_COMMA:
-            #         self.advance()
-            #     else:
-            #         break
             if param_count < expected_param_count:
                 self.warn(
                     f"Too few parameters, expected {expected_param_count}, got {param_count}, filling in remainder with zeros"
@@ -975,16 +924,6 @@ class Parser:
             return for_loop
         return None
 
-        # if self.parse_if_stmt():
-        #     return True
-        # if self.parse_do_loop():
-        #     return True
-        # if self.parse_while_loop():
-        #     return True
-        # if self.parse_for_loop():
-        #     return True
-        # return False
-
     def parse_if_stmt(self) -> ast.If | None:
         """
         <IF stmt> ::= IF <cond exp> THEN {stmt list} {|:ELSEIF exten:|}{ELSE exten} FI
@@ -1016,56 +955,6 @@ class Parser:
         self.consume(TokenType.FI)
         return ast.If(conditionals, else_statements)
 
-        # jump_end_addrs: list[int] = []
-
-        # # If
-        # self.advance()
-        # self.parse_cond_exp()
-        # self.consume(TokenType.THEN)
-        # jump_over_addr = self.code_gen.emit_jump_if_false(self.last_t)
-        # self.parse_stmt_list()
-        # jump_end_addrs.append(self.code_gen.emit_jump())
-        # self.code_gen.fixup_jump(jump_over_addr, self.code_gen.get_next_addr())
-
-        # # Elseif
-        # while self.current_token().tok_type == TokenType.ELSEIF:
-        #     self.advance()
-        #     self.parse_cond_exp()
-        #     self.consume(TokenType.THEN)
-        #     jump_over_addr = self.code_gen.emit_jump_if_false(self.last_t)
-        #     self.parse_stmt_list()
-        #     jump_end_addrs.append(self.code_gen.emit_jump())
-        #     self.code_gen.fixup_jump(jump_over_addr, self.code_gen.get_next_addr())
-
-        # # Else
-        # if self.current_token().tok_type == TokenType.ELSE:
-        #     self.advance()
-        #     self.parse_stmt_list()
-
-        # # Fi
-        # self.consume(TokenType.FI)
-        # end_addr = self.code_gen.get_next_addr()
-        # for jump_end_addr in jump_end_addrs:
-        #     self.code_gen.fixup_jump(jump_end_addr, end_addr)
-
-        # return True
-
-    # def prepare_exits(self):
-    #     """
-    #     Helper method to set up exit patching
-    #     """
-    #     self.exits_to_patch.append([])
-
-    # def patch_exits(self):
-    #     """
-    #     Helper method for patching exits at the end of loops
-    #     """
-    #     exits_to_patch = self.exits_to_patch.pop()
-    #     if exits_to_patch:
-    #         next_addr = self.code_gen.get_next_addr()
-    #         for jump_exit in exits_to_patch:
-    #             self.code_gen.fixup_jump(jump_exit, next_addr)
-
     def parse_do_loop(self) -> ast.Do | None:
         """
         <DO loop> ::= DO {<stmt list>} {<UNTIL stmt>} OD
@@ -1081,23 +970,6 @@ class Parser:
             until_expr = self.parse_cond_exp()
         self.consume(TokenType.OD)
         return ast.Do(statements, until_expr)
-
-        # if self.current_token().tok_type != TokenType.DO:
-        #     return False
-        # self.advance()
-        # self.prepare_exits()
-        # jump_start_addr = self.code_gen.get_next_addr()
-        # self.parse_stmt_list()
-        # if self.current_token().tok_type == TokenType.UNTIL:
-        #     self.advance()
-        #     self.parse_cond_exp()
-        #     self.code_gen.emit_jump_if_false(self.last_t, jump_start_addr)
-        #     self.consume(TokenType.OD)
-        # else:
-        #     self.consume(TokenType.OD)
-        #     self.code_gen.emit_jump(jump_start_addr)
-        # self.patch_exits()
-        # return True
 
     def parse_while_loop(self) -> ast.While | None:
         """
@@ -1115,26 +987,6 @@ class Parser:
         if do_loop is None:
             raise SyntaxError("Expected DO loop after WHILE")
         return ast.While(cond_expr, do_loop)
-
-        # if self.current_token().tok_type != TokenType.WHILE:
-        #     return False
-        # self.advance()
-        # self.prepare_exits()
-        # jump_start_addr = self.code_gen.get_next_addr()
-        # self.parse_cond_exp()
-        # jump_end_addr = self.code_gen.emit_jump_if_false(self.last_t)
-        # self.consume(TokenType.DO)
-        # self.parse_stmt_list()
-        # if self.current_token().tok_type == TokenType.UNTIL:
-        #     self.advance()
-        #     self.parse_cond_exp()
-        #     self.code_gen.emit_jump_if_false(self.last_t, jump_start_addr)
-        # else:
-        #     self.code_gen.emit_jump(jump_start_addr)
-        # self.consume(TokenType.OD)
-        # self.code_gen.fixup_jump(jump_end_addr, self.code_gen.get_next_addr())
-        # self.patch_exits()
-        # return True
 
     def parse_for_loop(self) -> ast.For | None:
         """
@@ -1170,19 +1022,6 @@ class Parser:
         var_target = ast.Var(identifier, var_decl.var_t)
         return ast.For(var_target, start_expr, finish_expr, inc_expr, do_loop)
 
-        # self.prepare_exits()
-        # identifier = self.consume(TokenType.IDENTIFIER).value
-        # self.consume(TokenType.EQUAL)
-        # self.parse_arith_exp()
-        # self.consume(TokenType.TO)
-        # self.parse_arith_exp()
-        # if self.current_token().tok_type == TokenType.STEP:
-        #     self.advance()
-        #     self.parse_arith_exp()
-        # self.parse_do_loop()
-        # self.patch_exits()
-        # return True
-
     def parse_code_block(self) -> ast.CodeBlock | None:
         """
         <code block> ::= [<comp const list>]
@@ -1194,13 +1033,6 @@ class Parser:
         self.consume(TokenType.OP_RBRACK)
         return ast.CodeBlock(comp_consts)
 
-        # if self.current_token().tok_type != TokenType.OP_LBRACK:
-        #     return False
-        # self.advance()
-        # self.parse_comp_const_list()
-        # self.consume(TokenType.OP_RBRACK)
-        # return True
-
     def parse_comp_const_list(self) -> list[int]:
         """
         <comp const list> ::= <comp const list> <comp const> | <comp const>
@@ -1211,7 +1043,6 @@ class Parser:
             if not comp_const:
                 break
             comp_consts.append(comp_const)
-            # self.code_gen.emit_comp_const(comp_const)
         return comp_consts
 
     def parse_expression(self) -> ast.Expr | None:  # , is_inner_expression=False):
@@ -1258,10 +1089,6 @@ class Parser:
             if left_operand is None:
                 raise InternalError("Expected left operand for binary expression")
             return self.parse_binary(left_operand)
-        # elif action == ExprAction.AND:
-        #     return self.parse_and()
-        # elif action == ExprAction.OR:
-        #     return self.parse_or()
         elif action == ExprAction.IDENTIFIER:
             return self.parse_identifier_expr()
         else:
@@ -1284,10 +1111,6 @@ class Parser:
             raise SyntaxError(f"Numeric literal {value} out of range [-65535, 65535]")
         self.advance()
         return ast.NumericConst(value)
-        # const_index = self.symbol_table.declare_constant(value)
-        # typed_expression = TypedExpressionItem(TypedExpressionOp.CONSTANT, const_index)
-        # self.typed_expression.append(typed_expression)
-        # self.code_gen.emit_numerical_constant(const_index)
 
     def parse_grouping(self) -> ast.Expr:
         """
@@ -1305,6 +1128,7 @@ class Parser:
         Action method for parsing a unary operator
         """
         operator_type = self.current_token().tok_type
+        self.advance()
         operand = self.parse_expr_precedence(ExprPrecedence.UNARY)
         if operand is None:
             raise SyntaxError("Expected operand for unary operator {operator_type}")
@@ -1313,13 +1137,7 @@ class Parser:
             # self.code_gen.emit_unary_minus()
         else:
             raise SyntaxError(f"Unknown unary operator: {operator_type}")
-        self.advance()
         return expr
-        # operator_type = self.current_token().tok_type
-        # self.parse_expr_precedence(ExprPrecedence.UNARY)
-        # if operator_type == TokenType.OP_MINUS:
-        #     self.code_gen.emit_unary_minus()
-        # self.advance()
 
     def parse_binary(self, left_operand: ast.Expr) -> ast.Expr:
         """
@@ -1337,71 +1155,6 @@ class Parser:
         if op is None:
             raise SyntaxError(f"Unknown binary operator: {operator_type}")
         return ast.BinaryExpr(op, left_operand, right_operand)
-
-        # if operator_type == TokenType.OP_PLUS:
-        #     self.typed_expression.append(TypedExpressionItem(TypedExpressionOp.ADD))
-        # elif operator_type == TokenType.OP_MINUS:
-        #     self.typed_expression.append(
-        #         TypedExpressionItem(TypedExpressionOp.SUBTRACT)
-        #     )
-        # elif operator_type == TokenType.OP_TIMES:
-        #     self.typed_expression.append(
-        #         TypedExpressionItem(TypedExpressionOp.MULTIPLY)
-        #     )
-        # elif operator_type == TokenType.OP_DIVIDE:
-        #     self.typed_expression.append(TypedExpressionItem(TypedExpressionOp.DIVIDE))
-        # elif operator_type == TokenType.MOD:
-        #     self.typed_expression.append(TypedExpressionItem(TypedExpressionOp.MOD))
-        # elif operator_type == TokenType.LSH:
-        #     self.typed_expression.append(TypedExpressionItem(TypedExpressionOp.LSH))
-        # elif operator_type == TokenType.RSH:
-        #     self.typed_expression.append(TypedExpressionItem(TypedExpressionOp.RSH))
-        # elif operator_type == TokenType.OP_EQ:
-        #     self.typed_expression.append(TypedExpressionItem(TypedExpressionOp.EQ))
-        # elif operator_type == TokenType.OP_NE:
-        #     self.typed_expression.append(TypedExpressionItem(TypedExpressionOp.NE))
-        # elif operator_type == TokenType.OP_GT:
-        #     self.typed_expression.append(TypedExpressionItem(TypedExpressionOp.GT))
-        # elif operator_type == TokenType.OP_GE:
-        #     self.typed_expression.append(TypedExpressionItem(TypedExpressionOp.GE))
-        # elif operator_type == TokenType.OP_LT:
-        #     self.typed_expression.append(TypedExpressionItem(TypedExpressionOp.LT))
-        # elif operator_type == TokenType.OP_LE:
-        #     self.typed_expression.append(TypedExpressionItem(TypedExpressionOp.LE))
-        # elif operator_type == TokenType.XOR:
-        #     self.typed_expression.append(TypedExpressionItem(TypedExpressionOp.XOR))
-        # elif operator_type == TokenType.OP_BIT_AND:
-        #     self.typed_expression.append(TypedExpressionItem(TypedExpressionOp.BIT_AND))
-        # elif operator_type == TokenType.OP_BIT_OR:
-        #     self.typed_expression.append(TypedExpressionItem(TypedExpressionOp.BIT_OR))
-        # elif operator_type == TokenType.OP_BIT_XOR:
-        #     self.typed_expression.append(TypedExpressionItem(TypedExpressionOp.BIT_XOR))
-
-    # def parse_and(self):
-    #     """
-    #     Action method for parsing an AND operator
-
-    #     AND is short-circuiting, so we don't treat it as a simple binary operator
-    #     """
-    #     jump_end = self.code_gen.emit_jump_if_false()
-    #     self.code_gen.emit_pop()
-    #     self.advance()
-    #     self.parse_expr_precedence(ExprPrecedence.AND)
-    #     jump_end.value = self.code_gen.get_next_addr()
-
-    # def parse_or(self):
-    #     """
-    #     Action method for parsing an OR operator
-
-    #     OR is short-circuiting, so we don't treat it as a simple binary operator
-    #     """
-    #     jump_else = self.code_gen.emit_jump_if_false()
-    #     jump_end = self.code_gen.emit_jump()
-    #     jump_else.value = self.code_gen.get_next_addr()
-    #     self.code_gen.emit_pop()
-    #     self.advance()
-    #     self.parse_expr_precedence(ExprPrecedence.OR)
-    #     jump_end.value = self.code_gen.get_next_addr()
 
     def parse_identifier_expr(self) -> ast.Expr:
         """
@@ -1436,49 +1189,8 @@ class Parser:
             if routine_call is None:
                 raise InternalError(f"Failed to parse routine call for {identifier}")
             return routine_call
-
-            # routine = cast(ast.Routine, symbol_table_entry.ast_node)
-            # routine.
-            # return ast.RoutineCall(identifier, [])
         else:
             raise IdentifierError(f"Invalid identifier in expression: {identifier}")
-
-        # # TODO: Arrays, pointers, and records
-        # # TODO: Locals
-        # identifier = self.current_token().value
-        # local_index = self.symbol_table.locals_lookup.get(identifier)
-        # global_index = self.symbol_table.globals_lookup.get(identifier)
-        # if local_index is not None:
-        #     local_var = self.symbol_table.locals[local_index]
-        #     typed_expression_item = TypedExpressionItem(
-        #         TypedExpressionOp.LOAD_VARIABLE, local_index
-        #     )
-        #     typed_expression_item.item_t = local_var.var_t
-        #     typed_expression_item.scope = ByteCodeVariableScope.LOCAL
-        #     typed_expression_item.address = local_var.address
-        #     typed_expression_item.addr_mode = ByteCodeVariableAddressMode.DEFAULT
-        #     self.typed_expression.append(typed_expression_item)
-        #     # self.code_gen.emit_get_variable(
-        #     #     var_t, var_scope, ByteCodeVariableAddressMode.DEFAULT, var_addr
-        #     # )
-        #     self.advance()
-        # elif global_index is not None:
-        #     # TODO: Should call parse_mem_reference to deal with arrays.
-        #     global_var = self.symbol_table.globals[global_index]
-        #     typed_expression_item = TypedExpressionItem(
-        #         TypedExpressionOp.LOAD_VARIABLE, global_index
-        #     )
-        #     typed_expression_item.item_t = global_var.var_t
-        #     typed_expression_item.scope = ByteCodeVariableScope.GLOBAL
-        #     typed_expression_item.address = global_var.address
-        #     typed_expression_item.addr_mode = ByteCodeVariableAddressMode.DEFAULT
-        #     self.typed_expression.append(typed_expression_item)
-        #     # self.code_gen.emit_get_variable(
-        #     #     var_t, var_scope, ByteCodeVariableAddressMode.DEFAULT, var_addr
-        #     # )
-        #     self.advance()
-        # else:
-        #     raise NotImplemented("Function calls in expressions not yet implemented")
 
     def parse_mem_reference(self):
         """
