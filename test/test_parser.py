@@ -181,6 +181,39 @@ class ParserTestCase(unittest.TestCase):
         )
         self.assertEqual(parser.current_token().tok_type, TokenType.EOF)
 
+    def test_for_loop(self):
+        source_code = """
+        PROC forloop()
+          BYTE i
+          FOR i = 1 TO 5
+          DO
+            DEVPRINT (i)
+          OD
+          FOR i = 10 TO 20 STEP 2
+          DO
+            DEVPRINT (i)
+          OD
+        RETURN
+        """
+        tokens = tokenize(source_code, S_F)
+        symbol_table = SymTab()
+        parser = Parser(tokens, symbol_table)
+        tree = parser.parse_program()
+        self.maxDiff = None
+        self.assertEqualIgnoreWhitespace(
+            str(tree),
+            """
+            Program([Module([],
+            [Routine(forloop,[],[VarDecl(i,FundamentalType.BYTE_T,None)],
+                [For(Var(i,FundamentalType.BYTE_T),Const(1),Const(5),Const(1),
+                  Do([DevPrint(Var(i,FundamentalType.BYTE_T))],None)),
+                For(Var(i,FundamentalType.BYTE_T),Const(10),Const(20),Const(2),
+                  Do([DevPrint(Var(i,FundamentalType.BYTE_T))],None)),
+                Return(None)],None,None)])])
+            """,
+        )
+        self.assertEqual(parser.current_token().tok_type, TokenType.EOF)
+
     def test_system_decls_basic(self):
         source_code = """
         BYTE somebyte = [$12]
