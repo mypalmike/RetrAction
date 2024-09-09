@@ -167,40 +167,6 @@ class ArrayAccess(Expr):
         return array_t.element_t
 
 
-# class PointerVar(Var):
-#     def __init__(self, symbol_name: str):
-#         self.symbol_name = symbol_name
-
-#     def __repr__(self) -> str:
-#         return f"PointerVar({self.symbol_name})"
-
-
-# class ArrayVar(Var):
-#     def __init__(self, symbol_name: str, index: Expr):
-#         self.symbol_name = symbol_name
-#         self.index = index
-
-#     def __repr__(self) -> str:
-#         return f"ArrayVar({self.symbol_name}, {self.index})"
-
-
-# class StructVar(Var):
-#     def __init__(self, symbol_name: str, field_name: str):
-#         self.symbol_name = symbol_name
-#         self.field_index = field_name
-
-#     def __repr__(self) -> str:
-#         return f"StructVar({self.symbol_name}, {self.field_index})"
-
-
-# class ReferenceVar(Var):
-#     def __init__(self, symbol_name: str):
-#         self.symbol_name = symbol_name
-
-#     def __repr__(self) -> str:
-#         return f"ReferenceVar({self.symbol_name})"
-
-
 class Assign(Statement):
     def __init__(self, target: Expr, expr: Expr):
         self.target = target
