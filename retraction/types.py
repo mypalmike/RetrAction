@@ -10,6 +10,16 @@ class FundamentalType(Enum):
     INT_T = 2
     CARD_T = 3
 
+    def cast_priority(self):
+        if self == FundamentalType.BYTE_T:
+            return 1
+        elif self == FundamentalType.CHAR_T:
+            return 1
+        elif self == FundamentalType.INT_T:
+            return 2
+        else:  # self == FundamentalType.CARD_T:
+            return 3
+
     # BYTE_POINTER_T = 4
     # CHAR_POINTER_T = 5
     # INT_POINTER_T = 6
@@ -66,19 +76,46 @@ class PointerType(ComplexType):
 
 class ArrayType(ComplexType):
     def __init__(self, element_type: FundamentalType, length: int | None):
-        self.element_type = element_type
+        self.element_t = element_type
         self.length = length
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, ArrayType):
             return False
-        return self.element_type == other.element_type and self.length == other.length
+        return self.element_t == other.element_t and self.length == other.length
 
     def __repr__(self) -> str:
-        return f"ArrayType({self.element_type}, {self.length})"
+        return f"ArrayType({self.element_t}, {self.length})"
 
 
-type Type = FundamentalType | RecordType | PointerType | ArrayType
+type Type = FundamentalType | ComplexType
+
+
+def cast_to_fundamental(t: Type) -> FundamentalType:
+    if isinstance(t, FundamentalType):
+        return t
+
+    # Type for all other types is FundamentalType.CARD_T, value is the address of the variable
+    return FundamentalType.CARD_T
+
+
+def binary_expression_type(t1: Type, t2: Type) -> FundamentalType:
+    t1_fund = cast_to_fundamental(t1)
+    t2_fund = cast_to_fundamental(t2)
+    pri1, pri2 = t1_fund.cast_priority(), t2_fund.cast_priority()
+    result_priority = max(pri1, pri2)
+    # print(
+    #     f"binary_expression_type... t1: {t1}, t2: {t2}, result_priority: {result_priority}"
+    # )
+    if result_priority == 1:
+        return FundamentalType.BYTE_T
+    elif result_priority == 2:
+        return FundamentalType.INT_T
+    elif result_priority == 3:
+        return FundamentalType.CARD_T
+    else:
+        raise InternalError(f"Invalid cast priority: {result_priority}")
+
 
 # FUNDAMENTAL_TYPES = {
 #     Type.BYTE_T,
@@ -120,22 +157,6 @@ type Type = FundamentalType | RecordType | PointerType | ArrayType
 #     0,  # RECORD_T
 #     1,  # BOOL_INTERNAL_T
 # ]
-
-
-# def binary_expression_type(t1: Type, t2: Type) -> Type:
-#     pri1, pri2 = CAST_PRIORITY[t1.value], CAST_PRIORITY[t2.value]
-#     result_priority = max(pri1, pri2)
-#     print(
-#         f"binary_expression_type... t1: {t1}, t2: {t2}, result_priority: {result_priority}"
-#     )
-#     if result_priority == 1:
-#         return Type.BYTE_T
-#     elif result_priority == 2:
-#         return Type.INT_T
-#     elif result_priority == 3:
-#         return Type.CARD_T
-#     else:
-#         raise InternalError(f"Invalid cast priority: {result_priority}")
 
 
 # class RecordType:

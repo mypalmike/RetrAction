@@ -737,7 +737,7 @@ class Parser:
         self.consume(TokenType.OP_RPAREN)
         return ast.DevPrint(expr)
 
-    def parse_assign_stmt(self) -> ast.SetVar | None:
+    def parse_assign_stmt(self) -> ast.Assign | None:
         """
         <assign stmt> ::= <mem contents>=<arith exp>
         <mem contents> ::= <fund ref> | <arr ref> | <ptr ref> | <rec ref>
@@ -748,7 +748,7 @@ class Parser:
         """
         # TODO: Handle aliases for self-assignment (e.g. x = x + 1 written as x ==+ 1)
         # Examples: b2==+1, b2==-b1, b2==& $0F, b2==LSH (5+3)
-        var_target: ast.Var | None = None
+        var_target: ast.Expr | None = None
         if self.current_token().tok_type == TokenType.IDENTIFIER:
             identifier = self.current_token().value
             symbol_table_entry = self.symbol_table.find(identifier)
@@ -757,11 +757,13 @@ class Parser:
                 raise IdentifierError(f"Undefined identifier: {identifier}")
             if symbol_table_entry.entry_type != EntryType.VAR:
                 return None
+            # Get type of variable from decl
+            var_decl = cast(ast.VarDecl, symbol_table_entry.ast_node)
+            var_target = ast.Var(identifier, var_decl.var_t)
             if self.next_token().tok_type == TokenType.OP_EQ:
                 self.advance()
                 self.advance()
                 # TODO: Need to check anything in symbol table about the variable here?
-                var_target = ast.SimpleVar(identifier)
             elif self.next_token().tok_type == TokenType.OP_LPAREN:
                 # TODO: Check to see if it's an array. Need to expand ast VarDecl to keep this info.
                 self.advance()
@@ -769,28 +771,24 @@ class Parser:
                 rec_index_expr = self.parse_arith_exp()
                 self.consume(TokenType.OP_RPAREN)
                 self.consume(TokenType.OP_EQ)
-                var_target = ast.ArrayVar(identifier, rec_index_expr)
+                var_target = ast.ArrayAccess(var_target, rec_index_expr)
             elif self.next_token().tok_type == TokenType.OP_CARET:
                 self.advance()
                 self.advance()
                 self.consume(TokenType.OP_EQ)
-                var_target = ast.PointerVar(identifier)
+                var_target = ast.Dereference(var_target)
             elif self.next_token().tok_type == TokenType.OP_DOT:
                 self.advance()
                 self.advance()
                 field_name = self.consume(TokenType.IDENTIFIER).value
                 self.consume(TokenType.OP_EQ)
-                var_target = ast.StructVar(identifier, field_name)
+                var_target = ast.FieldAccess(var_target, field_name)
 
         if var_target is None:
             return None
 
-        # TODO: Verify that this only parses arithmetic expressions, not conditional expressions,
-        # to match the behavior of the original Action! compiler
-        # e.g. "x = 1 < 2" is not allowed even though other languages would
-        # cast the result from boolean to int
         expr = self.parse_arith_exp()
-        return ast.SetVar(var_target, expr)
+        return ast.Assign(var_target, expr)
 
     def parse_exit_stmt(self) -> ast.Exit | None:
         """
@@ -870,7 +868,7 @@ class Parser:
         routine = cast(ast.Routine, symbol_table_entry.ast_node)
         params = self.parse_params(routine)
         self.consume(TokenType.OP_RPAREN)
-        return ast.Call(identifier, params)
+        return ast.Call(identifier, params, routine.return_t)
 
         # if self.current_token().tok_type != TokenType.IDENTIFIER:
         #     return False
@@ -1162,9 +1160,14 @@ class Parser:
         do_loop = self.parse_do_loop()
         if do_loop is None:
             raise SyntaxError("Expected DO loop after FOR")
-        # TODO: Verify that the identifier is a variable with fundamental type
-        # TODO: Verify that the identifier must actually be fundamental type
-        var_target = ast.SimpleVar(identifier)
+        # Need the type of the identifier.
+        symbol_table_entry = self.symbol_table.find(identifier)
+        if symbol_table_entry is None:
+            raise IdentifierError(f"Undefined identifier: {identifier}")
+        if symbol_table_entry.entry_type != EntryType.VAR:
+            raise IdentifierError(f"Expected variable identifier: {identifier}")
+        var_decl = cast(ast.VarDecl, symbol_table_entry.ast_node)
+        var_target = ast.Var(identifier, var_decl.var_t)
         return ast.For(var_target, start_expr, finish_expr, inc_expr, do_loop)
 
         # self.prepare_exits()
@@ -1420,15 +1423,18 @@ class Parser:
             raise IdentifierError(f"Undefined identifier: {identifier}")
         if symbol_table_entry.entry_type == EntryType.VAR:
             var_decl = cast(ast.VarDecl, symbol_table_entry.ast_node)
+            var_node = ast.Var(identifier, var_decl.var_t)
             if is_pointer:
                 if not isinstance(var_decl.var_t, PointerType):
                     raise SyntaxError(f"Variable {identifier} is not a pointer")
-                return ast.GetVar(ast.PointerVar(identifier))
+                return ast.Dereference(var_node)
             if is_reference:
-                return ast.GetVar(ast.ReferenceVar(identifier))
-            return ast.GetVar(ast.SimpleVar(identifier))
+                return ast.Reference(var_node)
+            return var_node
         elif symbol_table_entry.entry_type == EntryType.ROUTINE:
             routine_call = self.parse_routine_call()
+            if routine_call is None:
+                raise InternalError(f"Failed to parse routine call for {identifier}")
             return routine_call
 
             # routine = cast(ast.Routine, symbol_table_entry.ast_node)

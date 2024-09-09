@@ -1,6 +1,15 @@
 from enum import Enum, auto
+from typing import cast
 
-from retraction.types import Type
+from retraction.error import InternalError
+from retraction.types import (
+    ArrayType,
+    FundamentalType,
+    RecordType,
+    Type,
+    binary_expression_type,
+    cast_to_fundamental,
+)
 
 
 # Forward declarations to handle circular dependencies.
@@ -78,62 +87,127 @@ class Statement(Node):
 
 
 class Expr(Node):
-    pass
+    # TODO: Look into python typing.Protocol to enforce this statically
+    @property
+    def fund_t(self) -> FundamentalType:
+        raise NotImplementedError("Every expression must have a fundamental type")
 
 
-class Var(Node):
-    pass
-
-
-class SimpleVar(Var):
-    def __init__(self, symbol_name: str):
+class Var(Expr):
+    def __init__(self, symbol_name: str, var_t: Type):
         self.symbol_name = symbol_name
+        self.var_t = var_t
 
     def __repr__(self) -> str:
-        return f"SimpleVar({self.symbol_name})"
+        return f"Var({self.symbol_name}, {self.var_t})"
+
+    @property
+    def fund_t(self) -> FundamentalType:
+        return cast_to_fundamental(self.var_t)
 
 
-class PointerVar(Var):
-    def __init__(self, symbol_name: str):
-        self.symbol_name = symbol_name
-
-    def __repr__(self) -> str:
-        return f"PointerVar({self.symbol_name})"
-
-
-class ArrayVar(Var):
-    def __init__(self, symbol_name: str, index: Expr):
-        self.symbol_name = symbol_name
-        self.index = index
-
-    def __repr__(self) -> str:
-        return f"ArrayVar({self.symbol_name}, {self.index})"
-
-
-class StructVar(Var):
-    def __init__(self, symbol_name: str, field_name: str):
-        self.symbol_name = symbol_name
-        self.field_index = field_name
-
-    def __repr__(self) -> str:
-        return f"StructVar({self.symbol_name}, {self.field_index})"
-
-
-class ReferenceVar(Var):
-    def __init__(self, symbol_name: str):
-        self.symbol_name = symbol_name
-
-    def __repr__(self) -> str:
-        return f"ReferenceVar({self.symbol_name})"
-
-
-class SetVar(Statement):
-    def __init__(self, var_target: Var, expr: Expr):
-        self.var_target = var_target
+class Dereference(Expr):
+    def __init__(self, expr: Expr):
         self.expr = expr
 
     def __repr__(self) -> str:
-        return f"SetVar({self.var_target}, {self.expr})"
+        return f"Dereference({self.expr})"
+
+    @property
+    def fund_t(self) -> FundamentalType:
+        # Any valid dereference refers to a pointer type
+        return cast(Var, self.expr).fund_t
+
+
+class Reference(Expr):
+    def __init__(self, expr: Expr):
+        self.expr = expr
+
+    def __repr__(self) -> str:
+        return f"Reference({self.expr})"
+
+    @property
+    def fund_t(self) -> FundamentalType:
+        return FundamentalType.CARD_T
+
+
+class FieldAccess(Expr):
+    def __init__(self, expr: Expr, field_name: str):
+        self.expr = expr
+        self.field_name = field_name
+
+    def __repr__(self) -> str:
+        return f"FieldAccess({self.expr}, {self.field_name})"
+
+    @property
+    def fund_t(self) -> FundamentalType:
+        # A valid field access refers to a var
+        access_var = cast(Var, self.expr)
+        # Look up the field name in the struct
+        struct_t = cast(RecordType, access_var.var_t)
+        for field in struct_t.fields:
+            if field[0] == self.field_name:
+                return field[1]
+        raise InternalError(f"Field {self.field_name} not found in struct {struct_t}")
+
+
+class ArrayAccess(Expr):
+    def __init__(self, expr: Expr, index: Expr):
+        self.expr = expr
+        self.index = index
+
+    def __repr__(self) -> str:
+        return f"ArrayAccess({self.expr}, {self.index})"
+
+    @property
+    def fund_t(self) -> FundamentalType:
+        # A valid array access refers to a var
+        access_var = cast(Var, self.expr)
+        array_t = cast(ArrayType, access_var.var_t)
+        return array_t.element_t
+
+
+# class PointerVar(Var):
+#     def __init__(self, symbol_name: str):
+#         self.symbol_name = symbol_name
+
+#     def __repr__(self) -> str:
+#         return f"PointerVar({self.symbol_name})"
+
+
+# class ArrayVar(Var):
+#     def __init__(self, symbol_name: str, index: Expr):
+#         self.symbol_name = symbol_name
+#         self.index = index
+
+#     def __repr__(self) -> str:
+#         return f"ArrayVar({self.symbol_name}, {self.index})"
+
+
+# class StructVar(Var):
+#     def __init__(self, symbol_name: str, field_name: str):
+#         self.symbol_name = symbol_name
+#         self.field_index = field_name
+
+#     def __repr__(self) -> str:
+#         return f"StructVar({self.symbol_name}, {self.field_index})"
+
+
+# class ReferenceVar(Var):
+#     def __init__(self, symbol_name: str):
+#         self.symbol_name = symbol_name
+
+#     def __repr__(self) -> str:
+#         return f"ReferenceVar({self.symbol_name})"
+
+
+class Assign(Statement):
+    def __init__(self, target: Expr, expr: Expr):
+        self.target = target
+        self.expr = expr
+
+    def __repr__(self) -> str:
+        return f"Assign({self.target}, {self.expr})"
 
 
 class Conditional(Node):
@@ -185,7 +259,7 @@ class Until(Statement):
 class For(Statement):
     def __init__(
         self,
-        var_target: SimpleVar,
+        var_target: Var,
         start_expr: Expr,
         finish_expr: Expr,
         inc_expr: Expr,
@@ -239,8 +313,21 @@ class BinaryExpr(Expr):
         self.left = left
         self.right = right
 
+        # Determine the type of the expression based on the operator and operands
+        if op.is_conditional():
+            self.expr_t = FundamentalType.BYTE_T
+        elif op in [Op.MOD, Op.DIV, Op.MUL]:
+            self.expr_t = FundamentalType.INT_T
+        else:
+            # Most binary expression types are derived from the types of their operands
+            self.expr_t = binary_expression_type(left.fund_t, right.fund_t)
+
     def __repr__(self) -> str:
         return f"BinaryExpr({self.op}, {self.left}, {self.right})"
+
+    @property
+    def fund_t(self) -> FundamentalType:
+        return self.expr_t
 
 
 class UnaryExpr(Expr):
@@ -251,6 +338,11 @@ class UnaryExpr(Expr):
     def __repr__(self) -> str:
         return f"UnaryExpr({self.op}, {self.expr})"
 
+    @property
+    def fund_t(self) -> FundamentalType:
+        # The only unary operator is negation, which is implicitly INT
+        return FundamentalType.INT_T
+
 
 class Routine(Node):
     def __init__(
@@ -260,7 +352,7 @@ class Routine(Node):
         decls: list[Decl] | None,
         body: list[Statement] | None,
         fixed_addr: int | None,
-        return_t: Type | None,
+        return_t: FundamentalType | None,
         local_symtab: SymTab | None,
     ):
         self.name = name
@@ -276,12 +368,19 @@ class Routine(Node):
 
 
 class Call(Expr):
-    def __init__(self, name: str, args: list[Expr]):
+    def __init__(self, name: str, args: list[Expr], return_t: FundamentalType | None):
         self.name = name
         self.args = args
+        self.return_t = return_t
 
     def __repr__(self) -> str:
-        return f"Call({self.name}, {self.args})"
+        return f"Call({self.name}, {self.args}, {self.return_t})"
+
+    @property
+    def fund_t(self) -> FundamentalType:
+        if self.return_t is None:
+            raise InternalError("Call expression has no return type")
+        return cast_to_fundamental(self.return_t)
 
 
 class CallStmt(Statement):
@@ -296,16 +395,27 @@ class NumericConst(Expr):
     def __init__(self, value: int):
         self.value = value
 
+        if value < 0 or value < 0x8000:
+            self.expr_t = FundamentalType.INT_T
+        elif value < 256:
+            self.expr_t = FundamentalType.BYTE_T
+        else:
+            self.expr_t = FundamentalType.CARD_T
+
     def __repr__(self) -> str:
         return f"Const({self.value})"
 
+    @property
+    def fund_t(self) -> FundamentalType:
+        return self.expr_t
 
-class GetVar(Expr):
-    def __init__(self, var: Var):
-        self.var = var
 
-    def __repr__(self) -> str:
-        return f"GetVar({self.var})"
+# class GetVar(Expr):
+#     def __init__(self, var: Var):
+#         self.var = var
+
+#     def __repr__(self) -> str:
+#         return f"GetVar({self.var})"
 
 
 class Module(Node):
@@ -343,7 +453,7 @@ class Visitor:  # type: ignore
     def visit_struct_decl(self, struct_decl: StructDecl):
         raise NotImplementedError()
 
-    def visit_assign(self, assign: SetVar):
+    def visit_setvar(self, assign: Assign):
         raise NotImplementedError()
 
     def visit_binary_expr(self, binary_expr: BinaryExpr):
@@ -380,4 +490,16 @@ class Visitor:  # type: ignore
         raise NotImplementedError()
 
     def visit_routine(self, routine: Routine):
+        raise NotImplementedError()
+
+    def visit_call(self, call: Call):
+        raise NotImplementedError()
+
+    def visit_call_stmt(self, call_stmt: CallStmt):
+        raise NotImplementedError()
+
+    def visit_numeric_const(self, numeric_const: NumericConst):
+        raise NotImplementedError()
+
+    def visit_init_opts(self, init_opts: InitOpts):
         raise NotImplementedError()

@@ -297,8 +297,7 @@ class ParserTestCase(unittest.TestCase):
             Program([Module(
             [VarDecl(somebyte,FundamentalType.BYTE_T,InitOpts([18],False))],
             [Routine(main,[],[],
-            [DevPrint(GetVar(SimpleVar(somebyte))),Return(None)],
-            None,None)])])
+            [DevPrint(Var(somebyte,FundamentalType.BYTE_T)),Return(None)],None,None)])])
             """,
         )
         self.assertEqual(parser.current_token().tok_type, TokenType.EOF)
@@ -322,9 +321,11 @@ class ParserTestCase(unittest.TestCase):
             """
             Program([Module(
             [VarDecl(globalbyte,FundamentalType.BYTE_T,None)],
-            [Routine(main,[],[VarDecl(localbyte,FundamentalType.BYTE_T,None)],
-            [SetVar(SimpleVar(globalbyte),Const(1)),SetVar(SimpleVar(localbyte),Const(2)),Return(None)],
-            None,None)])])
+            [Routine(main,[],
+              [VarDecl(localbyte,FundamentalType.BYTE_T,None)],
+              [Assign(Var(globalbyte,FundamentalType.BYTE_T),Const(1)),
+              Assign(Var(localbyte,FundamentalType.BYTE_T),Const(2)),
+              Return(None)],None,None)])])
             """,
         )
         self.assertEqual(parser.current_token().tok_type, TokenType.EOF)
@@ -355,10 +356,14 @@ class ParserTestCase(unittest.TestCase):
             Program([Module([],
             [Routine(proc1,[],[],[DevPrint(Const(1)),Return(None)],None,None),
             Routine(proc2,
-            [VarDecl(p2arg1,FundamentalType.BYTE_T,None),VarDecl(p2arg2,FundamentalType.BYTE_T,None),VarDecl(p2arg3,FundamentalType.INT_T,None)],
-            [VarDecl(p2local,FundamentalType.CARD_T,None)],
-            [CallStmt(Call(proc1,[])),DevPrint(GetVar(SimpleVar(p2arg1)))],None,None),
-            Routine(main,[],[],[CallStmt(Call(proc2,[Const(6),Const(0),Const(0)])),Return(None)],None,None)])])
+              [VarDecl(p2arg1,FundamentalType.BYTE_T,None),
+              VarDecl(p2arg2,FundamentalType.BYTE_T,None),
+              VarDecl(p2arg3,FundamentalType.INT_T,None)],
+              [VarDecl(p2local,FundamentalType.CARD_T,None)],
+              [CallStmt(Call(proc1,[],None)),
+              DevPrint(Var(p2arg1,FundamentalType.BYTE_T))],None,None),
+            Routine(main,[],[],
+              [CallStmt(Call(proc2,[Const(6),Const(0),Const(0)],None)),Return(None)],None,None)])])
             """,
         )
         self.assertEqual(parser.current_token().tok_type, TokenType.EOF)
