@@ -385,6 +385,8 @@ class Parser:
                 raise SyntaxError("Declaration may not have an initial value")
             self.advance()
             value = self.parse_comp_const()
+            if value is None:
+                raise SyntaxError("Expected constant value in pointer declaration")
             return ast.VarDecl(
                 identifier, PointerType(ref_type), ast.InitOpts([value], False)
             )
@@ -447,6 +449,8 @@ class Parser:
             return None
         self.advance()
         dim = self.parse_comp_const()
+        if dim is None:
+            raise SyntaxError("Expected constant value in array dimension")
         self.consume(TokenType.OP_RPAREN)
         return dim
 
@@ -480,7 +484,10 @@ class Parser:
         """
         values = []
         while self.current_token().tok_type != TokenType.OP_RBRACK:
-            values.append(self.parse_comp_const())
+            value = self.parse_comp_const()
+            if value is None:
+                raise SyntaxError("Expected constant value in array initialization")
+            values.append(value)
         return values
 
     def parse_record_type(self) -> RecordType | None:
@@ -615,13 +622,16 @@ class Parser:
             self.symbol_table = outer_symbol_table
             self.parsing_routine = None
 
-    def parse_addr(self):
+    def parse_addr(self) -> int:
         """
         <addr> ::= <comp const>
         """
-        return self.parse_comp_const()
+        value = self.parse_comp_const()
+        if value is None:
+            raise SyntaxError("Expected constant value for address")
+        return value
 
-    def parse_comp_const(self) -> int:
+    def parse_comp_const(self) -> int | None:
         """
         TODO: Implement this correctly, which includes allowing addition and references to function addresses...
         For now, just parse a number
@@ -634,9 +644,7 @@ class Parser:
         elif self.current_token().tok_type == TokenType.CHAR_LITERAL:
             value = ord(self.current_token().value)
         else:
-            raise SyntaxError(
-                f"Unexpected token in parse_number: {self.current_token()}"
-            )
+            return None
         if value < -65535 or value > 65535:
             raise SyntaxError(f"Numeric literal {value} out of range [-65535, 65535]")
         self.advance()
@@ -1047,7 +1055,7 @@ class Parser:
         comp_consts: list[int] = []
         while True:
             comp_const = self.parse_comp_const()
-            if not comp_const:
+            if comp_const is None:
                 break
             comp_consts.append(comp_const)
         return comp_consts

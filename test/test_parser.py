@@ -580,3 +580,22 @@ class ParserTestCase(unittest.TestCase):
             """,
         )
         self.assertEqual(parser.current_token().tok_type, TokenType.EOF)
+
+    def test_code_block(self):
+        source_code = """
+        PROC main()
+            [$1234$5678$9ABC$DEF0]
+        RETURN
+        """
+        tokens = tokenize(source_code, S_F)
+        symbol_table = SymTab()
+        parser = Parser(tokens, symbol_table)
+        tree = parser.parse_program()
+        self.maxDiff = None
+        self.assertEqualIgnoreWhitespace(
+            str(tree),
+            """
+            Program([Module([],[Routine(main,[],[],[CodeBlock([4660,22136,39612,57072]),Return(None)],None,None)])])
+            """,
+        )
+        self.assertEqual(parser.current_token().tok_type, TokenType.EOF)
