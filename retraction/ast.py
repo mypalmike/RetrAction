@@ -36,6 +36,8 @@ class Op(Enum):
     GE = auto()
     LT = auto()
     LE = auto()
+    AND = auto()
+    OR = auto()
     XOR = auto()
     BIT_AND = auto()
     BIT_OR = auto()

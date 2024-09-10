@@ -31,6 +31,8 @@ OP_MAP: dict[TokenType, ast.Op] = {
     TokenType.OP_GE: ast.Op.GE,
     TokenType.OP_LT: ast.Op.LT,
     TokenType.OP_LE: ast.Op.LE,
+    TokenType.AND: ast.Op.AND,
+    TokenType.OR: ast.Op.OR,
     TokenType.XOR: ast.Op.XOR,
     TokenType.OP_BIT_AND: ast.Op.BIT_AND,
     TokenType.OP_BIT_OR: ast.Op.BIT_OR,
@@ -1194,6 +1196,14 @@ class Parser:
                 return ast.Dereference(var_node)
             if is_reference:
                 return ast.Reference(var_node)
+            if isinstance(var_decl.var_t, ArrayType):
+                if self.current_token().tok_type == TokenType.OP_LPAREN:
+                    self.advance()
+                    index_expr = self.parse_arith_exp()
+                    self.consume(TokenType.OP_RPAREN)
+                    return ast.ArrayAccess(var_node, index_expr)
+                else:
+                    return ast.Reference(var_node)
             return var_node
         elif symbol_table_entry.entry_type == EntryType.ROUTINE:
             routine_call = self.parse_routine_call()

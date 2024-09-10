@@ -464,3 +464,66 @@ class ParserTestCase(unittest.TestCase):
             """,
         )
         self.assertEqual(parser.current_token().tok_type, TokenType.EOF)
+
+    def test_array_access(self):
+        source_code = """
+        BYTE ARRAY somearr(3) = [$12 $34 $56]
+        PROC main()
+            BYTE i = [1]
+            DEVPRINT(somearr(i))
+        RETURN
+        """
+        tokens = tokenize(source_code, S_F)
+        symbol_table = SymTab()
+        parser = Parser(tokens, symbol_table)
+        tree = parser.parse_program()
+        self.maxDiff = None
+        self.assertEqualIgnoreWhitespace(
+            str(tree),
+            """
+            Program([Module(
+            [VarDecl(somearr,ArrayType(FundamentalType.BYTE_T,3),InitOpts([18,52,86],False))],
+            [Routine(main,[],[VarDecl(i,FundamentalType.BYTE_T,InitOpts([1],False))],
+              [DevPrint(ArrayAccess(Var(somearr,ArrayType(FundamentalType.BYTE_T,3)),Var(i,FundamentalType.BYTE_T))),
+              Return(None)],None,None)])])
+            """,
+        )
+        self.assertEqual(parser.current_token().tok_type, TokenType.EOF)
+
+    def test_all_arith_ops(self):
+        source_code = """
+        PROC main()
+            INT a = [10], b = $1000, c
+            c = -a + b * 2 - b / 5 MOD (a LSH b) & a % b RSH 7
+            DEVPRINT(c)
+        RETURN
+        """
+        tokens = tokenize(source_code, S_F)
+        symbol_table = SymTab()
+        parser = Parser(tokens, symbol_table)
+        tree = parser.parse_program()
+        self.maxDiff = None
+        self.assertEqualIgnoreWhitespace(
+            str(tree),
+            """
+            Program([Module([],
+            [Routine(main,[],
+              [VarDecl(a,FundamentalType.INT_T,InitOpts([10],False)),
+              VarDecl(b,FundamentalType.INT_T,InitOpts([4096],True)),
+              VarDecl(c,FundamentalType.INT_T,None)],
+              [Assign(Var(c,FundamentalType.INT_T),
+                BinaryExpr(Op.BIT_OR,
+                  BinaryExpr(Op.BIT_AND,
+                    BinaryExpr(Op.SUB,
+                      BinaryExpr(Op.ADD,
+                        UnaryExpr(Op.SUB,Var(a,FundamentalType.INT_T)),
+                        BinaryExpr(Op.MUL,Var(b,FundamentalType.INT_T),Const(2))),
+                      BinaryExpr(Op.MOD,
+                        BinaryExpr(Op.DIV,Var(b,FundamentalType.INT_T),Const(5)),
+                        BinaryExpr(Op.LSH,Var(a,FundamentalType.INT_T),Var(b,FundamentalType.INT_T)))),
+                    Var(a,FundamentalType.INT_T)),
+                  BinaryExpr(Op.RSH,Var(b,FundamentalType.INT_T),Const(7)))),
+              DevPrint(Var(c,FundamentalType.INT_T)),Return(None)],None,None)])])
+            """,
+        )
+        self.assertEqual(parser.current_token().tok_type, TokenType.EOF)
