@@ -38,7 +38,6 @@ class Op(Enum):
     LE = auto()
     AND = auto()
     OR = auto()
-    XOR = auto()
     BIT_AND = auto()
     BIT_OR = auto()
     BIT_XOR = auto()

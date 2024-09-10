@@ -35,7 +35,6 @@ class TokenType(Enum):
     TYPE = auto()
     UNTIL = auto()
     WHILE = auto()
-    XOR = auto()
     OP_PLUS = auto()
     OP_MINUS = auto()
     OP_TIMES = auto()
@@ -123,7 +122,7 @@ TEXT_TO_TOKEN = {
     "TYPE": TokenType.TYPE,
     "UNTIL": TokenType.UNTIL,
     "WHILE": TokenType.WHILE,
-    "XOR": TokenType.XOR,
+    "XOR": TokenType.OP_BIT_XOR,
     "+": TokenType.OP_PLUS,
     "-": TokenType.OP_MINUS,
     "*": TokenType.OP_TIMES,

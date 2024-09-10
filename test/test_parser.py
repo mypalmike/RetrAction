@@ -527,3 +527,56 @@ class ParserTestCase(unittest.TestCase):
             """,
         )
         self.assertEqual(parser.current_token().tok_type, TokenType.EOF)
+
+    def test_all_conditional_ops(self):
+        source_code = """
+        PROC main()
+            INT a = [10], b = $1000
+            IF a < b AND a <= b OR a = b AND a > b OR a < b AND a # b THEN
+                DEVPRINT(1)
+            ELSE
+                DEVPRINT(0)
+            FI
+        RETURN
+        """
+        tokens = tokenize(source_code, S_F)
+        symbol_table = SymTab()
+        parser = Parser(tokens, symbol_table)
+        tree = parser.parse_program()
+        self.maxDiff = None
+        self.assertEqualIgnoreWhitespace(
+            str(tree),
+            """
+            Program([Module([],
+            [Routine(main,[],
+            [VarDecl(a,FundamentalType.INT_T,InitOpts([10],False)),
+            VarDecl(b,FundamentalType.INT_T,InitOpts([4096],True))],
+            [If([Conditional(
+              BinaryExpr(Op.OR,
+                BinaryExpr(Op.OR,
+                  BinaryExpr(Op.AND,
+                    BinaryExpr(Op.LT,
+                      Var(a,FundamentalType.INT_T),
+                      Var(b,FundamentalType.INT_T)),
+                    BinaryExpr(Op.LE,
+                      Var(a,FundamentalType.INT_T),
+                      Var(b,FundamentalType.INT_T))),
+                  BinaryExpr(Op.AND,
+                    BinaryExpr(Op.EQ,
+                      Var(a,FundamentalType.INT_T),
+                      Var(b,FundamentalType.INT_T)),
+                    BinaryExpr(Op.GT,
+                      Var(a,FundamentalType.INT_T),
+                      Var(b,FundamentalType.INT_T)))),
+                BinaryExpr(Op.AND,
+                  BinaryExpr(Op.LT,
+                    Var(a,FundamentalType.INT_T),
+                    Var(b,FundamentalType.INT_T)),
+                  BinaryExpr(Op.NE,
+                    Var(a,FundamentalType.INT_T),
+                    Var(b,FundamentalType.INT_T)))),
+              [DevPrint(Const(1))])],
+              [DevPrint(Const(0))]),Return(None)],None,None)])])
+            """,
+        )
+        self.assertEqual(parser.current_token().tok_type, TokenType.EOF)

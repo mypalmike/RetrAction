@@ -33,7 +33,6 @@ OP_MAP: dict[TokenType, ast.Op] = {
     TokenType.OP_LE: ast.Op.LE,
     TokenType.AND: ast.Op.AND,
     TokenType.OR: ast.Op.OR,
-    TokenType.XOR: ast.Op.XOR,
     TokenType.OP_BIT_AND: ast.Op.BIT_AND,
     TokenType.OP_BIT_OR: ast.Op.BIT_OR,
     TokenType.OP_BIT_XOR: ast.Op.BIT_XOR,

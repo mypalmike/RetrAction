@@ -104,11 +104,8 @@ EXPRESSION_RULES = {
     TokenType.OP_LE: ExprRule(
         ExprAction.NONE, ExprAction.BINARY, ExprPrecedence.COMPARE
     ),
-    # TokenType.AND: ExprRule(ExprAction.NONE, ExprAction.AND, ExprPrecedence.AND),
-    # TokenType.OR: ExprRule(ExprAction.NONE, ExprAction.OR, ExprPrecedence.OR),
     TokenType.AND: ExprRule(ExprAction.NONE, ExprAction.BINARY, ExprPrecedence.AND),
     TokenType.OR: ExprRule(ExprAction.NONE, ExprAction.BINARY, ExprPrecedence.OR),
-    TokenType.XOR: ExprRule(ExprAction.NONE, ExprAction.BINARY, ExprPrecedence.XOR),
     TokenType.OP_BIT_AND: ExprRule(
         ExprAction.NONE, ExprAction.BINARY, ExprPrecedence.AND
     ),
