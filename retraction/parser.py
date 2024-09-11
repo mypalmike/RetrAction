@@ -437,9 +437,19 @@ class Parser:
         <arr ident> ::= <identifier>{(<dim>)}{=<arr init opts>}
         """
         identifier = self.consume(TokenType.IDENTIFIER).value
-        dimensions = self.parse_dimensions()
+        dim = self.parse_dimensions()
         init_opts = self.parse_arr_init_opts(allow_init)
-        return ast.VarDecl(identifier, ArrayType(fund_t, dimensions), init_opts)
+        if dim is None and init_opts is None:
+            self.warn("Array declaration has no dimensions or initialization")
+        elif (
+            dim is not None
+            and init_opts is not None
+            and dim != len(init_opts.initial_values)
+        ):
+            self.warn(
+                f"Array dimension {dim} does not match initialization length {len(init_opts.initial_values)}, will allocated based on initialization length"
+            )
+        return ast.VarDecl(identifier, ArrayType(fund_t, dim), init_opts)
 
     def parse_dimensions(self) -> int | None:
         """

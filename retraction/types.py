@@ -10,6 +10,16 @@ class FundamentalType(Enum):
     INT_T = 2
     CARD_T = 3
 
+    def size_bytes(self):
+        if self == FundamentalType.BYTE_T:
+            return 1
+        elif self == FundamentalType.CHAR_T:
+            return 1
+        elif self == FundamentalType.INT_T:
+            return 2
+        else:  # self == FundamentalType.CARD_T:
+            return 2
+
     def cast_priority(self):
         if self == FundamentalType.BYTE_T:
             return 1
@@ -47,6 +57,9 @@ class RecordType(ComplexType):
 
     def __repr__(self) -> str:
         return f"RecordType({self.name}, {self.fields})"
+
+    def size_bytes(self):
+        return sum(f[1].size_bytes() for f in self.fields)
 
 
 class PointerType(ComplexType):

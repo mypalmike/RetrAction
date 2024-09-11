@@ -7,8 +7,8 @@ from retraction.bytecode import (
     ByteCodeVariableScope,
     ByteCodeVariableAddressMode,
 )
-from retraction.types import FundamentalType, Type
-import retraction.ast as ast
+from retraction.types import ArrayType, FundamentalType, PointerType, RecordType, Type
+from retraction import ast
 
 
 # Action calling conventions:
@@ -191,19 +191,51 @@ class ByteCodeGen:
         # local_var = self.symbol_table.locals[local_index]
         # return local_var.address
 
-    def emit_global_data(self, global_index: int) -> int:
+    def emit_global_data(self, var_decl: ast.VarDecl) -> int:
         """
-        This places raw data in the code stream, and returns the address of the data.
+        This places raw data in the code stream, and returns the address of the beginning of the data.
         """
+        init_opts = var_decl.init_opts
+        if init_opts is not None and init_opts.is_address:
+            return init_opts.initial_values[0]
         addr = len(self.code)
-        return 0
-        # TODO
-        # global_var = self.symbol_table.globals[global_index]
-        # if global_var.var_t in [Type.BYTE_T, Type.CHAR_T]:
-        #     self.append_byte(global_var.init_opts.initial_value)
-        # elif global_var.var_t in [Type.INT_T, Type.CARD_T]:
-        #     self.append_short(global_var.init_opts.initial_value)
-        # return addr
+        # Depending on the type of the variable, we need to emit a different number of bytes
+        if isinstance(var_decl.var_t, ArrayType):
+            array_t = cast(ArrayType, var_decl.var_t)
+            element_t = array_t.element_t
+            length = array_t.length
+            init_opts = var_decl.init_opts
+            if init_opts is not None:
+                for value in init_opts.initial_values:
+                    self.append(element_t, value)
+            elif length is not None:
+                for _ in range(length):
+                    self.append(element_t, 0)
+        elif isinstance(var_decl.var_t, PointerType):
+            if init_opts is not None:
+                self.append_short(init_opts.initial_values[0])
+            else:
+                self.append_short(0)
+        elif isinstance(var_decl.var_t, RecordType):
+            record_t = cast(RecordType, var_decl.var_t)
+            for _ in range(record_t.size_bytes()):
+                self.append_byte(0)
+        else:
+            if init_opts is not None:
+                self.append(var_decl.var_t, init_opts.initial_values[0])
+            else:
+                self.append(var_decl.var_t, 0)
+        return addr
+
+        # addr = len(self.code)
+        # return 0
+        # # TODO
+        # # global_var = self.symbol_table.globals[global_index]
+        # # if global_var.var_t in [Type.BYTE_T, Type.CHAR_T]:
+        # #     self.append_byte(global_var.init_opts.initial_value)
+        # # elif global_var.var_t in [Type.INT_T, Type.CARD_T]:
+        # #     self.append_short(global_var.init_opts.initial_value)
+        # # return addr
 
     def emit_get_variable(
         self,

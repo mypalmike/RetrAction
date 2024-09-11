@@ -1,6 +1,6 @@
 # Commentary on the design
 
-Writing a compiler involves making many decisions. This document is intended to describe some of these decisions and the reasoning behind them.
+Writing a compiler involves making many decisions and analyzing both pulished specifications and analyzing existing implementations. This document is intended to describe some of the decisions and the analysis behind them. Please note that when I refer to the Action! implementation, I am testing with a cartidge image titled "ACTION-36-ROM-OSS.rom" using the "Atari800" emulator under Linux.
 
 ## Generating and interpreting bytecode
 
@@ -153,4 +153,46 @@ TYPE foo = [BYTE x]
 INT x
 ```
 
-It appears to consider this a name collision, showing error 6, "Declaration error". This would appear to be a bug(?) when considering how most languages treat record types. RetrAction allows this code to compile.
+It seems to consider this a name collision, showing error 6, "Declaration error". This would appear to be a bug(?) when considering how most languages treat record types. RetrAction allows this code to compile.
+
+### POINTER initialization
+
+The manual, addendum, and implementation seem to disagree somewhat on this topic. The manual and addendum claim that the language allows only this format:
+
+```
+BYTE POINTER foo = $1234
+```
+
+But the compiler supports the above in addition to:
+
+```
+BYTE POINTER foo = [$1234]
+```
+
+It's not obvious what each should do. Let's see what the Action! implementation does.
+
+```
+CARD POINTER cp1 = 100
+CARD POINTER cp2 = [100]
+
+PROC main()
+  PrintCE(cp1)
+  PrintCE(cp1^)
+  PrintCE(@cp1)
+  PrintCE(cp2)
+  PrintCE(cp2^)
+  PrintCE(@cp2)
+RETURN
+
+Output:
+100
+40082
+9499
+9501
+100
+9503
+```
+
+The cp1 declaration, without the brackets, appears to do what might be expected in other languages, which is to allocate space for a pointer and set that pointer to point to address 100 (which happens to contain the value 40082). The cp2 declaration appears to allocate a location for a CARD object and then create another space for a pointer to the first location, hence the @cp1, cp2, and @cp2 are addresses near each other, presumably allocated by the Action! compiler.
+
+For now, RetrAction only supports the former initialization.
