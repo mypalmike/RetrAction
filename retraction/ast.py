@@ -73,6 +73,8 @@ class VarDecl(Decl):
         self.var_t = var_t
         self.init_opts = init_opts
 
+        self.addr: int | None = None
+
     def __repr__(self) -> str:
         return f"VarDecl({self.name}, {self.var_t}, {self.init_opts})"
 
@@ -380,7 +382,7 @@ class Routine(Node):
         name: str,
         params: list[VarDecl],
         decls: list[Decl] | None,
-        body: list[Statement] | None,
+        statements: list[Statement] | None,
         fixed_addr: int | None,
         return_t: FundamentalType | None,
         local_symtab: SymTab | None,
@@ -388,13 +390,15 @@ class Routine(Node):
         self.name = name
         self.params = params
         self.decls = decls
-        self.body = body
+        self.statements = statements
         self.fixed_addr = fixed_addr
         self.return_t = return_t
         self.local_symtab = local_symtab
 
+        self.addr: int | None = None
+
     def __repr__(self) -> str:
-        return f"Routine({self.name}, {self.params}, {self.decls}, {self.body}, {self.fixed_addr}, {self.return_t})"
+        return f"Routine({self.name}, {self.params}, {self.decls}, {self.statements}, {self.fixed_addr}, {self.return_t})"
 
     def accept(self, visitor: Visitor):
         visitor.visit_routine(self)
