@@ -1,6 +1,7 @@
 from typing import cast
 
 
+from retraction.error import IdentifierError
 from retraction.symtab import SymTab
 from retraction.bytecode import (
     ByteCodeOp,
@@ -71,7 +72,7 @@ class ByteCodeGen:
         else:
             raise ValueError(f"Invalid value type {value_t}")
 
-    def emit_routine_call(self, routine_index: int):
+    def emit_routine_call(self, return_t: FundamentalType, params_size: int, locals_size: int, addr: int):
         """
         Routine call bytecode:
             ROUTINE_CALL - 1 byte
@@ -81,50 +82,39 @@ class ByteCodeGen:
             ROUTINE ADDR - 2 bytes
         """
         self.append_byte(ByteCodeOp.ROUTINE_CALL.value)
-        symbol_table_entry = self.symbol_table.table[routine_index]
-        routine = cast(ast.Routine, symbol_table_entry.ast_node)
-        # TODO:
-        # self.append_byte(routine.return_t.value)
-        # self.append_short(routine.get_params_size())
-        # self.append_short(routine.get_locals_size())
-        # self.append_short(routine.entry_point)
+        self.append_byte(return_t.value)
+        self.append_short(params_size)
+        self.append_short(locals_size)
+        self.append_short(addr)
 
-    def emit_return(self, routine_index: int):
+    def emit_return(self, return_t: FundamentalType):
         """
         Return bytecode:
             RETURN - 1 byte
             TYPE   - 1 byte
         """
         self.append_byte(ByteCodeOp.RETURN.value)
-        symbol_table_entry = self.symbol_table.table[routine_index]
-        routine = cast(ast.Routine, symbol_table_entry.ast_node)
-        # TODO:
-        # routine = self.symbol_table.routines[routine_index]
-        # self.append_byte(routine.return_t.value)
+        self.append_byte(return_t.value)
 
-    def emit_binary_op(self, op: ByteCodeOp, operand1_t: Type, operand2_t: Type):
+    def emit_binary_op(self, op: ByteCodeOp, operand1_t: FundamentalType, operand2_t: FundamentalType):
         """
         Binary operation bytecode:
             OP         - 1 byte
-            OPERAND1_T - 1 byte
-            OPERAND2_T - 1 byte
+            OPERAND_Ts - 1 byte
         """
         self.append_byte(op.value)
-        # TODO
-        # self.append_byte(operand1_t.value)
-        # self.append_byte(operand2_t.value)
+        self.append_byte(operand1_t.value) << 2 | operand2_t.value
 
-    def emit_unary_minus(self, operand_t: Type):
+    def emit_unary_minus(self, operand_t: FundamentalType):
         """
         Unary minus bytecode:
             UNARY_MINUS - 1 byte
             OPERAND_T   - 1 byte
         """
         self.append_byte(ByteCodeOp.UNARY_MINUS.value)
-        # TODO
-        # self.append_byte(operand_t.value)
+        self.append_byte(operand_t.value)
 
-    def emit_jump_if_false(self, operand_t: Type, addr: int = 0) -> int:
+    def emit_jump_if_false(self, operand_t: FundamentalType, addr: int = 0) -> int:
         """
         Returns the address of the jump target, for fixup later if needed
         Jump if false bytecode:
@@ -133,12 +123,10 @@ class ByteCodeGen:
             ADDR          - 2 bytes
         """
         self.append_byte(ByteCodeOp.JUMP_IF_FALSE.value)
-        return 0
-        # TODO
-        # self.append_byte(operand_t.value)
-        # curr_addr = len(self.code)
-        # self.append_short(addr)
-        # return curr_addr
+        self.append_byte(operand_t.value)
+        curr_addr = len(self.code)
+        self.append_short(addr)
+        return curr_addr
 
     def emit_jump(self, addr: int = 0) -> int:
         """
@@ -152,15 +140,14 @@ class ByteCodeGen:
         self.append_short(addr)
         return curr_addr
 
-    def emit_pop(self, operand_t: Type):
+    def emit_pop(self, operand_t: FundamentalType):
         """
         Pop bytecode:
             POP - 1 byte
             OPERAND_T - 1 byte
         """
         self.append_byte(ByteCodeOp.POP.value)
-        # TODO
-        # self.append_byte(operand_t.value)
+        self.append_byte(operand_t.value)
 
     def emit_numerical_constant(self, const_index):
         """
@@ -191,73 +178,115 @@ class ByteCodeGen:
         # local_var = self.symbol_table.locals[local_index]
         # return local_var.address
 
-    def emit_global_data(self, var_decl: ast.VarDecl) -> int:
+    def emit_bytes(self, data: list[int]) -> int:
         """
-        This places raw data in the code stream, and returns the address of the beginning of the data.
+        This places raw bytes in the code stream, and returns the address of the beginning of the data.
         """
-        init_opts = var_decl.init_opts
-        if init_opts is not None and init_opts.is_address:
-            return init_opts.initial_values[0]
         addr = len(self.code)
-        # Depending on the type of the variable, we need to emit a different number of bytes
-        if isinstance(var_decl.var_t, ArrayType):
-            array_t = cast(ArrayType, var_decl.var_t)
-            element_t = array_t.element_t
-            length = array_t.length
-            init_opts = var_decl.init_opts
-            if init_opts is not None:
-                for value in init_opts.initial_values:
-                    self.append(element_t, value)
-            elif length is not None:
-                for _ in range(length):
-                    self.append(element_t, 0)
-        elif isinstance(var_decl.var_t, PointerType):
-            if init_opts is not None:
-                self.append_short(init_opts.initial_values[0])
-            else:
-                self.append_short(0)
-        elif isinstance(var_decl.var_t, RecordType):
-            record_t = cast(RecordType, var_decl.var_t)
-            for _ in range(record_t.size_bytes()):
-                self.append_byte(0)
-        else:
-            if init_opts is not None:
-                self.append(var_decl.var_t, init_opts.initial_values[0])
-            else:
-                self.append(var_decl.var_t, 0)
+        for val in data:
+            self.append_byte(val)
+        return addr
+    
+    def emit_shorts(self, data: list[int]) -> int:
+        """
+        This places raw cards in the code stream, and returns the address of the beginning of the data.
+        """
+        addr = len(self.code)
+        for val in data:
+            self.append_short(val)
         return addr
 
-        # addr = len(self.code)
-        # return 0
-        # # TODO
-        # # global_var = self.symbol_table.globals[global_index]
-        # # if global_var.var_t in [Type.BYTE_T, Type.CHAR_T]:
-        # #     self.append_byte(global_var.init_opts.initial_value)
-        # # elif global_var.var_t in [Type.INT_T, Type.CARD_T]:
-        # #     self.append_short(global_var.init_opts.initial_value)
-        # # return addr
+    def emit_string(self, string: str) -> int:
+        """
+        This places a string in the code stream, and returns the address of the beginning of the string.
+        Action! strings are ATASCII and have a length byte at the beginning.
+        """
+        addr = len(self.code)
+        length = len(string)
+        if length > 255:
+            raise IdentifierError(f"String too long: {string}")
+        self.append_byte(length)
+        for char in string:
+            self.append_byte(ord(char))
+        return addr
+    
+    # def emit_global_data(self, var_decl: ast.VarDecl) -> int:
+    #     """
+    #     This places raw data in the code stream, and returns the address of the beginning of the data.
+    #     """
+    #     init_opts = var_decl.init_opts
+    #     if init_opts is not None and init_opts.is_address:
+    #         return init_opts.initial_values[0]
+    #     addr = len(self.code)
+    #     # Depending on the type of the variable, we need to emit a different number of bytes
+    #     if isinstance(var_decl.var_t, ArrayType):
+    #         array_t = cast(ArrayType, var_decl.var_t)
+    #         element_t = array_t.element_t
+    #         length = array_t.length
+    #         init_opts = var_decl.init_opts
+    #         if init_opts is not None:
+    #             for value in init_opts.initial_values:
+    #                 self.append(element_t, value)
+    #         elif length is not None:
+    #             for _ in range(length):
+    #                 self.append(element_t, 0)
+    #     elif isinstance(var_decl.var_t, PointerType):
+    #         if init_opts is not None:
+    #             self.append_short(init_opts.initial_values[0])
+    #         else:
+    #             self.append_short(0)
+    #     elif isinstance(var_decl.var_t, RecordType):
+    #         record_t = cast(RecordType, var_decl.var_t)
+    #         for _ in range(record_t.size_bytes()):
+    #             self.append_byte(0)
+    #     else:
+    #         if init_opts is not None:
+    #             self.append(var_decl.var_t, init_opts.initial_values[0])
+    #         else:
+    #             self.append(var_decl.var_t, 0)
+    #     return addr
 
-    def emit_get_variable(
+    def emit_load_variable(
         self,
-        var_t: Type,
+        var_t: FundamentalType,
         var_scope: ByteCodeVariableScope,
         var_addr_mode: ByteCodeVariableAddressMode,
         address: int,
     ):
         """
         Get variable bytecode:
-            GET_VARIABLE - 1 byte
+            LOAD_VARIABLE - 1 byte
             TYPE         - 1 byte
             SCOPE        - 1 byte
             ADDR_MODE    - 1 byte
             ADDR         - 2 bytes
         """
-        self.append_byte(ByteCodeOp.GET_VARIABLE.value)
-        # TODO
-        # self.append_byte(var_t.value)
-        # self.append_byte(var_scope.value)
-        # self.append_byte(var_addr_mode.value)
-        # self.append_short(address)
+        self.append_byte(ByteCodeOp.LOAD_VARIABLE.value)
+        self.append_byte(var_t.value)
+        self.append_byte(var_scope.value)
+        self.append_byte(var_addr_mode.value)
+        self.append_short(address)
+
+    def emit_store_variable(
+        self,
+        var_t: FundamentalType,
+        var_scope: ByteCodeVariableScope,
+        var_addr_mode: ByteCodeVariableAddressMode,
+        address: int,
+    ):
+        """
+        Set variable bytecode:
+            STORE_VARIABLE - 1 byte
+            TYPE          - 1 byte
+            SCOPE         - 1 byte
+            ADDR_MODE     - 1 byte
+            ADDR          - 2 bytes
+        """
+        self.append_byte(ByteCodeOp.STORE_VARIABLE.value)
+        self.append_byte(var_t.value)
+        self.append_byte(var_scope.value)
+        self.append_byte(var_addr_mode.value)
+        self.append_short(address)
 
     # def emit_get_global(self, global_index):
     #     # GET_GLOBAL, TYPE, INDEX
@@ -295,15 +324,14 @@ class ByteCodeGen:
     # def emit_zero(self):
     #     self.code.append(ByteCode(ByteCodeOp.ZERO))
 
-    def emit_devprint(self, operand_t: Type):
+    def emit_devprint(self, operand_t: FundamentalType):
         """
         Devprint bytecode:
             DEVPRINT - 1 byte
             OPERAND_T - 1 byte
         """
         self.code.append(ByteCodeOp.DEVPRINT.value)
-        # TODO
-        # self.code.append(operand_t.value)
+        self.code.append(operand_t.value)
 
     def get_next_addr(self):
         return len(self.code)

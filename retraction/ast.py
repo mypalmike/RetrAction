@@ -1,4 +1,5 @@
 from enum import Enum, auto
+from functools import singledispatchmethod
 from typing import cast
 
 from retraction.error import InternalError
@@ -10,16 +11,7 @@ from retraction.types import (
     binary_expression_type,
     cast_to_fundamental,
 )
-
-
-# Forward declarations to handle circular dependencies.
-# TODO: This works OK but should refactor to remove circular dependencies.
-class Visitor:
-    pass
-
-
-class SymTab:
-    pass
+from retraction import symtab
 
 
 class Op(Enum):
@@ -46,9 +38,8 @@ class Op(Enum):
         return self in [Op.EQ, Op.NE, Op.GT, Op.GE, Op.LT, Op.LE]
 
 
-class Node:
-    def accept(self, visitor: Visitor):
-        raise NotImplementedError()
+class Node(symtab.Node):
+    pass
 
 
 class InitOpts(Node):
@@ -58,9 +49,6 @@ class InitOpts(Node):
 
     def __repr__(self) -> str:
         return f"InitOpts({self.initial_values}, {self.is_address})"
-
-    def accept(self, visitor: Visitor):
-        return visitor.visit_init_opts(self)
 
 
 class Decl(Node):
@@ -78,9 +66,6 @@ class VarDecl(Decl):
     def __repr__(self) -> str:
         return f"VarDecl({self.name}, {self.var_t}, {self.init_opts})"
 
-    def accept(self, visitor: Visitor):
-        return visitor.visit_var_decl(self)
-
 
 class StructDecl(Decl):
     def __init__(self, name: str, fields: list[VarDecl]):
@@ -89,9 +74,6 @@ class StructDecl(Decl):
 
     def __repr__(self) -> str:
         return f"StructDecl({self.name}, {self.fields})"
-
-    def accept(self, visitor: Visitor):
-        return visitor.visit_struct_decl(self)
 
 
 class Statement(Node):
@@ -106,19 +88,16 @@ class Expr(Node):
 
 
 class Var(Expr):
-    def __init__(self, symbol_name: str, var_t: Type):
-        self.symbol_name = symbol_name
+    def __init__(self, name: str, var_t: Type):
+        self.name = name
         self.var_t = var_t
 
     def __repr__(self) -> str:
-        return f"Var({self.symbol_name}, {self.var_t})"
+        return f"Var({self.name}, {self.var_t})"
 
     @property
     def fund_t(self) -> FundamentalType:
         return cast_to_fundamental(self.var_t)
-
-    def accept(self, visitor: Visitor):
-        visitor.visit_var(self)
 
 
 class Dereference(Expr):
@@ -133,9 +112,6 @@ class Dereference(Expr):
         # Any valid dereference refers to a pointer type
         return cast(Var, self.expr).fund_t
 
-    def accept(self, visitor: Visitor):
-        visitor.visit_dereference(self)
-
 
 class Reference(Expr):
     def __init__(self, expr: Expr):
@@ -147,9 +123,6 @@ class Reference(Expr):
     @property
     def fund_t(self) -> FundamentalType:
         return FundamentalType.CARD_T
-
-    def accept(self, visitor: Visitor):
-        visitor.visit_reference(self)
 
 
 class FieldAccess(Expr):
@@ -171,9 +144,6 @@ class FieldAccess(Expr):
                 return field[1]
         raise InternalError(f"Field {self.field_name} not found in struct {struct_t}")
 
-    def accept(self, visitor: Visitor):
-        visitor.visit_field_access(self)
-
 
 class ArrayAccess(Expr):
     def __init__(self, expr: Expr, index: Expr):
@@ -190,9 +160,6 @@ class ArrayAccess(Expr):
         array_t = cast(ArrayType, access_var.var_t)
         return array_t.element_t
 
-    def accept(self, visitor: Visitor):
-        visitor.visit_array_access(self)
-
 
 class Assign(Statement):
     def __init__(self, target: Expr, expr: Expr):
@@ -202,9 +169,6 @@ class Assign(Statement):
     def __repr__(self) -> str:
         return f"Assign({self.target}, {self.expr})"
 
-    def accept(self, visitor: Visitor):
-        visitor.visit_assign(self)
-
 
 class Conditional(Node):
     def __init__(self, condition: Expr, body: list[Statement]):
@@ -213,9 +177,6 @@ class Conditional(Node):
 
     def __repr__(self) -> str:
         return f"Conditional({self.condition}, {self.body})"
-
-    def accept(self, visitor: Visitor):
-        visitor.visit_conditional(self)
 
 
 class If(Statement):
@@ -228,9 +189,6 @@ class If(Statement):
     def __repr__(self) -> str:
         return f"If({self.conditionals}, {self.else_body})"
 
-    def accept(self, visitor: Visitor):
-        visitor.visit_if(self)
-
 
 class Do(Statement):
     def __init__(self, body: list[Statement], until: Expr | None):
@@ -239,9 +197,6 @@ class Do(Statement):
 
     def __repr__(self) -> str:
         return f"Do({self.body}, {self.until})"
-
-    def accept(self, visitor: Visitor):
-        visitor.visit_do(self)
 
 
 class While(Statement):
@@ -252,9 +207,6 @@ class While(Statement):
     def __repr__(self) -> str:
         return f"While({self.condition}, {self.do_statement})"
 
-    def accept(self, visitor: Visitor):
-        visitor.visit_while(self)
-
 
 class Until(Statement):
     def __init__(self, condition: Expr, body: list[Statement]):
@@ -262,9 +214,6 @@ class Until(Statement):
 
     def __repr__(self) -> str:
         return f"Until({self.condition}"
-
-    def accept(self, visitor: Visitor):
-        visitor.visit_until(self)
 
 
 class For(Statement):
@@ -285,9 +234,6 @@ class For(Statement):
     def __repr__(self) -> str:
         return f"For({self.var_target}, {self.start_expr}, {self.finish_expr}, {self.inc_expr}, {self.do_loop})"
 
-    def accept(self, visitor: Visitor):
-        visitor.visit_for(self)
-
 
 class Exit(Statement):
     def __init__(self):
@@ -295,9 +241,6 @@ class Exit(Statement):
 
     def __repr__(self) -> str:
         return f"Exit()"
-
-    def accept(self, visitor: Visitor):
-        visitor.visit_exit(self)
 
 
 class CodeBlock(Statement):
@@ -307,9 +250,6 @@ class CodeBlock(Statement):
     def __repr__(self) -> str:
         return f"CodeBlock({self.values})"
 
-    def accept(self, visitor: Visitor):
-        visitor.visit_code_block(self)
-
 
 class Return(Statement):
     def __init__(self, expr: Expr | None):
@@ -318,9 +258,6 @@ class Return(Statement):
     def __repr__(self) -> str:
         return f"Return({self.expr})"
 
-    def accept(self, visitor: Visitor):
-        visitor.visit_return(self)
-
 
 class DevPrint(Statement):
     def __init__(self, expr: Expr):
@@ -328,9 +265,6 @@ class DevPrint(Statement):
 
     def __repr__(self) -> str:
         return f"DevPrint({self.expr})"
-
-    def accept(self, visitor: Visitor):
-        visitor.visit_dev_print(self)
 
 
 class BinaryExpr(Expr):
@@ -355,9 +289,6 @@ class BinaryExpr(Expr):
     def fund_t(self) -> FundamentalType:
         return self.expr_t
 
-    def accept(self, visitor: Visitor):
-        visitor.visit_binary_expr(self)
-
 
 class UnaryExpr(Expr):
     def __init__(self, op: Op, expr: Expr):
@@ -372,9 +303,6 @@ class UnaryExpr(Expr):
         # The only unary operator is negation, which is implicitly INT
         return FundamentalType.INT_T
 
-    def accept(self, visitor: Visitor):
-        visitor.visit_unary_expr(self)
-
 
 class Routine(Node):
     def __init__(
@@ -384,8 +312,8 @@ class Routine(Node):
         decls: list[Decl] | None,
         statements: list[Statement] | None,
         fixed_addr: int | None,
-        return_t: FundamentalType | None,
-        local_symtab: SymTab | None,
+        return_t: FundamentalType,
+        local_symtab: symtab.SymTab | None,
     ):
         self.name = name
         self.params = params
@@ -400,12 +328,9 @@ class Routine(Node):
     def __repr__(self) -> str:
         return f"Routine({self.name}, {self.params}, {self.decls}, {self.statements}, {self.fixed_addr}, {self.return_t})"
 
-    def accept(self, visitor: Visitor):
-        visitor.visit_routine(self)
-
 
 class Call(Expr):
-    def __init__(self, name: str, args: list[Expr], return_t: FundamentalType | None):
+    def __init__(self, name: str, args: list[Expr], return_t: FundamentalType):
         self.name = name
         self.args = args
         self.return_t = return_t
@@ -419,9 +344,6 @@ class Call(Expr):
             raise InternalError("Call expression has no return type")
         return cast_to_fundamental(self.return_t)
 
-    def accept(self, visitor: Visitor):
-        visitor.visit_call(self)
-
 
 class CallStmt(Statement):
     def __init__(self, call: Call):
@@ -429,9 +351,6 @@ class CallStmt(Statement):
 
     def __repr__(self) -> str:
         return f"CallStmt({self.call})"
-
-    def accept(self, visitor: Visitor):
-        visitor.visit_call_stmt(self)
 
 
 class NumericConst(Expr):
@@ -451,9 +370,6 @@ class NumericConst(Expr):
     @property
     def fund_t(self) -> FundamentalType:
         return self.expr_t
-
-    def accept(self, visitor: Visitor):
-        visitor.visit_numeric_const(self)
 
 
 # class GetVar(Expr):
@@ -476,82 +392,11 @@ class Module(Node):
     def __repr__(self) -> str:
         return f"Module({self.decls}, {self.routines})"
 
-    def accept(self, visitor: Visitor):
-        visitor.visit_module(self)
-
 
 class Program(Node):
-    def __init__(self, modules: list[Module], symbol_table: SymTab):
+    def __init__(self, modules: list[Module], symbol_table: symtab.SymTab):
         self.modules = modules
         self.symbol_table = symbol_table
 
     def __repr__(self) -> str:
         return f"Program({self.modules})"
-
-    def accept(self, visitor: Visitor):
-        visitor.visit_program(self)
-
-
-class Visitor:  # type: ignore
-    def visit_program(self, program: Program):
-        raise NotImplementedError()
-
-    def visit_module(self, module: Module):
-        raise NotImplementedError()
-
-    def visit_var_decl(self, var_decl: VarDecl):
-        raise NotImplementedError()
-
-    def visit_struct_decl(self, struct_decl: StructDecl):
-        raise NotImplementedError()
-
-    def visit_assign(self, assign: Assign):
-        raise NotImplementedError()
-
-    def visit_binary_expr(self, binary_expr: BinaryExpr):
-        raise NotImplementedError()
-
-    def visit_unary_expr(self, unary_expr: UnaryExpr):
-        raise NotImplementedError()
-
-    def visit_conditional(self, conditional: Conditional):
-        raise NotImplementedError()
-
-    def visit_if(self, if_stmt: If):
-        raise NotImplementedError()
-
-    def visit_do(self, do_stmt: Do):
-        raise NotImplementedError()
-
-    def visit_while(self, while_stmt: While):
-        raise NotImplementedError()
-
-    def visit_until(self, until_stmt: Until):
-        raise NotImplementedError()
-
-    def visit_exit(self, exit_stmt: Exit):
-        raise NotImplementedError()
-
-    def visit_code_block(self, code_block: CodeBlock):
-        raise NotImplementedError()
-
-    def visit_return(self, return_stmt: Return):
-        raise NotImplementedError()
-
-    def visit_dev_print(self, dev_print: DevPrint):
-        raise NotImplementedError()
-
-    def visit_routine(self, routine: Routine):
-        raise NotImplementedError()
-
-    def visit_call(self, call: Call):
-        raise NotImplementedError()
-
-    def visit_call_stmt(self, call_stmt: CallStmt):
-        raise NotImplementedError()
-
-    def visit_numeric_const(self, numeric_const: NumericConst):
-        raise NotImplementedError()
-
-    def visit_init_opts(self, init_opts: InitOpts):
-        raise NotImplementedError()

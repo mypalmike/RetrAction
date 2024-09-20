@@ -378,7 +378,7 @@ class TypedPostfixExpression:
                     and item.addr_mode is not None
                     and item.address is not None
                 ):
-                    code_gen.emit_get_variable(
+                    code_gen.emit_load_variable(
                         item.item_t, item.scope, item.addr_mode, item.address
                     )
                 # if item.scope == TypedExpressionScope.GLOBAL:

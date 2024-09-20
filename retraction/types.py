@@ -9,6 +9,7 @@ class FundamentalType(Enum):
     CHAR_T = 1
     INT_T = 2
     CARD_T = 3
+    VOID_T = 4
 
     def size_bytes(self):
         if self == FundamentalType.BYTE_T:
@@ -17,8 +18,10 @@ class FundamentalType(Enum):
             return 1
         elif self == FundamentalType.INT_T:
             return 2
-        else:  # self == FundamentalType.CARD_T:
+        elif self == FundamentalType.CARD_T:
             return 2
+        else:
+            raise InternalError(f"Invalid size for {self}")
 
     def cast_priority(self):
         if self == FundamentalType.BYTE_T:
@@ -27,8 +30,10 @@ class FundamentalType(Enum):
             return 1
         elif self == FundamentalType.INT_T:
             return 2
-        else:  # self == FundamentalType.CARD_T:
+        elif self == FundamentalType.CARD_T:
             return 3
+        else:
+            raise InternalError(f"Invalid cast priority for {self}")
 
 
 class ComplexType:

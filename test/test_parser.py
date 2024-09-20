@@ -244,7 +244,7 @@ class ParserTestCase(unittest.TestCase):
                   Do([DevPrint(Var(i,FundamentalType.BYTE_T))],None)),
                 For(Var(i,FundamentalType.BYTE_T),Const(10),Const(20),Const(2),
                   Do([DevPrint(Var(i,FundamentalType.BYTE_T))],None)),
-                Return(None)],None,None)])])
+                Return(None)],None,FundamentalType.VOID_T)])])
             """,
         )
         self.assertEqual(parser.current_token().tok_type, TokenType.EOF)
@@ -313,7 +313,7 @@ class ParserTestCase(unittest.TestCase):
             VarDecl(someintarr,ArrayType(FundamentalType.INT_T,None),None),
             VarDecl(somebytearrinit,ArrayType(FundamentalType.BYTE_T,3),InitOpts([18,52,86],False)),
             VarDecl(somechararrinit,ArrayType(FundamentalType.CHAR_T,None),InitOpts([97,98,99],False)),
-            VarDecl(somechararrinit2,ArrayType(FundamentalType.CHAR_T,None),InitOpts([97,98,99],False))]
+            VarDecl(somechararrinit2,ArrayType(FundamentalType.CHAR_T,None),InitOpts([3,97,98,99],False))]
             """,
         )
         self.assertEqual(parser.current_token().tok_type, TokenType.EOF)
@@ -365,7 +365,7 @@ class ParserTestCase(unittest.TestCase):
             Program([Module(
             [VarDecl(somebyte,FundamentalType.BYTE_T,InitOpts([18],False))],
             [Routine(main,[],[],
-            [DevPrint(Var(somebyte,FundamentalType.BYTE_T)),Return(None)],None,None)])])
+            [DevPrint(Var(somebyte,FundamentalType.BYTE_T)),Return(None)],None,FundamentalType.VOID_T)])])
             """,
         )
         self.assertEqual(parser.current_token().tok_type, TokenType.EOF)
@@ -393,7 +393,7 @@ class ParserTestCase(unittest.TestCase):
               [VarDecl(localbyte,FundamentalType.BYTE_T,None)],
               [Assign(Var(globalbyte,FundamentalType.BYTE_T),Const(1)),
               Assign(Var(localbyte,FundamentalType.BYTE_T),Const(2)),
-              Return(None)],None,None)])])
+              Return(None)],None,FundamentalType.VOID_T)])])
             """,
         )
         self.assertEqual(parser.current_token().tok_type, TokenType.EOF)
@@ -422,16 +422,16 @@ class ParserTestCase(unittest.TestCase):
             str(tree),
             """
             Program([Module([],
-            [Routine(proc1,[],[],[DevPrint(Const(1)),Return(None)],None,None),
+            [Routine(proc1,[],[],[DevPrint(Const(1)),Return(None)],None,FundamentalType.VOID_T),
             Routine(proc2,
               [VarDecl(p2arg1,FundamentalType.BYTE_T,None),
               VarDecl(p2arg2,FundamentalType.BYTE_T,None),
               VarDecl(p2arg3,FundamentalType.INT_T,None)],
               [VarDecl(p2local,FundamentalType.CARD_T,None)],
-              [CallStmt(Call(proc1,[],None)),
-              DevPrint(Var(p2arg1,FundamentalType.BYTE_T))],None,None),
+              [CallStmt(Call(proc1,[],FundamentalType.VOID_T)),
+              DevPrint(Var(p2arg1,FundamentalType.BYTE_T))],None,FundamentalType.VOID_T),
             Routine(main,[],[],
-              [CallStmt(Call(proc2,[Const(6),Const(0),Const(0)],None)),Return(None)],None,None)])])
+              [CallStmt(Call(proc2,[Const(6),Const(0),Const(0)],FundamentalType.VOID_T)),Return(None)],None,FundamentalType.VOID_T)])])
             """,
         )
         self.assertEqual(parser.current_token().tok_type, TokenType.EOF)
@@ -460,7 +460,7 @@ class ParserTestCase(unittest.TestCase):
               [Return(BinaryExpr(Op.ADD,Var(f1arg,FundamentalType.BYTE_T),Const(1)))],None,FundamentalType.BYTE_T),
             Routine(main,[],[VarDecl(result,FundamentalType.BYTE_T,None)],
               [CallStmt(Call(func1,[Const(12)],FundamentalType.BYTE_T)),
-              DevPrint(Call(func1,[Const(24)],FundamentalType.BYTE_T)),Return(None)],None,None)])])
+              DevPrint(Call(func1,[Const(24)],FundamentalType.BYTE_T)),Return(None)],None,FundamentalType.VOID_T)])])
             """,
         )
         self.assertEqual(parser.current_token().tok_type, TokenType.EOF)
@@ -485,7 +485,7 @@ class ParserTestCase(unittest.TestCase):
             [VarDecl(somearr,ArrayType(FundamentalType.BYTE_T,3),InitOpts([18,52,86],False))],
             [Routine(main,[],[VarDecl(i,FundamentalType.BYTE_T,InitOpts([1],False))],
               [DevPrint(ArrayAccess(Var(somearr,ArrayType(FundamentalType.BYTE_T,3)),Var(i,FundamentalType.BYTE_T))),
-              Return(None)],None,None)])])
+              Return(None)],None,FundamentalType.VOID_T)])])
             """,
         )
         self.assertEqual(parser.current_token().tok_type, TokenType.EOF)
@@ -523,7 +523,7 @@ class ParserTestCase(unittest.TestCase):
                         BinaryExpr(Op.LSH,Var(a,FundamentalType.INT_T),Var(b,FundamentalType.INT_T)))),
                     Var(a,FundamentalType.INT_T)),
                   BinaryExpr(Op.RSH,Var(b,FundamentalType.INT_T),Const(7)))),
-              DevPrint(Var(c,FundamentalType.INT_T)),Return(None)],None,None)])])
+              DevPrint(Var(c,FundamentalType.INT_T)),Return(None)],None,FundamentalType.VOID_T)])])
             """,
         )
         self.assertEqual(parser.current_token().tok_type, TokenType.EOF)
@@ -576,7 +576,7 @@ class ParserTestCase(unittest.TestCase):
                     Var(a,FundamentalType.INT_T),
                     Var(b,FundamentalType.INT_T)))),
               [DevPrint(Const(1))])],
-              [DevPrint(Const(0))]),Return(None)],None,None)])])
+              [DevPrint(Const(0))]),Return(None)],None,FundamentalType.VOID_T)])])
             """,
         )
         self.assertEqual(parser.current_token().tok_type, TokenType.EOF)
@@ -595,7 +595,9 @@ class ParserTestCase(unittest.TestCase):
         self.assertEqualIgnoreWhitespace(
             str(tree),
             """
-            Program([Module([],[Routine(main,[],[],[CodeBlock([4660,22136,39612,57072]),Return(None)],None,None)])])
+            Program([Module([],
+            [Routine(main,[],[],
+              [CodeBlock([4660,22136,39612,57072]),Return(None)],None,FundamentalType.VOID_T)])])
             """,
         )
         self.assertEqual(parser.current_token().tok_type, TokenType.EOF)

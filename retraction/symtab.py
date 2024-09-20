@@ -4,6 +4,10 @@ import retraction.ast as ast
 from retraction.error import IdentifierError
 
 
+class Node:
+    pass
+
+
 class EntryType(Enum):
     VAR = auto()
     ROUTINE = auto()
@@ -15,11 +19,11 @@ class Entry:
         self,
         name: str,
         entry_type: EntryType,
-        ast_node: ast.Node | None = None,
+        node: Node | None = None,
     ):
         self.name = name
         self.entry_type = entry_type
-        self.ast_node = ast_node
+        self.node = node
 
 
 class SymTab:
@@ -31,11 +35,11 @@ class SymTab:
         self,
         name: str,
         entry_type: EntryType,
-        ast_node: ast.Node,
+        node: Node,
     ):
         if name in self.lookup:
             raise SyntaxError(f"Symbol {name} already exists in this scope")
-        self.lookup[name] = Entry(name, entry_type, ast_node)
+        self.lookup[name] = Entry(name, entry_type, node)
 
     def find(self, name: str) -> Entry:
         entry = self.lookup.get(name)

@@ -48,7 +48,9 @@ def token_type_to_fundamental_type(token_type: TokenType) -> FundamentalType:
         return FundamentalType.INT_T
     if token_type == TokenType.CARD:
         return FundamentalType.CARD_T
-    raise InternalError(f"Invalid token type {token_type}")
+    raise InternalError(
+        f"Invalid token type {token_type} when parsing fundamental type"
+    )
 
 
 class RoutineCategory(Enum):
@@ -75,7 +77,7 @@ class Parser:
         self.parsing_param_decl = False
         self.exits_to_patch: list[list[int]] = []  # Addresses of jumps to patch
         self.parsing_routine: RoutineCategory | None = None
-        self.routine_return_type: Type | None = None
+        self.routine_return_type: Type = FundamentalType.VOID_T
         self.typed_expression = None
         self.last_t: Type | None = None
 
@@ -483,7 +485,7 @@ class Parser:
         elif self.current_token().tok_type == TokenType.STRING_LITERAL:
             str_literal = self.current_token().value
             self.advance()
-            values = [ord(c) for c in str_literal]
+            values = [len(str_literal)] + [ord(c) for c in str_literal]
             return ast.InitOpts(values, False)
         addr = self.parse_addr()
         return ast.InitOpts([addr], True)
@@ -498,6 +500,9 @@ class Parser:
             if value is None:
                 raise SyntaxError("Expected constant value in array initialization")
             values.append(value)
+            # Commas may or may not separate values. Note: this allows trailing commas.
+            if self.current_token().tok_type == TokenType.OP_COMMA:
+                self.advance()
         return values
 
     def parse_record_type(self) -> RecordType | None:
@@ -583,14 +588,17 @@ class Parser:
         to the next routine on a 6502.
         The ".<addr>" appears to be a typo in the grammar. It should be "=<addr>".
         """
-        return_t = None
+        return_t: FundamentalType = FundamentalType.VOID_T
         if self.current_token().tok_type == TokenType.PROC:
             self.advance()
         elif (
             self.current_token().is_fund_type()
             and self.next_token().tok_type == TokenType.FUNC
         ):
-            return_t = self.parse_fund_type()
+            parsed_return_t = self.parse_fund_type()
+            if parsed_return_t is None:
+                raise SyntaxError("Expected return type in function declaration")
+            return_t = parsed_return_t
             self.consume(TokenType.FUNC)
         else:
             return None
@@ -601,7 +609,9 @@ class Parser:
             fixed_addr = self.parse_addr()
         try:
             self.parsing_routine = (
-                RoutineCategory.PROC if return_t is None else RoutineCategory.FUNC
+                RoutineCategory.PROC
+                if return_t == FundamentalType.VOID_T
+                else RoutineCategory.FUNC
             )
             # Push symbol table stack
             outer_symbol_table = self.symbol_table
@@ -781,7 +791,7 @@ class Parser:
             if symbol_table_entry.entry_type != EntryType.VAR:
                 return None
             # Get type of variable from decl
-            var_decl = cast(ast.VarDecl, symbol_table_entry.ast_node)
+            var_decl = cast(ast.VarDecl, symbol_table_entry.node)
             var_target = ast.Var(identifier, var_decl.var_t)
             if self.next_token().tok_type == TokenType.OP_EQ:
                 self.advance()
@@ -865,7 +875,7 @@ class Parser:
             raise SyntaxError("A function call may not be used as a parameter.")
         self.advance()  # routine name
         self.advance()  # (
-        routine = cast(ast.Routine, symbol_table_entry.ast_node)
+        routine = cast(ast.Routine, symbol_table_entry.node)
         params = self.parse_params(routine)
         self.consume(TokenType.OP_RPAREN)
         return ast.Call(identifier, params, routine.return_t)
@@ -1043,7 +1053,7 @@ class Parser:
             raise IdentifierError(f"Undefined identifier: {identifier}")
         if symbol_table_entry.entry_type != EntryType.VAR:
             raise IdentifierError(f"Expected variable identifier: {identifier}")
-        var_decl = cast(ast.VarDecl, symbol_table_entry.ast_node)
+        var_decl = cast(ast.VarDecl, symbol_table_entry.node)
         var_target = ast.Var(identifier, var_decl.var_t)
         return ast.For(var_target, start_expr, finish_expr, inc_expr, do_loop)
 
@@ -1205,7 +1215,7 @@ class Parser:
             if self.current_token().tok_type == TokenType.OP_CARET:
                 is_pointer = True
                 self.advance()
-            var_decl = cast(ast.VarDecl, symbol_table_entry.ast_node)
+            var_decl = cast(ast.VarDecl, symbol_table_entry.node)
             var_node = ast.Var(identifier, var_decl.var_t)
             if is_pointer:
                 if not isinstance(var_decl.var_t, PointerType):

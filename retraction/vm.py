@@ -306,12 +306,12 @@
 #             elif op == ByteCodeOp.JUMP:
 #                 jump_addr = self.memory[self.pc + 1]
 #                 self.pc = jump_addr
-#             elif op == ByteCodeOp.GET_VARIABLE:
+#             elif op == ByteCodeOp.LOAD_VARIABLE:
 #                 value_t = Type(self.memory[self.pc + 1])
 #                 scope = ByteCodeVariableScope(self.memory[self.pc + 2])
 #                 address_mode = ByteCodeVariableAddressMode(self.memory[self.pc + 3])
 #                 address = self.read_card(self.pc + 4)
-#                 print(f"GET_VARIABLE: {value_t}, {scope}, {address_mode}, {address}")
+#                 print(f"LOAD_VARIABLE: {value_t}, {scope}, {address_mode}, {address}")
 #                 # Adjust address based on scope
 #                 if scope == ByteCodeVariableScope.LOCAL:
 #                     # Skip return address and calling frame pointer
