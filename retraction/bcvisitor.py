@@ -14,6 +14,9 @@ class BCWalk:
 
         self.symbol_table: symtab.SymTab | None = None
         self.current_routine: ast.Routine | None = None
+        self.next_param_addr: int | None = None
+        self.next_local_addr: int | None = None
+        self.local_parameter_index: int = 0
 
     @singledispatchmethod
     def walk(self, node: ast.Node):
@@ -55,7 +58,7 @@ class BCWalk:
                 elif length is None and init_opts is None:
                     # Legal but unusual for a global, array is declared with no
                     # length and no initial values. Just get the address.
-                    addr = self.codegen.emit_bytes([])
+                    addr = self.codegen.get_next_addr()
                 else:
                     values = []
                     if length is not None:
@@ -93,19 +96,57 @@ class BCWalk:
                 else:
                     raise InternalError(f"Unsupported variable type {var_decl.var_t}")
             var_decl.addr = addr
-            # addr = self.codegen.emit_global_data(var_decl)
-            # var_decl.addr = addr
+        elif self.next_param_addr is not None:
+            # Assign an offset address to the parameter.
+            var_decl.addr = self.next_param_addr
+            size_bytes = 0
+            if isinstance(var_decl.var_t, FundamentalType):
+                size_bytes = var_decl.var_t.size_bytes()
+            elif isinstance(var_decl.var_t, PointerType):
+                size_bytes = 2
+            elif isinstance(var_decl.var_t, ArrayType):
+                # TODO: Arrays are passed as pointers?
+                size_bytes = 2
+            elif isinstance(var_decl.var_t, RecordType):
+                raise InternalError("RecordType not supported for parameters")
+            self.next_param_addr -= size_bytes
+        elif self.next_local_addr is not None:
+            # Assign an offset address to the local variable.
+            var_decl.addr = self.next_local_addr
+            self.next_local_addr += var_decl.var_t.size_bytes()
+
+            # Local var initialization is emitted as instructions
+            if var_decl.init_opts is not None:
+                self.codegen.emit_numerical_constant(
+                    var_decl.init_opts.initial_values[self.local_parameter_index]
+                )
+                self.codegen.emit_store_variable(
+                    var_decl.var_t,
+                    ByteCodeVariableScope.LOCAL,
+                    ByteCodeVariableAddressMode.DEFAULT,
+                    var_decl.addr,
+                )
 
     @walk.register
     def _(self, routine: ast.Routine):
         self.current_routine = routine
         routine.addr = self.codegen.get_next_addr()
-        # TODO: Probably no need to visit params and local decls? The routine call makes use of these through the symbol table
-        # for param in routine.params:
-        #     param.accept(self)
-        # if routine.decls is not None:
-        #     for decl in routine.decls:
-        #         decl.accept(self)
+        # Reverse the parameter list
+        if routine.params is not None:
+            try:
+                self.next_param_addr = -6  # initial offset from frame pointer
+                for param in reversed(routine.params):
+                    self.walk(param)
+            finally:
+                self.next_param_addr = None
+        if routine.decls is not None:
+            try:
+                self.next_local_addr = 0
+                self.local_parameter_index = 0
+                for decl in routine.decls:
+                    self.walk(decl)
+            finally:
+                self.next_local_addr = None
         if routine.statements is not None:
             for statement in routine.statements:
                 self.walk(statement)

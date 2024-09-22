@@ -32,7 +32,7 @@
 
 
 # # Action! does not use a stack for parameters, locals, and return addresses,
-# # as an optimization for the 6502. But we do use a stack for this VM.
+# # as a speed optimization for the 6502. But we do use a stack for this VM.
 # #
 # # Stack layout: Stack grows upwards
 # # +----------------------------------------------------------+
@@ -42,7 +42,7 @@
 # # + frame pointer -->        local variables   (per routine) +
 # # +                          calling frame ptr (2 bytes)     +
 # # +                          return address    (2 bytes)     +
-# # +                          parameters size   (2 bytes)     +
+# # +                          XXX parameters size   (2 bytes) + (no we are going to reverse the params so we don't need this)
 # # +                          parameters        (per routine) +
 # # +----------------------------------------------------------+
 # # + CALLING ROUTINE                                          +
@@ -57,6 +57,7 @@
 # # +----------------------------------------------------------+
 
 # # This is fairly typical of frame-pointer based stack management.
+# # XXX (ignore below about paramters size I think)
 # # However, the "parameters size" is needed here because the parameters are
 # # pushed onto the stack in the order they are declared, and the called routine
 # # references them by offset in the same order. So the parameters

@@ -1,17 +1,22 @@
 from enum import Enum, auto
-from typing import cast
+from typing import Literal, cast
 
 from retraction.error import InternalError
 
 
-class FundamentalType(Enum):
+class SizeBytes:
+    def size_bytes(self) -> int:
+        raise NotImplementedError
+
+
+class FundamentalType(SizeBytes, Enum):
     BYTE_T = 0
     CHAR_T = 1
     INT_T = 2
     CARD_T = 3
     VOID_T = 4
 
-    def size_bytes(self):
+    def size_bytes(self) -> int:
         if self == FundamentalType.BYTE_T:
             return 1
         elif self == FundamentalType.CHAR_T:
@@ -36,7 +41,7 @@ class FundamentalType(Enum):
             raise InternalError(f"Invalid cast priority for {self}")
 
 
-class ComplexType:
+class ComplexType(SizeBytes):
     pass
 
 
@@ -79,6 +84,9 @@ class PointerType(ComplexType):
     def __repr__(self) -> str:
         return f"PointerType({self.reference_type})"
 
+    def size_bytes(self):
+        return 2
+
 
 class ArrayType(ComplexType):
     def __init__(self, element_type: FundamentalType, length: int | None):
@@ -92,6 +100,9 @@ class ArrayType(ComplexType):
 
     def __repr__(self) -> str:
         return f"ArrayType({self.element_t}, {self.length})"
+
+    def size_bytes(self):
+        return self.element_t.size_bytes() * self.length
 
 
 type Type = FundamentalType | ComplexType
