@@ -72,7 +72,9 @@ class ByteCodeGen:
         else:
             raise ValueError(f"Invalid value type {value_t}")
 
-    def emit_routine_call(self, return_t: FundamentalType, params_size: int, locals_size: int, addr: int):
+    def emit_routine_call(
+        self, return_t: FundamentalType, params_size: int, locals_size: int, addr: int
+    ):
         """
         Routine call bytecode:
             ROUTINE_CALL - 1 byte
@@ -96,7 +98,9 @@ class ByteCodeGen:
         self.append_byte(ByteCodeOp.RETURN.value)
         self.append_byte(return_t.value)
 
-    def emit_binary_op(self, op: ByteCodeOp, operand1_t: FundamentalType, operand2_t: FundamentalType):
+    def emit_binary_op(
+        self, op: ByteCodeOp, operand1_t: FundamentalType, operand2_t: FundamentalType
+    ):
         """
         Binary operation bytecode:
             OP         - 1 byte
@@ -149,7 +153,7 @@ class ByteCodeGen:
         self.append_byte(ByteCodeOp.POP.value)
         self.append_byte(operand_t.value)
 
-    def emit_numerical_constant(self, const_index):
+    def emit_numerical_constant(self, const_t: FundamentalType, value: int):
         """
         Constant bytecode:
             NUMERICAL_CONSTANT - 1 byte
@@ -157,16 +161,15 @@ class ByteCodeGen:
             VALUE              - 1 or 2 bytes
         """
         self.append_byte(ByteCodeOp.NUMERICAL_CONSTANT.value)
-        constant_value = self.symbol_table.numerical_constants[const_index]
-        if constant_value < 256:
-            self.append_byte(Type.BYTE_T.value)
-            self.append_byte(constant_value)
-        elif constant_value > -32768 and constant_value < 32768:
-            self.append_byte(Type.INT_T.value)
-            self.append_short(constant_value)
+        if value < 256:
+            self.append_byte(FundamentalType.BYTE_T.value)
+            self.append_byte(value)
+        elif value > -32768 and value < 32768:
+            self.append_byte(FundamentalType.INT_T.value)
+            self.append_short(value)
         else:
-            self.append_byte(Type.CARD_T.value)
-            self.append_short(constant_value)
+            self.append_byte(FundamentalType.CARD_T.value)
+            self.append_short(value)
 
     def emit_local_data(self, local_index: int) -> int:
         """
@@ -186,7 +189,7 @@ class ByteCodeGen:
         for val in data:
             self.append_byte(val)
         return addr
-    
+
     def emit_shorts(self, data: list[int]) -> int:
         """
         This places raw cards in the code stream, and returns the address of the beginning of the data.
@@ -209,7 +212,7 @@ class ByteCodeGen:
         for char in string:
             self.append_byte(ord(char))
         return addr
-    
+
     # def emit_global_data(self, var_decl: ast.VarDecl) -> int:
     #     """
     #     This places raw data in the code stream, and returns the address of the beginning of the data.

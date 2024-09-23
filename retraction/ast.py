@@ -328,6 +328,16 @@ class Routine(Node):
     def __repr__(self) -> str:
         return f"Routine({self.name}, {self.params}, {self.decls}, {self.statements}, {self.fixed_addr}, {self.return_t})"
 
+    @property
+    def locals_size(self) -> int:
+        if self.decls is None:
+            return 0
+        decl_size = 0
+        for decl in self.decls:
+            if isinstance(decl, VarDecl):
+                decl_size += decl.var_t.size_bytes()
+        return decl_size
+
 
 class Call(Expr):
     def __init__(self, name: str, args: list[Expr], return_t: FundamentalType):
@@ -353,14 +363,14 @@ class CallStmt(Statement):
         return f"CallStmt({self.call})"
 
 
-class NumericConst(Expr):
+class NumericalConst(Expr):
     def __init__(self, value: int):
         self.value = value
 
-        if value < 0 or value < 0x8000:
-            self.expr_t = FundamentalType.INT_T
-        elif value < 256:
+        if value >= 0 and value < 256:
             self.expr_t = FundamentalType.BYTE_T
+        elif value < 0 or value < 0x8000:
+            self.expr_t = FundamentalType.INT_T
         else:
             self.expr_t = FundamentalType.CARD_T
 

@@ -181,3 +181,49 @@ class BCWalk:
 
         else:
             raise InternalError("Unsupported assignment target")
+
+    @walk.register
+    def _(self, numerical_const: ast.NumericalConst):
+        self.codegen.emit_numerical_constant(
+            numerical_const.expr_t, numerical_const.value
+        )
+
+    @walk.register
+    def _(self, return_node: ast.Return):
+        if return_node.expr is not None:
+            self.walk(return_node.expr)
+            self.codegen.emit_return(return_node.expr.fund_t)
+        else:
+            self.codegen.emit_return(FundamentalType.VOID_T)
+
+    @walk.register
+    def _(self, call_stmt: ast.CallStmt):
+        # This is a wrapper around the expression call.
+        # TODO: Maybe pop the return value?
+        self.walk(call_stmt.call)
+
+    @walk.register
+    def _(self, call_expr: ast.Call):
+        # Walk the args in reverse order
+        if call_expr.args is not None:
+            for arg in reversed(call_expr.args):
+                self.walk(arg)
+        routine_name = call_expr.name
+        routine_entry = self.symbol_table.find(routine_name)
+        if routine_entry is None:
+            raise InternalError(f"Routine {routine_name} not found")
+        routine = routine_entry.node
+        if not isinstance(routine, ast.Routine):
+            raise InternalError(f"Routine {routine_name} not found")
+        addr = routine.addr
+        params_size = 0  # TODO: Get rid of this, no longer needed
+        locals_size = routine.locals_size
+
+        # Emit the call
+        self.codegen.emit_routine_call(call_expr.fund_t, params_size, locals_size, addr)
+
+    @walk.register
+    def _(self, devprint: ast.DevPrint):
+        expr = devprint.expr
+        self.walk(expr)
+        self.codegen.emit_devprint(expr.fund_t)

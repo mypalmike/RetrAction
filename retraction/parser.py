@@ -902,7 +902,7 @@ class Parser:
                     f"Too few parameters, expected {expected_param_count}, got {param_count}, filling in remainder with zeros"
                 )
                 while param_count < expected_param_count:
-                    param_exprs.append(ast.NumericConst(0))
+                    param_exprs.append(ast.NumericalConst(0))
                     param_count += 1
             elif self.current_token().tok_type == TokenType.OP_COMMA:
                 raise SyntaxError(
@@ -1043,7 +1043,7 @@ class Parser:
             self.advance()
             inc_expr = self.parse_arith_exp()
         else:
-            inc_expr = ast.NumericConst(1)
+            inc_expr = ast.NumericalConst(1)
         do_loop = self.parse_do_loop()
         if do_loop is None:
             raise SyntaxError("Expected DO loop after FOR")
@@ -1145,7 +1145,7 @@ class Parser:
         if value < -65535 or value > 65535:
             raise SyntaxError(f"Numeric literal {value} out of range [-65535, 65535]")
         self.advance()
-        return ast.NumericConst(value)
+        return ast.NumericalConst(value)
 
     def parse_grouping(self) -> ast.Expr:
         """
