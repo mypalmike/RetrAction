@@ -240,7 +240,7 @@ class ByteCodeGen:
     #             self.append_short(0)
     #     elif isinstance(var_decl.var_t, RecordType):
     #         record_t = cast(RecordType, var_decl.var_t)
-    #         for _ in range(record_t.size_bytes()):
+    #         for _ in range(record_t.size_bytes):
     #             self.append_byte(0)
     #     else:
     #         if init_opts is not None:

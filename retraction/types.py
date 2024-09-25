@@ -5,6 +5,7 @@ from retraction.error import InternalError
 
 
 class SizeBytes:
+    @property
     def size_bytes(self) -> int:
         raise NotImplementedError
 
@@ -16,6 +17,7 @@ class FundamentalType(SizeBytes, Enum):
     CARD_T = 3
     VOID_T = 4
 
+    @property
     def size_bytes(self) -> int:
         if self == FundamentalType.BYTE_T:
             return 1
@@ -68,8 +70,9 @@ class RecordType(ComplexType):
     def __repr__(self) -> str:
         return f"RecordType({self.name}, {self.fields})"
 
+    @property
     def size_bytes(self):
-        return sum(f[1].size_bytes() for f in self.fields)
+        return sum(f[1].size_bytes for f in self.fields)
 
 
 class PointerType(ComplexType):
@@ -84,6 +87,7 @@ class PointerType(ComplexType):
     def __repr__(self) -> str:
         return f"PointerType({self.reference_type})"
 
+    @property
     def size_bytes(self):
         return 2
 
@@ -101,8 +105,9 @@ class ArrayType(ComplexType):
     def __repr__(self) -> str:
         return f"ArrayType({self.element_t}, {self.length})"
 
+    @property
     def size_bytes(self):
-        return self.element_t.size_bytes() * self.length
+        return self.element_t.size_bytes * self.length
 
 
 type Type = FundamentalType | ComplexType

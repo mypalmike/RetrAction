@@ -335,7 +335,7 @@ class Routine(Node):
         decl_size = 0
         for decl in self.decls:
             if isinstance(decl, VarDecl):
-                decl_size += decl.var_t.size_bytes()
+                decl_size += decl.var_t.size_bytes
         return decl_size
 
 

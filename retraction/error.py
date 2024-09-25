@@ -3,6 +3,9 @@ class RetractionError(Exception):
         super().__init__()
         self.msg = msg
 
+    def __repr__(self) -> str:
+        return self.__class__.__name__ + "(" + repr(self.msg) + ")"
+
 
 class SyntaxError(RetractionError):
     def __init__(self, msg):

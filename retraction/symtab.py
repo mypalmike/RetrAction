@@ -1,7 +1,7 @@
 from enum import Enum, auto
 
 import retraction.ast as ast
-from retraction.error import IdentifierError
+from retraction.error import IdentifierError, InternalError
 
 
 class Node:
@@ -48,3 +48,11 @@ class SymTab:
                 return self.parent.find(name)
             raise IdentifierError(f"Identifier {name} not found")
         return entry
+
+    def get_last_routine(self) -> Entry:
+        for entry in reversed(self.lookup.values()):
+            if entry.entry_type == EntryType.ROUTINE:
+                return entry
+        # if self.parent is not None:
+        #     return self.parent.get_last_routine()
+        raise InternalError("No routine found in symbol table")

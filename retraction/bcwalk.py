@@ -20,7 +20,7 @@ class BCWalk:
 
     @singledispatchmethod
     def walk(self, node: ast.Node):
-        raise InternalError(f"Unsupported node type {type(node)}")
+        raise InternalError(f"Unsupported node type {node}")  # {type(node)}")
 
     @walk.register
     def _(self, program: ast.Program):
@@ -65,7 +65,7 @@ class BCWalk:
                         values = [0] * length
                     if init_opts is not None:
                         values = init_opts.initial_values
-                    size_bytes = element_t.size_bytes()
+                    size_bytes = element_t.size_bytes
                     if size_bytes == 1:
                         addr = self.codegen.emit_bytes(values)
                     elif size_bytes == 2:
@@ -82,13 +82,13 @@ class BCWalk:
             elif isinstance(var_decl.var_t, RecordType):
                 # Record types have no initial values, emit zeroes
                 record_t = cast(RecordType, var_decl.var_t)
-                addr = self.codegen.emit_bytes([0] * record_t.size_bytes())
+                addr = self.codegen.emit_bytes([0] * record_t.size_bytes)
             elif isinstance(var_decl.var_t, FundamentalType):
                 fund_t = cast(FundamentalType, var_decl.var_t)
                 values = [0]
                 if init_opts is not None:
                     values = init_opts.initial_values
-                size_bytes = fund_t.size_bytes()
+                size_bytes = fund_t.size_bytes
                 if size_bytes == 1:
                     addr = self.codegen.emit_bytes(values)
                 elif size_bytes == 2:
@@ -101,7 +101,7 @@ class BCWalk:
             var_decl.addr = self.next_param_addr
             size_bytes = 0
             if isinstance(var_decl.var_t, FundamentalType):
-                size_bytes = var_decl.var_t.size_bytes()
+                size_bytes = var_decl.var_t.size_bytes
             elif isinstance(var_decl.var_t, PointerType):
                 size_bytes = 2
             elif isinstance(var_decl.var_t, ArrayType):
@@ -113,7 +113,7 @@ class BCWalk:
         elif self.next_local_addr is not None:
             # Assign an offset address to the local variable.
             var_decl.addr = self.next_local_addr
-            self.next_local_addr += var_decl.var_t.size_bytes()
+            self.next_local_addr += var_decl.var_t.size_bytes
 
             # Local var initialization is emitted as instructions
             if var_decl.init_opts is not None:
