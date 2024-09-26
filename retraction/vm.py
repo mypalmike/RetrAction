@@ -455,6 +455,9 @@ class VirtualMachine:
                     return_value = self.pop(return_t)
                 # Pop locals
                 self.stack_ptr = self.frame_ptr
+                # Exit if stack is empty (caller is top-level vm)
+                if self.stack_ptr == START_STACK:
+                    break
                 # Pop frame pointer
                 self.frame_ptr = self.pop(FundamentalType.CARD_T)
                 # Pop return address
