@@ -1,3 +1,4 @@
+from binascii import hexlify
 from retraction.bytecode import (
     ByteCodeOp,
     ByteCodeVariableAddressMode,
@@ -318,7 +319,10 @@ class VirtualMachine:
             # TODO: Optimize by reading the instruction and then dispatching
             instr = self.memory[self.pc]
             op = ByteCodeOp(instr)
-            print(f"PC: {self.pc}, OP: {op}")
+            stack_str = hexlify(self.memory[self.frame_ptr : self.stack_ptr])
+            print(
+                f"PC: {self.pc}, OP: {op}, FP: {self.frame_ptr} SP: {self.stack_ptr}, STACK: {stack_str!r}"
+            )
             if op in BINARY_OPS:
                 op1_t, op2_t, op1, op2 = self.extract_binary_operands()
                 result, result_t = BINARY_OPS[op](op1, op2, op1_t, op2_t)
@@ -449,6 +453,8 @@ class VirtualMachine:
                 return_value = None
                 if return_t != FundamentalType.VOID_T:
                     return_value = self.pop(return_t)
+                # Pop locals
+                self.stack_ptr = self.frame_ptr
                 # Pop frame pointer
                 self.frame_ptr = self.pop(FundamentalType.CARD_T)
                 # Pop return address
