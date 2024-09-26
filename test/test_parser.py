@@ -356,7 +356,7 @@ class ParserTestCase(unittest.TestCase):
         parser = Parser(tokens, symbol_table)
         tree = parser.parse_program()
         self.maxDiff = None
-        symbol_table_entry = symbol_table.find("main")
+        symbol_table_entry, _ = symbol_table.find("main")
         self.assertEqual(symbol_table_entry.name, "main")
         self.assertEqual(symbol_table_entry.entry_type, EntryType.ROUTINE)
         self.assertEqualIgnoreWhitespace(

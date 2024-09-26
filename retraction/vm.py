@@ -385,6 +385,42 @@ class VirtualMachine:
                 self.pc += (
                     8 if address_mode == ByteCodeVariableAddressMode.OFFSET else 6
                 )
+            elif op == ByteCodeOp.STORE_VARIABLE:
+                value_t = FundamentalType(self.memory[self.pc + 1])
+                scope = ByteCodeVariableScope(self.memory[self.pc + 2])
+                address_mode = ByteCodeVariableAddressMode(self.memory[self.pc + 3])
+                address = self.read_card(self.pc + 4)
+                value = self.pop(value_t)
+                print(f"STORE_VARIABLE: {value_t}, {scope}, {address_mode}, {address}")
+                # Adjust address based on scope
+                if scope == ByteCodeVariableScope.LOCAL:
+                    # Skip return address and calling frame pointer
+                    address += self.frame_ptr
+                elif scope == ByteCodeVariableScope.PARAM:
+                    param_size = self.read_card(self.frame_ptr - 6)
+                    address += self.frame_ptr - 6 - param_size
+                # Store value at address based on address mode
+                if address_mode == ByteCodeVariableAddressMode.DEFAULT:
+                    if value_t.size_bytes == 2:
+                        self.write_card(address, value)
+                    else:
+                        self.write_byte(address, value)
+                elif address_mode == ByteCodeVariableAddressMode.POINTER:
+                    if value_t.size_bytes == 2:
+                        self.write_card(self.read_card(address), value)
+                    else:
+                        self.write_byte(self.read_card(address), value)
+                # elif address_mode == ByteCodeVariableAddressMode.REFERENCE:
+                #     self.write_card(address, value)
+                elif address_mode == ByteCodeVariableAddressMode.OFFSET:
+                    offset = self.read_card(self.pc + 6)
+                    if value_t.size_bytes == 2:
+                        self.write_card(address + offset, value)
+                    else:
+                        self.write_byte(address + offset, value)
+                self.pc += (
+                    8 if address_mode == ByteCodeVariableAddressMode.OFFSET else 6
+                )
             elif op == ByteCodeOp.PUSH_PARAM:
                 value_t = FundamentalType(self.memory[self.pc + 1])
                 # In theory, we pop this and then push it. But since the value is already on the

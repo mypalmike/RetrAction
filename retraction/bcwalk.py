@@ -129,28 +129,32 @@ class BCWalk:
 
     @walk.register
     def _(self, routine: ast.Routine):
-        self.current_routine = routine
-        routine.addr = self.codegen.get_next_addr()
-        # Reverse the parameter list
-        if routine.params is not None:
-            try:
-                self.next_param_addr = -6  # initial offset from frame pointer
-                for param in reversed(routine.params):
-                    self.walk(param)
-            finally:
-                self.next_param_addr = None
-        if routine.decls is not None:
-            try:
-                self.next_local_addr = 0
-                self.local_parameter_index = 0
-                for decl in routine.decls:
-                    self.walk(decl)
-            finally:
-                self.next_local_addr = None
-        if routine.statements is not None:
-            for statement in routine.statements:
-                self.walk(statement)
-        self.current_routine = None
+        try:
+            self.symbol_table = routine.local_symtab
+            self.current_routine = routine
+            routine.addr = self.codegen.get_next_addr()
+            # Reverse the parameter list
+            if routine.params is not None:
+                try:
+                    self.next_param_addr = -6  # initial offset from frame pointer
+                    for param in reversed(routine.params):
+                        self.walk(param)
+                finally:
+                    self.next_param_addr = None
+            if routine.decls is not None:
+                try:
+                    self.next_local_addr = 0
+                    self.local_parameter_index = 0
+                    for decl in routine.decls:
+                        self.walk(decl)
+                finally:
+                    self.next_local_addr = None
+            if routine.statements is not None:
+                for statement in routine.statements:
+                    self.walk(statement)
+            self.current_routine = None
+        finally:
+            self.symbol_table = self.symbol_table.parent
 
     @walk.register
     def _(self, assign: ast.Assign):
@@ -161,14 +165,21 @@ class BCWalk:
             var = cast(ast.Var, target)
             if self.symbol_table is None:
                 raise InternalError("Symbol table not set")
-            var_decl = cast(ast.VarDecl, self.symbol_table.find(var.name))
+            entry, depth = self.symbol_table.find(var.name)
+            var_decl = cast(ast.VarDecl, entry.node)
             if var_decl.addr is None:
                 raise InternalError("Address not found")
             if not isinstance(var_decl.var_t, FundamentalType):
                 raise InternalError("Default variable access should be FundamentalType")
+            scope = ByteCodeVariableScope.GLOBAL
+            if depth > 0:
+                if var_decl.addr < 0:
+                    scope = ByteCodeVariableScope.PARAM
+                else:
+                    scope = ByteCodeVariableScope.LOCAL
             self.codegen.emit_store_variable(
                 var_decl.var_t,
-                ByteCodeVariableScope.GLOBAL,  # TODO: Get scope based on var, probably needs to be stored during parse.
+                scope,
                 ByteCodeVariableAddressMode.DEFAULT,
                 var_decl.addr,
             )
@@ -192,14 +203,21 @@ class BCWalk:
     def _(self, var: ast.Var):
         if self.symbol_table is None:
             raise InternalError("Symbol table not set")
-        var_decl = cast(ast.VarDecl, self.symbol_table.find(var.name).node)
+        entry, depth = self.symbol_table.find(var.name)
+        var_decl = cast(ast.VarDecl, entry.node)
         if var_decl.addr is None:
             raise InternalError("Address not found")
         if not isinstance(var_decl.var_t, FundamentalType):
             raise InternalError("Default variable access should be FundamentalType")
+        scope = ByteCodeVariableScope.GLOBAL
+        if depth > 0:
+            if var_decl.addr < 0:
+                scope = ByteCodeVariableScope.PARAM
+            else:
+                scope = ByteCodeVariableScope.LOCAL
         self.codegen.emit_load_variable(
             var_decl.var_t,
-            ByteCodeVariableScope.GLOBAL,  # TODO: Get scope based on var, probably needs to be stored during parse.
+            scope,
             ByteCodeVariableAddressMode.DEFAULT,
             var_decl.addr,
         )
@@ -225,7 +243,7 @@ class BCWalk:
             for arg in reversed(call_expr.args):
                 self.walk(arg)
         routine_name = call_expr.name
-        routine_entry = self.symbol_table.find(routine_name)
+        routine_entry, _ = self.symbol_table.find(routine_name)
         if routine_entry is None:
             raise InternalError(f"Routine {routine_name} not found")
         routine = routine_entry.node

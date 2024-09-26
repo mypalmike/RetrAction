@@ -512,7 +512,7 @@ class Parser:
         if self.current_token().tok_type != TokenType.IDENTIFIER:
             return None
         identifier = self.current_token().value
-        symtab_entry = self.symbol_table.find(identifier)
+        symtab_entry, _ = self.symbol_table.find(identifier)
         if symtab_entry is None or symtab_entry.entry_type != EntryType.RECORD:
             return None
         self.advance()
@@ -530,7 +530,7 @@ class Parser:
             return None
         # Make sure it's a record.
         identifier = self.current_token().value
-        symtab_entry = self.symbol_table.find(identifier)
+        symtab_entry, _ = self.symbol_table.find(identifier)
         if symtab_entry is None or symtab_entry.entry_type != EntryType.RECORD:
             return None
         self.advance()
@@ -615,8 +615,8 @@ class Parser:
             )
             # Push symbol table stack
             outer_symbol_table = self.symbol_table
-            self.symbol_table = SymTab()
-            self.symbol_table.parent = outer_symbol_table
+            self.symbol_table = SymTab(outer_symbol_table)
+            # self.symbol_table.parent = outer_symbol_table
             self.consume(TokenType.OP_LPAREN)
             param_decls = self.parse_param_decls()
             self.consume(TokenType.OP_RPAREN)
@@ -784,7 +784,7 @@ class Parser:
         var_target: ast.Expr | None = None
         if self.current_token().tok_type == TokenType.IDENTIFIER:
             identifier = self.current_token().value
-            symbol_table_entry = self.symbol_table.find(identifier)
+            symbol_table_entry, _ = self.symbol_table.find(identifier)
             # Check symbol table to see if it's a variable
             if symbol_table_entry is None:
                 raise IdentifierError(f"Undefined identifier: {identifier}")
@@ -866,7 +866,7 @@ class Parser:
             return None
 
         identifier = self.current_token().value
-        symbol_table_entry = self.symbol_table.find(identifier)
+        symbol_table_entry, _ = self.symbol_table.find(identifier)
         if symbol_table_entry is None:
             raise IdentifierError(f"Undefined identifier: {identifier}")
         if symbol_table_entry.entry_type != EntryType.ROUTINE:
@@ -1048,7 +1048,7 @@ class Parser:
         if do_loop is None:
             raise SyntaxError("Expected DO loop after FOR")
         # Need the type of the identifier.
-        symbol_table_entry = self.symbol_table.find(identifier)
+        symbol_table_entry, _ = self.symbol_table.find(identifier)
         if symbol_table_entry is None:
             raise IdentifierError(f"Undefined identifier: {identifier}")
         if symbol_table_entry.entry_type != EntryType.VAR:
@@ -1207,7 +1207,7 @@ class Parser:
                 f"Expected identifier in expression: {self.current_token()}"
             )
         identifier = self.current_token().value
-        symbol_table_entry = self.symbol_table.find(identifier)
+        symbol_table_entry, _ = self.symbol_table.find(identifier)
         if symbol_table_entry is None:
             raise IdentifierError(f"Undefined identifier: {identifier}")
         elif symbol_table_entry.entry_type == EntryType.VAR:
