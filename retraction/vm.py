@@ -418,7 +418,7 @@ class VirtualMachine:
                 # Pop return address
                 self.pc = self.pop(FundamentalType.CARD_T)
                 # Pop params size
-                self.pop(FundamentalType.CARD_T)
+                self.pop(FundamentalType.CARD_T)  # TODO: Remove when not needed
                 # Push return value
                 if return_value is not None:
                     self.push(return_value, return_t)

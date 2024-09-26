@@ -189,6 +189,22 @@ class BCWalk:
         )
 
     @walk.register
+    def _(self, var: ast.Var):
+        if self.symbol_table is None:
+            raise InternalError("Symbol table not set")
+        var_decl = cast(ast.VarDecl, self.symbol_table.find(var.name).node)
+        if var_decl.addr is None:
+            raise InternalError("Address not found")
+        if not isinstance(var_decl.var_t, FundamentalType):
+            raise InternalError("Default variable access should be FundamentalType")
+        self.codegen.emit_load_variable(
+            var_decl.var_t,
+            ByteCodeVariableScope.GLOBAL,  # TODO: Get scope based on var, probably needs to be stored during parse.
+            ByteCodeVariableAddressMode.DEFAULT,
+            var_decl.addr,
+        )
+
+    @walk.register
     def _(self, return_node: ast.Return):
         if return_node.expr is not None:
             self.walk(return_node.expr)

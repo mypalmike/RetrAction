@@ -109,25 +109,25 @@ class Parser:
         """
         <program> ::= <program> MODULE <prog module> | {MODULE} <prog module>
         """
-        try:
-            modules: list[ast.Module] = []
-            # First MODULE is optional
-            if self.current_token().tok_type == TokenType.MODULE:
-                self.advance()
+        # try:
+        modules: list[ast.Module] = []
+        # First MODULE is optional
+        if self.current_token().tok_type == TokenType.MODULE:
+            self.advance()
+        modules.append(self.parse_prog_module())
+
+        while self.current_token().tok_type == TokenType.MODULE:
+            self.advance()
+            self.parsing_routine = None
             modules.append(self.parse_prog_module())
 
-            while self.current_token().tok_type == TokenType.MODULE:
-                self.advance()
-                self.parsing_routine = None
-                modules.append(self.parse_prog_module())
-
-            return ast.Program(modules, self.symbol_table)  # type: ignore
-        except SyntaxError as e:
-            self.error(e.msg)
-            raise e
-        except Exception as e:
-            self.error(str(e))
-            raise e
+        return ast.Program(modules, self.symbol_table)  # type: ignore
+        # except SyntaxError as e:
+        #     self.error(e.msg)
+        #     raise e
+        # except Exception as e:
+        #     self.error(str(e))
+        #     raise e
 
     def parse_prog_module(self) -> ast.Module:
         """
