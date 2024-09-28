@@ -196,3 +196,11 @@ Output:
 The cp1 declaration, without the brackets, appears to do what might be expected in other languages, which is to allocate space for a pointer and set that pointer to point to address 100 (which happens to contain the value 40082). The cp2 declaration appears to allocate a location for a CARD object and then create another space for a pointer to the first location, hence the @cp1, cp2, and @cp2 are addresses near each other, presumably allocated by the Action! compiler.
 
 For now, RetrAction only supports the former initialization.
+
+### The AND and OR operations
+
+The original Action! implementation treats AND and OR as aliases for their bitwise versions, & and % respectively. This approach is sound, but means that the second operand is always evaluated, even when it does not need to be. An important optimization of logical AND and OR in most languages is that they can shortcut if the first operand is sufficient to determine the value of the full expression. For instance, the evaluation of `a < b AND c < d` can avoid evaluating `c < d` in cases where `a < b` is false, because there's no way to make the whole expression true, regarless of the values of c and d. Similarly `a < b OR c < d` is always true if `a < b` is true, so there's no need to evaluate `c < d` in that case. Thus, these operands are typically implemented with jumps to skip over the evaluation of an unnecessary expression. This approach is used in RetrAction.
+
+Note: It's common in some languages for programmers to depend on this shortcircuiting behavior. In C, `if (px != NULL && *px == 3)` avoids a potentially bad pointer dereference that could cause a CPU exception on some platforms when the pointer is NULL because C guarantees that the second operand is never evaluated if the first operand is false.
+
+Note: In RetrAction, when numerical values are used as operands, the result of AND is either 0 or the second operand. The result of OR is either 0 or the first non-zero operand. This is significantly different from the original implementation.

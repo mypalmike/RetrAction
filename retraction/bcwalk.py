@@ -1,11 +1,37 @@
 from functools import singledispatchmethod
 from typing import cast
 from retraction import ast
-from retraction.bytecode import ByteCodeVariableAddressMode, ByteCodeVariableScope
+from retraction.bytecode import (
+    ByteCodeOp,
+    ByteCodeVariableAddressMode,
+    ByteCodeVariableScope,
+)
 from retraction.codegen import ByteCodeGen
 from retraction.error import InternalError
 from retraction.types import ArrayType, FundamentalType, PointerType, RecordType
 from retraction import symtab
+
+
+# Note: AND and OR are short-circuiting operators, so they are
+# not implemented as binary operators in the bytecode.
+OP_MAP: dict[ast.Op, ByteCodeOp] = {
+    ast.Op.ADD: ByteCodeOp.ADD,
+    ast.Op.SUB: ByteCodeOp.SUBTRACT,
+    ast.Op.MUL: ByteCodeOp.MULTIPLY,
+    ast.Op.DIV: ByteCodeOp.DIVIDE,
+    ast.Op.MOD: ByteCodeOp.MOD,
+    ast.Op.EQ: ByteCodeOp.EQ,
+    ast.Op.NE: ByteCodeOp.NE,
+    ast.Op.LT: ByteCodeOp.LT,
+    ast.Op.LE: ByteCodeOp.LE,
+    ast.Op.GT: ByteCodeOp.GT,
+    ast.Op.GE: ByteCodeOp.GE,
+    ast.Op.BIT_AND: ByteCodeOp.BIT_AND,
+    ast.Op.BIT_OR: ByteCodeOp.BIT_OR,
+    ast.Op.BIT_XOR: ByteCodeOp.BIT_XOR,
+    ast.Op.LSH: ByteCodeOp.LSH,
+    ast.Op.RSH: ByteCodeOp.RSH,
+}
 
 
 class BCWalk:
@@ -221,6 +247,34 @@ class BCWalk:
             ByteCodeVariableAddressMode.DEFAULT,
             var_decl.addr,
         )
+
+    @walk.register
+    def _(self, binary_expr: ast.BinaryExpr):
+        op = binary_expr.op
+        if op in OP_MAP:
+            self.walk(binary_expr.left)
+            self.walk(binary_expr.right)
+            bytecode_op = OP_MAP[op]
+            self.codegen.emit_binary_op(
+                bytecode_op, binary_expr.left.fund_t, binary_expr.right.fund_t
+            )
+        elif op == ast.Op.AND:
+            # Short-circuiting AND
+            self.walk(binary_expr.left)
+            jump_end = self.codegen.emit_jump_if_false(binary_expr.left.fund_t)
+            self.codegen.emit_pop(binary_expr.left.fund_t)
+            self.walk(binary_expr.right)
+            target_addr = self.codegen.get_next_addr()
+            self.codegen.fixup_jump(jump_end, target_addr)
+        elif op == ast.Op.OR:
+            # Short-circuiting OR
+            self.walk(binary_expr.left)
+            jump_else = self.codegen.emit_jump_if_false(binary_expr.left.fund_t)
+            jump_end = self.codegen.emit_jump()
+            self.codegen.fixup_jump(jump_else, self.codegen.get_next_addr())
+            self.codegen.emit_pop(binary_expr.left.fund_t)
+            self.walk(binary_expr.right)
+            self.codegen.fixup_jump(jump_end, self.codegen.get_next_addr())
 
     @walk.register
     def _(self, return_node: ast.Return):

@@ -104,10 +104,12 @@ class ByteCodeGen:
         """
         Binary operation bytecode:
             OP         - 1 byte
-            OPERAND_Ts - 1 byte
+            OPERAND1_T - 1 byte
+            OPERAND2_T - 1 byte
         """
         self.append_byte(op.value)
-        self.append_byte(operand1_t.value) << 2 | operand2_t.value
+        self.append_byte(operand1_t.value)
+        self.append_byte(operand2_t.value)
 
     def emit_unary_minus(self, operand_t: FundamentalType):
         """

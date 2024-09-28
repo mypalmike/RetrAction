@@ -301,6 +301,18 @@ class VirtualMachine:
             raise InternalError(f"Invalid size for type {t}")
         return value
 
+    def peek_stack(self, t: FundamentalType) -> int:
+        size_bytes = t.size_bytes
+        if self.stack_ptr - size_bytes < START_STACK:
+            raise InternalError("Stack underflow")
+        if size_bytes == 2:
+            value = self.read_card(self.stack_ptr - 2)
+        elif size_bytes == 1:
+            value = self.read_byte(self.stack_ptr - 1)
+        else:
+            raise InternalError(f"Invalid size for type {t}")
+        return value
+
     def extract_binary_operands(
         self,
     ) -> tuple[FundamentalType, FundamentalType, int, int]:
@@ -341,7 +353,8 @@ class VirtualMachine:
                 self.pc += 4 if constant_t.size_bytes == 2 else 3
             elif op == ByteCodeOp.JUMP_IF_FALSE:
                 operand_t = FundamentalType(self.memory[self.pc + 1])
-                operand = self.pop(operand_t)
+                # operand = self.pop(operand_t)
+                operand = self.peek_stack(operand_t)
                 if operand == 0:
                     jump_addr = self.read_card(self.pc + 2)
                     self.pc = jump_addr
