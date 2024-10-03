@@ -203,6 +203,9 @@ class BCWalk:
                     scope = ByteCodeVariableScope.PARAM
                 else:
                     scope = ByteCodeVariableScope.LOCAL
+            if expr.fund_t.size_bytes != var_decl.var_t.size_bytes:
+                # Emit a cast
+                self.codegen.emit_cast(expr.fund_t, var_decl.var_t)
             self.codegen.emit_store_variable(
                 var_decl.var_t,
                 scope,
@@ -261,6 +264,7 @@ class BCWalk:
         elif op == ast.Op.AND:
             # Short-circuiting AND
             self.walk(binary_expr.left)
+            self.codegen.emit_dup(binary_expr.left.fund_t)
             jump_end = self.codegen.emit_jump_if_false(binary_expr.left.fund_t)
             self.codegen.emit_pop(binary_expr.left.fund_t)
             self.walk(binary_expr.right)
@@ -269,12 +273,21 @@ class BCWalk:
         elif op == ast.Op.OR:
             # Short-circuiting OR
             self.walk(binary_expr.left)
+            self.codegen.emit_dup(binary_expr.left.fund_t)
             jump_else = self.codegen.emit_jump_if_false(binary_expr.left.fund_t)
             jump_end = self.codegen.emit_jump()
             self.codegen.fixup_jump(jump_else, self.codegen.get_next_addr())
             self.codegen.emit_pop(binary_expr.left.fund_t)
             self.walk(binary_expr.right)
             self.codegen.fixup_jump(jump_end, self.codegen.get_next_addr())
+
+    @walk.register
+    def _(self, unary_expr: ast.UnaryExpr):
+        self.walk(unary_expr.expr)
+        if unary_expr.op == ast.Op.SUB:
+            self.codegen.emit_unary_minus(unary_expr.expr.fund_t)
+        else:
+            raise InternalError(f"Unsupported unary operator {unary_expr.op}")
 
     @walk.register
     def _(self, return_node: ast.Return):
@@ -309,6 +322,25 @@ class BCWalk:
 
         # Emit the call
         self.codegen.emit_routine_call(call_expr.fund_t, params_size, locals_size, addr)
+
+    @walk.register
+    def _(self, if_stmt: ast.If):
+        jump_end_addrs: list[int] = []
+        for conditional in if_stmt.conditionals:
+            self.walk(conditional.condition)
+            jump_over_addr = self.codegen.emit_jump_if_false(
+                conditional.condition.fund_t
+            )
+            for statement in conditional.body:
+                self.walk(statement)
+            jump_end_addrs.append(self.codegen.emit_jump())
+            self.codegen.fixup_jump(jump_over_addr, self.codegen.get_next_addr())
+        if if_stmt.else_body is not None:
+            for statement in if_stmt.else_body:
+                self.walk(statement)
+        end_addr = self.codegen.get_next_addr()
+        for jump_end_addr in jump_end_addrs:
+            self.codegen.fixup_jump(jump_end_addr, end_addr)
 
     @walk.register
     def _(self, devprint: ast.DevPrint):

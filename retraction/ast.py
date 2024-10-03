@@ -42,6 +42,14 @@ class Node(symtab.Node):
     pass
 
 
+# class Sequence(Node):
+#     def __init__(self, nodes: list[Node]):
+#         self.nodes = nodes
+
+#     def __repr__(self) -> str:
+#         return f"Sequence({self.nodes})"
+
+
 class InitOpts(Node):
     def __init__(self, initial_values: list[int], is_address: bool):
         self.initial_values = initial_values

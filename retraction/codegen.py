@@ -146,6 +146,15 @@ class ByteCodeGen:
         self.append_short(addr)
         return curr_addr
 
+    def emit_dup(self, operand_t: FundamentalType):
+        """
+        Dup bytecode:
+            DUP - 1 byte
+            OPERAND_T - 1 byte
+        """
+        self.append_byte(ByteCodeOp.DUP.value)
+        self.append_byte(operand_t.value)
+
     def emit_pop(self, operand_t: FundamentalType):
         """
         Pop bytecode:
@@ -328,6 +337,17 @@ class ByteCodeGen:
 
     # def emit_zero(self):
     #     self.code.append(ByteCode(ByteCodeOp.ZERO))
+
+    def emit_cast(self, from_t: FundamentalType, to_t: FundamentalType):
+        """
+        Cast bytecode:
+            CAST - 1 byte
+            FROM_T - 1 byte
+            TO_T - 1 byte
+        """
+        self.append_byte(ByteCodeOp.CAST.value)
+        self.append_byte(from_t.value)
+        self.append_byte(to_t.value)
 
     def emit_devprint(self, operand_t: FundamentalType):
         """

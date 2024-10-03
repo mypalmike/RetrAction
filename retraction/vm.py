@@ -110,21 +110,24 @@ def subtract(
 def multiply(
     a: int, b: int, a_t: FundamentalType, b_t: FundamentalType
 ) -> tuple[int, FundamentalType]:
-    result_t = binary_op_result_type(a_t, b_t)
+    # Multiplication always results in an int
+    result_t = FundamentalType.INT_T
     return fit_to_type(a * b, result_t), result_t
 
 
 def divide(
     a: int, b: int, a_t: FundamentalType, b_t: FundamentalType
 ) -> tuple[int, FundamentalType]:
-    result_t = binary_op_result_type(a_t, b_t)
+    # Division always results in an int
+    result_t = FundamentalType.INT_T
     return fit_to_type(a // b, result_t), result_t
 
 
 def mod(
     a: int, b: int, a_t: FundamentalType, b_t: FundamentalType
 ) -> tuple[int, FundamentalType]:
-    result_t = binary_op_result_type(a_t, b_t)
+    # Modulo always results in an int
+    result_t = FundamentalType.INT_T
     return fit_to_type(a % b, result_t), result_t
 
 
@@ -274,7 +277,7 @@ class VirtualMachine:
         else:
             raise InternalError(f"Invalid size for type {t}")
 
-    def push(self, value: int, t: FundamentalType):
+    def push_stack(self, value: int, t: FundamentalType):
         size_bytes = t.size_bytes
         if self.stack_ptr + size_bytes > END_STACK + 1:
             raise InternalError("Stack overflow")
@@ -287,13 +290,17 @@ class VirtualMachine:
         else:
             raise InternalError(f"Invalid size for type {t}")
 
-    def pop(self, t: FundamentalType) -> int:
+    def pop_stack(self, t: FundamentalType) -> int:
         size_bytes = t.size_bytes
         if self.stack_ptr - size_bytes < START_STACK:
             raise InternalError("Stack underflow")
         if size_bytes == 2:
             self.stack_ptr -= 2
             value = self.read_card(self.stack_ptr)
+            # Treat as 16-bit signed int if type is INT_T
+            if t == FundamentalType.INT_T:
+                if value >= 0x8000:
+                    value -= 0x10000
         elif size_bytes == 1:
             self.stack_ptr -= 1
             value = self.read_byte(self.stack_ptr)
@@ -318,8 +325,8 @@ class VirtualMachine:
     ) -> tuple[FundamentalType, FundamentalType, int, int]:
         operand1_t = FundamentalType(self.memory[self.pc + 1])
         operand2_t = FundamentalType(self.memory[self.pc + 2])
-        operand2 = self.pop(operand2_t)
-        operand1 = self.pop(operand1_t)
+        operand2 = self.pop_stack(operand2_t)
+        operand1 = self.pop_stack(operand1_t)
         return operand1_t, operand2_t, operand1, operand2
 
     def run(self, entry_point: int | None = None):
@@ -338,23 +345,22 @@ class VirtualMachine:
             if op in BINARY_OPS:
                 op1_t, op2_t, op1, op2 = self.extract_binary_operands()
                 result, result_t = BINARY_OPS[op](op1, op2, op1_t, op2_t)
-                self.push(result, result_t)
+                self.push_stack(result, result_t)
                 self.pc += 3
             elif op == ByteCodeOp.UNARY_MINUS:
                 operand_t = FundamentalType(self.memory[self.pc + 1])
-                operand = self.pop(operand_t)
+                operand = self.pop_stack(operand_t)
                 result = -operand
-                self.push(result, operand_t)
+                self.push_stack(result, FundamentalType.INT_T)
                 self.pc += 2
             elif op == ByteCodeOp.NUMERICAL_CONSTANT:
                 constant_t = FundamentalType(self.memory[self.pc + 1])
                 const_value = self.read(constant_t, self.pc + 2)
-                self.push(const_value, constant_t)
+                self.push_stack(const_value, constant_t)
                 self.pc += 4 if constant_t.size_bytes == 2 else 3
             elif op == ByteCodeOp.JUMP_IF_FALSE:
                 operand_t = FundamentalType(self.memory[self.pc + 1])
-                # operand = self.pop(operand_t)
-                operand = self.peek_stack(operand_t)
+                operand = self.pop_stack(operand_t)
                 if operand == 0:
                     jump_addr = self.read_card(self.pc + 2)
                     self.pc = jump_addr
@@ -398,7 +404,7 @@ class VirtualMachine:
                         value = self.read_byte(address + offset)
                 if value is None:
                     raise InternalError("Invalid value")
-                self.push(value, value_t)
+                self.push_stack(value, value_t)
                 self.pc += (
                     8 if address_mode == ByteCodeVariableAddressMode.OFFSET else 6
                 )
@@ -407,7 +413,7 @@ class VirtualMachine:
                 scope = ByteCodeVariableScope(self.memory[self.pc + 2])
                 address_mode = ByteCodeVariableAddressMode(self.memory[self.pc + 3])
                 address = self.read_card(self.pc + 4)
-                value = self.pop(value_t)
+                value = self.pop_stack(value_t)
                 print(f"STORE_VARIABLE: {value_t}, {scope}, {address_mode}, {address}")
                 # Adjust address based on scope
                 if scope == ByteCodeVariableScope.LOCAL:
@@ -448,11 +454,11 @@ class VirtualMachine:
                 params_size = self.read_card(self.pc + 2)
                 locals_size = self.read_card(self.pc + 4)
                 routine_addr = self.read_card(self.pc + 6)
-                self.push(params_size, FundamentalType.CARD_T)
+                self.push_stack(params_size, FundamentalType.CARD_T)
                 # Push return address
-                self.push(self.pc + 8, FundamentalType.CARD_T)
+                self.push_stack(self.pc + 8, FundamentalType.CARD_T)
                 # Push frame pointer
-                self.push(self.frame_ptr, FundamentalType.CARD_T)
+                self.push_stack(self.frame_ptr, FundamentalType.CARD_T)
                 # Set new frame pointer to top of stack
                 self.frame_ptr = self.stack_ptr
                 # Advance stack pointer to work area
@@ -465,37 +471,44 @@ class VirtualMachine:
                 return_t = FundamentalType(self.memory[self.pc + 1])
                 return_value = None
                 if return_t != FundamentalType.VOID_T:
-                    return_value = self.pop(return_t)
+                    return_value = self.pop_stack(return_t)
                 # Pop locals
                 self.stack_ptr = self.frame_ptr
                 # Exit if stack is empty (caller is top-level vm)
                 if self.stack_ptr == START_STACK:
                     break
                 # Pop frame pointer
-                self.frame_ptr = self.pop(FundamentalType.CARD_T)
+                self.frame_ptr = self.pop_stack(FundamentalType.CARD_T)
                 # Pop return address
-                self.pc = self.pop(FundamentalType.CARD_T)
+                self.pc = self.pop_stack(FundamentalType.CARD_T)
                 # Pop params size
-                self.pop(FundamentalType.CARD_T)  # TODO: Remove when not needed
+                self.pop_stack(FundamentalType.CARD_T)  # TODO: Remove when not needed
                 # Push return value
                 if return_value is not None:
-                    self.push(return_value, return_t)
+                    self.push_stack(return_value, return_t)
             elif op == ByteCodeOp.CAST:
                 from_t = FundamentalType(self.memory[self.pc + 1])
                 to_t = FundamentalType(self.memory[self.pc + 2])
-                value = self.pop(from_t)
-                self.push(value, to_t)
+                value = self.pop_stack(from_t)
+                self.push_stack(value, to_t)
                 self.pc += 3
             elif op == ByteCodeOp.NOP:
                 self.pc += 1
+            elif op == ByteCodeOp.DUP:
+                value_t = FundamentalType(self.memory[self.pc + 1])
+                value = self.peek_stack(value_t)
+                self.push_stack(value, value_t)
+                self.pc += 2
             elif op == ByteCodeOp.POP:
                 pop_t = FundamentalType(self.memory[self.pc + 1])
-                self.pop(pop_t)
+                self.pop_stack(pop_t)
                 self.pc += 2
             elif op == ByteCodeOp.DEVPRINT:
                 value_t = FundamentalType(self.memory[self.pc + 1])
-                value = self.pop(value_t)
-                print(value)
+                value = self.pop_stack(value_t)
+                print(value, value_t)
                 self.pc += 2
+            elif op == ByteCodeOp.BREAK:
+                raise InternalError("BREAK instruction")
             else:
-                raise ValueError(f"Unknown instruction {op}")
+                raise InternalError(f"Unknown instruction {op}")
