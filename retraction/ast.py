@@ -346,6 +346,13 @@ class Routine(Node):
                 decl_size += decl.var_t.size_bytes
         return decl_size
 
+    @property
+    def params_size(self) -> int:
+        param_size = 0
+        for param in self.params:
+            param_size += param.var_t.size_bytes
+        return param_size
+
 
 class Call(Expr):
     def __init__(self, name: str, args: list[Expr], return_t: FundamentalType):

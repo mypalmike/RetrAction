@@ -30,9 +30,10 @@ class ByteCodeOp(Enum):
     STORE_VARIABLE = 25
     PUSH_PARAM = 26
     ROUTINE_CALL = 27
-    RETURN = 28
-    CAST = 29
-    NOP = 30
+    ROUTINE_POSTLUDE = 28
+    RETURN = 29
+    CAST = 30
+    NOP = 31
     # GET_GLOBAL = 24
     # GET_ADDR_GLOBAL = 25
     # GET_PTR_GLOBAL = 26

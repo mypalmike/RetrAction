@@ -43,15 +43,13 @@ END_ROM = 0xFFFF
 # + frame pointer -->        local variables   (per routine) +
 # +                          calling frame ptr (2 bytes)     +
 # +                          return address    (2 bytes)     +
-# +                          XXX parameters size   (2 bytes) + (no we are going to reverse the params so we don't need this)
 # +                          parameters        (per routine) +
 # +----------------------------------------------------------+
 # + CALLING ROUTINE                                          +
-# +                          work area for computation       +
+# +                          work area                       +
 # +                          local variables                 +
 # +                          calling frame ptr               +
 # +                          return address                  +
-# +                          parameters size                 +
 # +                          parameters                      +
 # +----------------------------------------------------------+
 # + (etc)                                                    +
@@ -338,9 +336,10 @@ class VirtualMachine:
             # TODO: Optimize by reading the instruction and then dispatching
             instr = self.memory[self.pc]
             op = ByteCodeOp(instr)
+            full_stack_str = hexlify(self.memory[START_STACK : self.stack_ptr])
             stack_str = hexlify(self.memory[self.frame_ptr : self.stack_ptr])
             print(
-                f"PC: {self.pc}, OP: {op}, FP: {self.frame_ptr} SP: {self.stack_ptr}, STACK: {stack_str!r}"
+                f"PC: {self.pc}, OP: {op}, FP: {self.frame_ptr} SP: {self.stack_ptr}, STACK: {stack_str!r}, FULL STACK: {full_stack_str!r}"
             )
             if op in BINARY_OPS:
                 op1_t, op2_t, op1, op2 = self.extract_binary_operands()
@@ -380,8 +379,12 @@ class VirtualMachine:
                     # Skip return address and calling frame pointer
                     address += self.frame_ptr
                 elif scope == ByteCodeVariableScope.PARAM:
-                    param_size = self.read_card(self.frame_ptr - 6)
-                    address += self.frame_ptr - 6 - param_size
+                    # param_size = self.read_card(self.frame_ptr - 6)
+                    # We read address in as a card, but it's a negative offset,
+                    # so we need the 17-bit one's complement
+                    address -= 0x10000
+                    print(f"PARAM: {address}")
+                    address += self.frame_ptr  # - 6 - param_size
                 # Get value from address based on address mode
                 value = None
                 if address_mode == ByteCodeVariableAddressMode.DEFAULT:
@@ -444,19 +447,17 @@ class VirtualMachine:
                 self.pc += (
                     8 if address_mode == ByteCodeVariableAddressMode.OFFSET else 6
                 )
-            elif op == ByteCodeOp.PUSH_PARAM:
-                value_t = FundamentalType(self.memory[self.pc + 1])
-                # In theory, we pop this and then push it. But since the value is already on the
-                # stack, we just count the size.
-                self.params_size += value_t.size_bytes
+            # elif op == ByteCodeOp.PUSH_PARAM:
+            #     value_t = FundamentalType(self.memory[self.pc + 1])
+            #     # In theory, we pop this and then push it. But since the value is already on the
+            #     # stack, we just count the size.
+            #     self.params_size += value_t.size_bytes
             elif op == ByteCodeOp.ROUTINE_CALL:
                 return_t = FundamentalType(self.memory[self.pc + 1])  # TODO: Unused?
-                params_size = self.read_card(self.pc + 2)
-                locals_size = self.read_card(self.pc + 4)
-                routine_addr = self.read_card(self.pc + 6)
-                self.push_stack(params_size, FundamentalType.CARD_T)
-                # Push return address
-                self.push_stack(self.pc + 8, FundamentalType.CARD_T)
+                locals_size = self.read_card(self.pc + 2)
+                routine_addr = self.read_card(self.pc + 4)
+                # Push return address (operation after routine call)
+                self.push_stack(self.pc + 6, FundamentalType.CARD_T)
                 # Push frame pointer
                 self.push_stack(self.frame_ptr, FundamentalType.CARD_T)
                 # Set new frame pointer to top of stack
@@ -465,6 +466,20 @@ class VirtualMachine:
                 self.stack_ptr += locals_size
                 # Jump to routine
                 self.pc = routine_addr
+            elif op == ByteCodeOp.ROUTINE_POSTLUDE:
+                # Caller gets the return value, cleans up parameters, and leaves
+                # the return value on the stack
+                return_t = FundamentalType(self.memory[self.pc + 1])
+                n_bytes = self.read_card(self.pc + 2)
+                # Pop return value, if any
+                if return_t != FundamentalType.VOID_T:
+                    return_value = self.pop_stack(return_t)
+                # Restore stack pointer to where it was before the parameters were pushed
+                self.stack_ptr -= n_bytes
+                # Push return value
+                if return_t != FundamentalType.VOID_T:
+                    self.push_stack(return_value, return_t)
+                self.pc += 4
             elif op == ByteCodeOp.RETURN:
                 # TODO: Make sure to add a cast in the parser to ensure that the actual return type
                 # matches the routine's declared return type
@@ -481,8 +496,7 @@ class VirtualMachine:
                 self.frame_ptr = self.pop_stack(FundamentalType.CARD_T)
                 # Pop return address
                 self.pc = self.pop_stack(FundamentalType.CARD_T)
-                # Pop params size
-                self.pop_stack(FundamentalType.CARD_T)  # TODO: Remove when not needed
+
                 # Push return value
                 if return_value is not None:
                     self.push_stack(return_value, return_t)

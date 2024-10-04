@@ -12,6 +12,8 @@ from retraction.types import ArrayType, FundamentalType, PointerType, RecordType
 from retraction import symtab
 
 
+PARAMS_OFFSET = -4
+
 # Note: AND and OR are short-circuiting operators, so they are
 # not implemented as binary operators in the bytecode.
 OP_MAP: dict[ast.Op, ByteCodeOp] = {
@@ -42,7 +44,7 @@ class BCWalk:
         self.current_routine: ast.Routine | None = None
         self.next_param_addr: int | None = None
         self.next_local_addr: int | None = None
-        self.local_parameter_index: int = 0
+        self.local_param_index: int = 0
 
     @singledispatchmethod
     def walk(self, node: ast.Node):
@@ -124,7 +126,6 @@ class BCWalk:
             var_decl.addr = addr
         elif self.next_param_addr is not None:
             # Assign an offset address to the parameter.
-            var_decl.addr = self.next_param_addr
             size_bytes = 0
             if isinstance(var_decl.var_t, FundamentalType):
                 size_bytes = var_decl.var_t.size_bytes
@@ -135,7 +136,8 @@ class BCWalk:
                 size_bytes = 2
             elif isinstance(var_decl.var_t, RecordType):
                 raise InternalError("RecordType not supported for parameters")
-            self.next_param_addr -= size_bytes
+            var_decl.addr = self.next_param_addr - size_bytes
+            self.next_param_addr = var_decl.addr
         elif self.next_local_addr is not None:
             # Assign an offset address to the local variable.
             var_decl.addr = self.next_local_addr
@@ -144,7 +146,7 @@ class BCWalk:
             # Local var initialization is emitted as instructions
             if var_decl.init_opts is not None:
                 self.codegen.emit_numerical_constant(
-                    var_decl.init_opts.initial_values[self.local_parameter_index]
+                    var_decl.init_opts.initial_values[self.local_param_index]
                 )
                 self.codegen.emit_store_variable(
                     var_decl.var_t,
@@ -162,7 +164,8 @@ class BCWalk:
             # Reverse the parameter list
             if routine.params is not None:
                 try:
-                    self.next_param_addr = -6  # initial offset from frame pointer
+                    # initial negative offset from frame pointer
+                    self.next_param_addr = PARAMS_OFFSET
                     for param in reversed(routine.params):
                         self.walk(param)
                 finally:
@@ -170,7 +173,7 @@ class BCWalk:
             if routine.decls is not None:
                 try:
                     self.next_local_addr = 0
-                    self.local_parameter_index = 0
+                    self.local_param_index = 0
                     for decl in routine.decls:
                         self.walk(decl)
                 finally:
@@ -313,15 +316,16 @@ class BCWalk:
         routine_entry, _ = self.symbol_table.find(routine_name)
         if routine_entry is None:
             raise InternalError(f"Routine {routine_name} not found")
-        routine = routine_entry.node
+        routine = cast(ast.Routine, routine_entry.node)
         if not isinstance(routine, ast.Routine):
             raise InternalError(f"Routine {routine_name} not found")
         addr = routine.addr
-        params_size = 0  # TODO: Get rid of this, no longer needed
         locals_size = routine.locals_size
+        params_size = routine.params_size
 
         # Emit the call
-        self.codegen.emit_routine_call(call_expr.fund_t, params_size, locals_size, addr)
+        self.codegen.emit_routine_call(call_expr.fund_t, locals_size, addr)
+        self.codegen.emit_routine_postlude(routine.return_t, params_size)
 
     @walk.register
     def _(self, if_stmt: ast.If):

@@ -72,22 +72,29 @@ class ByteCodeGen:
         else:
             raise ValueError(f"Invalid value type {value_t}")
 
-    def emit_routine_call(
-        self, return_t: FundamentalType, params_size: int, locals_size: int, addr: int
-    ):
+    def emit_routine_call(self, return_t: FundamentalType, locals_size: int, addr: int):
         """
         Routine call bytecode:
             ROUTINE_CALL - 1 byte
             TYPE         - 1 byte
-            PARAMS SIZE  - 2 bytes
             LOCALS SIZE  - 2 bytes
             ROUTINE ADDR - 2 bytes
         """
         self.append_byte(ByteCodeOp.ROUTINE_CALL.value)
         self.append_byte(return_t.value)
-        self.append_short(params_size)
         self.append_short(locals_size)
         self.append_short(addr)
+
+    def emit_routine_postlude(self, return_t: FundamentalType, param_bytes: int):
+        """
+        Routine postlude bytecode:
+            ROUTINE_POSTLUDE - 1 byte
+            RETURN TYPE      - 1 byte
+            PARAM BYTES      - 2 byte
+        """
+        self.append_byte(ByteCodeOp.ROUTINE_POSTLUDE.value)
+        self.append_byte(return_t.value)
+        self.append_short(param_bytes)
 
     def emit_return(self, return_t: FundamentalType):
         """
