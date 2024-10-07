@@ -308,10 +308,8 @@ class BCWalk:
 
     @walk.register
     def _(self, call_expr: ast.Call):
-        # Walk the args in reverse order
-        if call_expr.args is not None:
-            for arg in reversed(call_expr.args):
-                self.walk(arg)
+        if self.symbol_table is None:
+            raise InternalError("Symbol table not set")
         routine_name = call_expr.name
         routine_entry, _ = self.symbol_table.find(routine_name)
         if routine_entry is None:
@@ -322,6 +320,22 @@ class BCWalk:
         addr = routine.addr
         locals_size = routine.locals_size
         params_size = routine.params_size
+
+        # Walk the args in reverse order
+        if call_expr.args is not None:
+            for i in range(len(call_expr.args) - 1, -1, -1):
+                arg = call_expr.args[i]
+                self.walk(arg)
+                param_t = routine.params[i].var_t
+                param_fund_t = FundamentalType.BYTE_T
+                if isinstance(param_t, FundamentalType):
+                    param_fund_t = param_t
+                else:
+                    param_fund_t = FundamentalType.CARD_T
+                arg_t = arg.fund_t
+                # If the argument type is not the same as the parameter type, emit a cast
+                if param_t.size_bytes != arg_t.size_bytes:
+                    self.codegen.emit_cast(arg_t, param_fund_t)
 
         # Emit the call
         self.codegen.emit_routine_call(call_expr.fund_t, locals_size, addr)
