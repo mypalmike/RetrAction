@@ -24,8 +24,6 @@ START_RESERVED = 0x0000
 END_RESERVED = 0x07FF
 START_STACK = 0x0800
 END_STACK = 0x1FFF
-# START_PARAMS = 0x1C00
-# END_PARAMS = 0x1FFF
 START_PROGRAM = 0x2000
 END_PROGRAM = 0xBFFF
 START_ROM = 0xC000
@@ -241,7 +239,6 @@ class VirtualMachine:
         self.stack_ptr = START_STACK
         self.memory[self.initial_pc : self.initial_pc + len(code)] = code
         self.frame_ptr = START_STACK
-        self.params_size = 0
         # TODO : Maybe define VM to start at address near end of memory, or maybe at start of ROM space
         # For now, start at Program Space. Still, this will require jumping to the start of the program,
         # which is the beginning of the last defined routine.
@@ -250,7 +247,6 @@ class VirtualMachine:
         return self.memory[address]
 
     def write_byte(self, address: int, value: int):
-        # TODO: May be unnecessary eventually, but ensure value is positive
         if value < 0:
             value = value % 0x100
         self.memory[address] = value
@@ -261,7 +257,6 @@ class VirtualMachine:
 
     def write_card(self, address: int, value: int):
         # Little-endian
-        # TODO: May be unnecessary eventually, but ensure value is positive
         if value < 0:
             value = value % 0x10000
         self.memory[address] = value & 0xFF
@@ -447,11 +442,6 @@ class VirtualMachine:
                 self.pc += (
                     8 if address_mode == ByteCodeVariableAddressMode.OFFSET else 6
                 )
-            # elif op == ByteCodeOp.PUSH_PARAM:
-            #     value_t = FundamentalType(self.memory[self.pc + 1])
-            #     # In theory, we pop this and then push it. But since the value is already on the
-            #     # stack, we just count the size.
-            #     self.params_size += value_t.size_bytes
             elif op == ByteCodeOp.ROUTINE_CALL:
                 return_t = FundamentalType(self.memory[self.pc + 1])  # TODO: Unused?
                 locals_size = self.read_card(self.pc + 2)

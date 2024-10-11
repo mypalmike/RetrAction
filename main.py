@@ -29,15 +29,12 @@ def main():
         symbol_table = SymTab()
         codegen = ByteCodeGen(symbol_table)
         parser = Parser(tokens, symbol_table)
-        # parser.parse_dev()
         tree = parser.parse_program()
         bc_walk = BCWalk(codegen)
         bc_walk.walk(tree)
         print(hexlify(codegen.code, "-", -2))
         vm = VirtualMachine(codegen.code, symbol_table)
-        last_routine_entry = symbol_table.get_last_routine()
-        routine_node = cast(Routine, last_routine_entry.node)
-        entry_point = routine_node.addr
+        entry_point = 0
         vm.run(entry_point)
     except Exception as e:
         print(e)

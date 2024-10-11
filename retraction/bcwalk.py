@@ -53,8 +53,24 @@ class BCWalk:
     @walk.register
     def _(self, program: ast.Program):
         self.symbol_table = program.symbol_table
+
+        # Start with main wrapper routine, which helps set up the stack frame for the first routine
+        # Don't know its local size or address yet, so initially they are set to 0
+        self.codegen.emit_routine_call(FundamentalType.VOID_T, 0, 0)
+        self.codegen.emit_return(FundamentalType.VOID_T)
+
+        # Walk the modules, emitting code for each
         for module in program.modules:
             self.walk(module)
+
+        # Patch the final routine details
+        final_routine = cast(ast.Routine, self.symbol_table.get_last_routine().node)
+        locals_size = final_routine.locals_size
+        self.codegen.write_short(2, locals_size)
+        addr_final_routine = final_routine.addr
+        if addr_final_routine is None:
+            raise InternalError("Final routine address not found")
+        self.codegen.write_short(4, addr_final_routine)
 
     @walk.register
     def _(self, module: ast.Module):
