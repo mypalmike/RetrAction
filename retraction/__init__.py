@@ -6,3 +6,6 @@ from .symtab import *
 from .bytecode import *
 from .vm import *
 from .types import *
+from .ast import *
+from .bcasm import *
+from .error import *

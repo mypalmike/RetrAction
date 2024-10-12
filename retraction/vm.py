@@ -4,6 +4,7 @@ from retraction.bytecode import (
     ByteCodeVariableAddressMode,
     ByteCodeVariableScope,
 )
+from retraction.bcasm import disasm_bytecode
 from retraction.error import InternalError
 from retraction.symtab import SymTab
 from retraction.types import FundamentalType, Type  # CAST_PRIORITY, SIZE_BYTES,
@@ -333,8 +334,12 @@ class VirtualMachine:
             op = ByteCodeOp(instr)
             full_stack_str = hexlify(self.memory[START_STACK : self.stack_ptr])
             stack_str = hexlify(self.memory[self.frame_ptr : self.stack_ptr])
+            # print(
+            #     f"PC: {self.pc}, OP: {op}, FP: {self.frame_ptr} SP: {self.stack_ptr}, STACK: {stack_str!r}, FULL STACK: {full_stack_str!r}"
+            # )
+            disasm, _ = disasm_bytecode(self.memory[self.pc :])
             print(
-                f"PC: {self.pc}, OP: {op}, FP: {self.frame_ptr} SP: {self.stack_ptr}, STACK: {stack_str!r}, FULL STACK: {full_stack_str!r}"
+                f'PC: {self.pc} BYTECODE: "{disasm}" STACK: {stack_str!r} FULL STACK: {full_stack_str!r}'
             )
             if op in BINARY_OPS:
                 op1_t, op2_t, op1, op2 = self.extract_binary_operands()
@@ -368,7 +373,6 @@ class VirtualMachine:
                 scope = ByteCodeVariableScope(self.memory[self.pc + 2])
                 address_mode = ByteCodeVariableAddressMode(self.memory[self.pc + 3])
                 address = self.read_card(self.pc + 4)
-                print(f"LOAD_VARIABLE: {value_t}, {scope}, {address_mode}, {address}")
                 # Adjust address based on scope
                 if scope == ByteCodeVariableScope.LOCAL:
                     # Skip return address and calling frame pointer
@@ -378,7 +382,6 @@ class VirtualMachine:
                     # We read address in as a card, but it's a negative offset,
                     # so we need the 17-bit one's complement
                     address -= 0x10000
-                    print(f"PARAM: {address}")
                     address += self.frame_ptr  # - 6 - param_size
                 # Get value from address based on address mode
                 value = None
@@ -412,7 +415,6 @@ class VirtualMachine:
                 address_mode = ByteCodeVariableAddressMode(self.memory[self.pc + 3])
                 address = self.read_card(self.pc + 4)
                 value = self.pop_stack(value_t)
-                print(f"STORE_VARIABLE: {value_t}, {scope}, {address_mode}, {address}")
                 # Adjust address based on scope
                 if scope == ByteCodeVariableScope.LOCAL:
                     # Skip return address and calling frame pointer

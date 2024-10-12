@@ -309,42 +309,6 @@ class ByteCodeGen:
         self.append_byte(var_addr_mode.value)
         self.append_short(address)
 
-    # def emit_get_global(self, global_index):
-    #     # GET_GLOBAL, TYPE, INDEX
-    #     self.append_byte(ByteCodeOp.GET_GLOBAL)
-    #     tipe = self.symbol_table.globals[global_index].var_tipe
-    #     self.append_byte(tipe.base_tipe)
-    #     self.append_short(global_index)
-
-    # def emit_get_addr_global(self, global_index):
-    #     # GET_ADDR_GLOBAL, INDEX
-    #     self.append_byte(ByteCodeOp.GET_ADDR_GLOBAL)
-    #     self.append_short(global_index)
-
-    # def emit_get_ptr_global(self, global_index):
-    #     # GET_PTR_GLOBAL, TYPE, INDEX
-    #     self.append_byte(ByteCodeOp.GET_PTR_GLOBAL)
-    #     global_obj = self.symbol_table.globals[global_index]
-    #     tipe = global_obj.var_tipe
-    #     if not tipe.is_pointer():
-    #         raise ValueError(f"Global {global_obj.name} is not a pointer")
-    #     ptr_tipe: PointerTipe = cast(PointerTipe, tipe)
-    #     ref_tipe = ptr_tipe.reference_tipe
-    #     self.append_byte(ref_tipe)
-    #     self.append_short(global_index)
-
-    # def emit_set_global(self, global_index):
-    #     self.code.append(ByteCode(ByteCodeOp.SET_GLOBAL, global_index))
-
-    # def emit_set_ptr_global(self, global_index):
-    #     self.code.append(ByteCode(ByteCodeOp.SET_PTR_GLOBAL, global_index))
-
-    # def emit_push_param(self):
-    #     self.code.append(ByteCode(ByteCodeOp.PUSH_PARAM))
-
-    # def emit_zero(self):
-    #     self.code.append(ByteCode(ByteCodeOp.ZERO))
-
     def emit_cast(self, from_t: FundamentalType, to_t: FundamentalType):
         """
         Cast bytecode:

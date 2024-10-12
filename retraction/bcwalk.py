@@ -310,11 +310,16 @@ class BCWalk:
 
     @walk.register
     def _(self, return_node: ast.Return):
-        if return_node.expr is not None:
-            self.walk(return_node.expr)
-            self.codegen.emit_return(return_node.expr.fund_t)
-        else:
+        if return_node.expr is None:
             self.codegen.emit_return(FundamentalType.VOID_T)
+        else:
+            self.walk(return_node.expr)
+            if self.current_routine is None:
+                raise InternalError("Current routine not set")
+            return_t = self.current_routine.return_t
+            if return_t.size_bytes != return_node.expr.fund_t.size_bytes:
+                self.codegen.emit_cast(return_node.expr.fund_t, return_t)
+            self.codegen.emit_return(return_t)
 
     @walk.register
     def _(self, call_stmt: ast.CallStmt):
