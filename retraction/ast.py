@@ -100,33 +100,48 @@ class Var(Expr):
         self.name = name
         self.var_t = var_t
 
+        self.addr: int | None = None
+        self.addr_is_relative: bool = False
+
     def __repr__(self) -> str:
-        return f"Var({self.name}, {self.var_t})"
+        return f"Var({self.name}, {self.var_t}) # addr: {self.addr} addr_is_relative: {self.addr_is_relative}"
 
     @property
     def fund_t(self) -> FundamentalType:
         return cast_to_fundamental(self.var_t)
 
 
-class Dereference(Expr):
-    def __init__(self, expr: Expr):
-        self.expr = expr
+class GetVar(Expr):
+    def __init__(self, var: Var):
+        self.var = var
 
     def __repr__(self) -> str:
-        return f"Dereference({self.expr})"
+        return f"GetVar({self.var})"
+
+    @property
+    def fund_t(self) -> FundamentalType:
+        return cast(Var, self.var).fund_t
+
+
+class Dereference(Var):
+    def __init__(self, var: Var):
+        self.var = var
+
+    def __repr__(self) -> str:
+        return f"Dereference({self.var})"
 
     @property
     def fund_t(self) -> FundamentalType:
         # Any valid dereference refers to a pointer type
-        return cast(Var, self.expr).fund_t
+        return cast(Var, self.var).fund_t
 
 
 class Reference(Expr):
-    def __init__(self, expr: Expr):
-        self.expr = expr
+    def __init__(self, var: Var):
+        self.var = var
 
     def __repr__(self) -> str:
-        return f"Reference({self.expr})"
+        return f"Reference({self.var})"
 
     @property
     def fund_t(self) -> FundamentalType:
@@ -134,17 +149,17 @@ class Reference(Expr):
 
 
 class FieldAccess(Expr):
-    def __init__(self, expr: Expr, field_name: str):
-        self.expr = expr
+    def __init__(self, var: Var, field_name: str):
+        self.var = var
         self.field_name = field_name
 
     def __repr__(self) -> str:
-        return f"FieldAccess({self.expr}, {self.field_name})"
+        return f"FieldAccess({self.var}, {self.field_name})"
 
     @property
     def fund_t(self) -> FundamentalType:
         # A valid field access refers to a var
-        access_var = cast(Var, self.expr)
+        access_var = cast(Var, self.var)
         # Look up the field name in the struct
         struct_t = cast(RecordType, access_var.var_t)
         for field in struct_t.fields:
@@ -154,17 +169,17 @@ class FieldAccess(Expr):
 
 
 class ArrayAccess(Expr):
-    def __init__(self, expr: Expr, index: Expr):
-        self.expr = expr
+    def __init__(self, var: Var, index: Expr):
+        self.var = var
         self.index = index
 
     def __repr__(self) -> str:
-        return f"ArrayAccess({self.expr}, {self.index})"
+        return f"ArrayAccess({self.var}, {self.index})"
 
     @property
     def fund_t(self) -> FundamentalType:
         # A valid array access refers to a var
-        access_var = cast(Var, self.expr)
+        access_var = cast(Var, self.var)
         array_t = cast(ArrayType, access_var.var_t)
         return array_t.element_t
 

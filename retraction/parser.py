@@ -1220,7 +1220,7 @@ class Parser:
             if is_pointer:
                 if not isinstance(var_decl.var_t, PointerType):
                     raise SyntaxError(f"Variable {identifier} is not a pointer")
-                return ast.Dereference(var_node)
+                return ast.GetVar(ast.Dereference(var_node))
             if is_reference:
                 return ast.Reference(var_node)
             if isinstance(var_decl.var_t, ArrayType):
@@ -1231,7 +1231,7 @@ class Parser:
                     return ast.ArrayAccess(var_node, index_expr)
                 else:
                     return ast.Reference(var_node)
-            return var_node
+            return ast.GetVar(var_node)
         elif symbol_table_entry.entry_type == EntryType.ROUTINE:
             routine_call = self.parse_routine_call()
             if routine_call is None:

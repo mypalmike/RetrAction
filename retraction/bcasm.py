@@ -18,8 +18,8 @@ disasm_type = {
 disasm_scope = {
     ByteCodeVariableScope.GLOBAL: "GLB",
     ByteCodeVariableScope.LOCAL: "LOC",
-    ByteCodeVariableScope.PARAM: "PRM",
-    ByteCodeVariableScope.ROUTINE_REFERENCE: "RTR",
+    # ByteCodeVariableScope.PARAM: "PRM",
+    # ByteCodeVariableScope.ROUTINE_REFERENCE: "RTR",
 }
 
 disasm_addr_mode = {
@@ -103,26 +103,46 @@ def disasm_numerical_constant(data: bytes) -> tuple[str, int]:
     return f"CONST {disasm_type[operand_t]} {value}", size
 
 
-def disasm_load_variable(data: bytes) -> tuple[str, int]:
+def disasm_load_absolute(data: bytes) -> tuple[str, int]:
     operand_t = FundamentalType(data[1])
-    scope = ByteCodeVariableScope(data[2])
-    addr_mode = ByteCodeVariableAddressMode(data[3])
-    addr = int.from_bytes(data[4:6], "little", signed=False)
-    return (
-        f"LOAD {disasm_type[operand_t]} {disasm_scope[scope]} {disasm_addr_mode[addr_mode]} {addr}",
-        6,
-    )
+    return f"LOADA {disasm_type[operand_t]}", 2
 
 
-def disasm_store_variable(data: bytes) -> tuple[str, int]:
+def disasm_load_relative(data: bytes) -> tuple[str, int]:
     operand_t = FundamentalType(data[1])
-    scope = ByteCodeVariableScope(data[2])
-    addr_mode = ByteCodeVariableAddressMode(data[3])
-    addr = int.from_bytes(data[4:6], "little", signed=False)
-    return (
-        f"STORE {disasm_type[operand_t]} {disasm_scope[scope]} {disasm_addr_mode[addr_mode]} {addr}",
-        6,
-    )
+    return f"LOADR {disasm_type[operand_t]}", 2
+
+
+def disasm_store_absolute(data: bytes) -> tuple[str, int]:
+    operand_t = FundamentalType(data[1])
+    return f"STORA {disasm_type[operand_t]}", 2
+
+
+def disasm_store_relative(data: bytes) -> tuple[str, int]:
+    operand_t = FundamentalType(data[1])
+    return f"STORR {disasm_type[operand_t]}", 2
+
+
+# def disasm_load_variable(data: bytes) -> tuple[str, int]:
+#     operand_t = FundamentalType(data[1])
+#     scope = ByteCodeVariableScope(data[2])
+#     addr_mode = ByteCodeVariableAddressMode(data[3])
+#     addr = int.from_bytes(data[4:6], "little", signed=False)
+#     return (
+#         f"LOAD {disasm_type[operand_t]} {disasm_scope[scope]} {disasm_addr_mode[addr_mode]} {addr}",
+#         6,
+#     )
+
+
+# def disasm_store_variable(data: bytes) -> tuple[str, int]:
+#     operand_t = FundamentalType(data[1])
+#     scope = ByteCodeVariableScope(data[2])
+#     addr_mode = ByteCodeVariableAddressMode(data[3])
+#     addr = int.from_bytes(data[4:6], "little", signed=False)
+#     return (
+#         f"STORE {disasm_type[operand_t]} {disasm_scope[scope]} {disasm_addr_mode[addr_mode]} {addr}",
+#         6,
+#     )
 
 
 def disasm_routine_call(data: bytes) -> tuple[str, int]:
@@ -147,6 +167,10 @@ def disasm_cast(data: bytes) -> tuple[str, int]:
     from_t = FundamentalType(data[1])
     to_t = FundamentalType(data[2])
     return f"CAST {disasm_type[from_t]} {disasm_type[to_t]}", 3
+
+
+def disasm_push_frame_pointer(data: bytes) -> tuple[str, int]:
+    return "PUSHFP", 1
 
 
 def disasm_nop(data: bytes) -> tuple[str, int]:
@@ -182,9 +206,11 @@ BC_TO_DISASM_FN: dict[ByteCodeOp, Callable[[bytes], tuple[str, int]]] = {
     ByteCodeOp.JUMP: disasm_jump,
     ByteCodeOp.DUP: disasm_dup,
     ByteCodeOp.POP: disasm_pop,
-    ByteCodeOp.NUMERICAL_CONSTANT: disasm_numerical_constant,
-    ByteCodeOp.LOAD_VARIABLE: disasm_load_variable,
-    ByteCodeOp.STORE_VARIABLE: disasm_store_variable,
+    ByteCodeOp.PUSH_CONSTANT: disasm_numerical_constant,
+    ByteCodeOp.LOAD_ABSOLUTE: disasm_load_absolute,
+    ByteCodeOp.LOAD_RELATIVE: disasm_load_relative,
+    ByteCodeOp.STORE_ABSOLUTE: disasm_store_absolute,
+    ByteCodeOp.STORE_RELATIVE: disasm_store_relative,
     ByteCodeOp.ROUTINE_CALL: disasm_routine_call,
     ByteCodeOp.ROUTINE_POSTLUDE: disasm_routine_postlude,
     ByteCodeOp.RETURN: disasm_return,

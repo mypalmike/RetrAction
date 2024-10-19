@@ -45,6 +45,8 @@ class BCWalk:
         self.next_param_addr: int | None = None
         self.next_local_addr: int | None = None
         self.local_param_index: int = 0
+        # self.var_addr: int | None = None
+        # self.is_lhs: bool = False
 
     @singledispatchmethod
     def walk(self, node: ast.Node):
@@ -160,8 +162,9 @@ class BCWalk:
             self.next_local_addr += var_decl.var_t.size_bytes
 
             # Local var initialization is emitted as instructions
+            # TODO: This is incomplete and broken.
             if var_decl.init_opts is not None:
-                self.codegen.emit_numerical_constant(
+                self.codegen.emit_push_constant(
                     var_decl.init_opts.initial_values[self.local_param_index]
                 )
                 self.codegen.emit_store_variable(
@@ -170,6 +173,151 @@ class BCWalk:
                     ByteCodeVariableAddressMode.DEFAULT,
                     var_decl.addr,
                 )
+
+    @walk.register
+    def _(self, get_var: ast.GetVar):
+        # Push the address of the variable onto the stack
+        print(f"get_var: {get_var.var.name}")
+        self.walk(get_var.var)
+        print(f"get_var.addr: {get_var.var.addr}")
+        addr = get_var.var.addr
+        is_relative = get_var.var.addr_is_relative
+        if addr is None:
+            raise InternalError("Address not found for get_var")
+        self.codegen.emit_push_constant(FundamentalType.CARD_T, addr)
+
+        # Load the value from the address
+        if is_relative:
+            self.codegen.emit_load_relative(get_var.fund_t)
+        else:
+            self.codegen.emit_load_absolute(get_var.fund_t)
+
+    @walk.register
+    def _(self, var: ast.Var):
+        print(f"var: {var.name}")
+        if self.symbol_table is None:
+            raise InternalError("Symbol table not set")
+        entry, depth = self.symbol_table.find(var.name)
+        var_decl = cast(ast.VarDecl, entry.node)
+        if var_decl.addr is None:
+            raise InternalError(f"Address not found for variable {var.name}")
+        var.addr = var_decl.addr
+        var.addr_is_relative = depth > 0
+        print(f"var.addr: {var.addr}")
+        print(f"var.addr_is_relative: {var.addr_is_relative}")
+
+    @walk.register
+    def _(self, ref: ast.Reference):
+        # Compute the address of the variable
+        self.walk(ref.var)
+
+        addr = ref.var.addr
+        is_relative = ref.var.addr_is_relative
+        if addr is None:
+            raise InternalError("Address not found for reference")
+
+        if is_relative:
+            self.codegen.emit_push_frame_pointer()
+            self.codegen.emit_push_constant(FundamentalType.INT_T, addr)
+            self.codegen.emit_binary_op(
+                ByteCodeOp.ADD, FundamentalType.CARD_T, FundamentalType.INT_T
+            )
+        else:
+            self.codegen.emit_push_constant(FundamentalType.CARD_T, addr)
+
+        # self.var_addr = None
+
+        # elif scope == ByteCodeVariableScope.PARAM:
+        #     self.codegen.emit_push_frame_pointer()
+        #     # Subtract the 17-bit one's complement of the address for parameters
+        #     addr -= 0x10000
+        #     self.codegen.emit_push_constant(FundamentalType.CARD_T, addr)
+        #     self.codegen.emit_binary_op(ByteCodeOp.SUBTRACT, FundamentalType.CARD_T)
+
+        # var = ref.var
+        # # TODO: Most of this is copy/paste from ast.Assign. Should refactor.
+        # if self.symbol_table is None:
+        #     raise InternalError("Symbol table not set")
+        # entry, depth = self.symbol_table.find(var.name)
+        # var_decl = cast(ast.VarDecl, entry.node)
+        # if var_decl.addr is None:
+        #     raise InternalError("Address not found")
+        # if not isinstance(var_decl.var_t, FundamentalType):
+        #     raise InternalError("Default variable access should be FundamentalType")
+        # scope = ByteCodeVariableScope.GLOBAL
+        # if depth > 0:
+        #     if var_decl.addr < 0:
+        #         scope = ByteCodeVariableScope.PARAM
+        #     else:
+        #         scope = ByteCodeVariableScope.LOCAL
+        # self.codegen.emit_load_variable(
+        #     var_decl.var_t,
+        #     scope,
+        #     ByteCodeVariableAddressMode.REFERENCE,
+        #     var_decl.addr,
+        # )
+        # xxxx
+        # if expr.fund_t.size_bytes != var_decl.var_t.size_bytes:
+        #     # Emit a cast
+        #     self.codegen.emit_cast(expr.fund_t, var_decl.var_t)
+        # self.codegen.emit_store_variable(
+        #     var_decl.var_t,
+        #     scope,
+        #     ByteCodeVariableAddressMode.DEFAULT,
+        #     var_decl.addr,
+        # )
+
+    @walk.register
+    def _(self, deref: ast.Dereference):
+        # Push the address of the variable onto the stack
+        self.walk(deref.var)
+
+        addr = deref.var.addr
+        is_relative = deref.var.addr_is_relative
+        if addr is None:
+            raise InternalError("Address not found for dereference")
+
+        self.codegen.emit_push_constant(FundamentalType.CARD_T, addr)
+
+        # Load the value from the address. The new value on the stack will be the
+        # address of the value to be dereferenced.
+        if is_relative:
+            self.codegen.emit_load_relative(
+                FundamentalType.CARD_T
+            )  # deref.fund_t) # TODO: Clean up commennted code here
+        else:
+            self.codegen.emit_load_absolute(FundamentalType.CARD_T)  # deref.fund_t)
+
+        # addr = self.resolve_address(deref)
+        # scope = self.resolve_scope(deref, addr)
+        # var = deref.var
+        # self.codegen.emit_load_variable(
+        #     var.fund_t, scope, ByteCodeVariableAddressMode.POINTER, addr
+        # )
+
+        # var = deref.var
+        # if self.symbol_table is None:
+        #     raise InternalError("Symbol table not set")
+        # # TODO: More copy/paste from ast.Assign
+        # entry, depth = self.symbol_table.find(var.name)
+        # var_decl = cast(ast.VarDecl, entry.node)
+        # if var_decl.addr is None:
+        #     raise InternalError("Address not found")
+        # if not isinstance(var_decl.var_t, PointerType):
+        #     raise InternalError("Dereference should be PointerType")
+        # scope = ByteCodeVariableScope.GLOBAL
+        # if depth > 0:
+        #     if var_decl.addr < 0:
+        #         scope = ByteCodeVariableScope.PARAM
+        #     else:
+        #         scope = ByteCodeVariableScope.LOCAL
+        # pointer_t = cast(PointerType, var_decl.var_t)
+        # self.codegen.emit_load_variable(
+        #     pointer_t.reference_type,
+        #     scope,
+        #     ByteCodeVariableAddressMode.POINTER,
+        #     var_decl.addr,
+        # )
 
     @walk.register
     def _(self, routine: ast.Routine):
@@ -205,70 +353,118 @@ class BCWalk:
     def _(self, assign: ast.Assign):
         target = assign.target
         expr = assign.expr
-        self.walk(expr)
-        if isinstance(target, ast.Var):
-            var = cast(ast.Var, target)
-            if self.symbol_table is None:
-                raise InternalError("Symbol table not set")
-            entry, depth = self.symbol_table.find(var.name)
-            var_decl = cast(ast.VarDecl, entry.node)
-            if var_decl.addr is None:
-                raise InternalError("Address not found")
-            if not isinstance(var_decl.var_t, FundamentalType):
-                raise InternalError("Default variable access should be FundamentalType")
-            scope = ByteCodeVariableScope.GLOBAL
-            if depth > 0:
-                if var_decl.addr < 0:
-                    scope = ByteCodeVariableScope.PARAM
-                else:
-                    scope = ByteCodeVariableScope.LOCAL
-            if expr.fund_t.size_bytes != var_decl.var_t.size_bytes:
-                # Emit a cast
-                self.codegen.emit_cast(expr.fund_t, var_decl.var_t)
-            self.codegen.emit_store_variable(
-                var_decl.var_t,
-                scope,
-                ByteCodeVariableAddressMode.DEFAULT,
-                var_decl.addr,
-            )
-        elif isinstance(target, ast.ArrayAccess):
-            raise NotImplementedError()
-        elif isinstance(target, ast.Dereference):
-            raise NotImplementedError()
-        elif isinstance(target, ast.Dereference):
-            raise NotImplementedError()
 
+        # Push the result of the expression onto the stack
+        self.walk(expr)
+
+        if expr.fund_t.size_bytes != target.fund_t.size_bytes:
+            # Emit a cast
+            self.codegen.emit_cast(expr.fund_t, target.fund_t)
+
+        # addr = self.resolve_address(target)
+
+        # scope = self.resolve_scope(target)
+
+        # self.is_lhs = True
+
+        # Push the address of the target onto the stack
+        self.walk(target)
+
+        # TODO : Deal with non-Var targets
+        target_var = cast(ast.Var, target)
+        addr = target_var.addr
+        is_relative = target_var.addr_is_relative
+
+        if addr is None:
+            raise InternalError("Address not found for assign target")
+
+        self.codegen.emit_push_constant(FundamentalType.CARD_T, addr)
+
+        if is_relative:
+            self.codegen.emit_store_relative(target.fund_t)
         else:
-            raise InternalError("Unsupported assignment target")
+            self.codegen.emit_store_absolute(target.fund_t)
+
+        # if isinstance(target, ast.Var):
+        #     var = cast(ast.Var, target)
+        #     if self.symbol_table is None:
+        #         raise InternalError("Symbol table not set")
+        #     entry, depth = self.symbol_table.find(var.name)
+        #     var_decl = cast(ast.VarDecl, entry.node)
+        #     if var_decl.addr is None:
+        #         raise InternalError("Address not found")
+        #     scope = ByteCodeVariableScope.GLOBAL
+        #     if depth > 0:
+        #         if var_decl.addr < 0:
+        #             scope = ByteCodeVariableScope.PARAM
+        #         else:
+        #             scope = ByteCodeVariableScope.LOCAL
+        #     # if isinstance(var_decl.var_t, PointerType):
+        #     #     self.codegen.emit_store_variable(
+        #     #         FundamentalType.CARD_T,
+        #     #         scope,
+        #     #         ByteCodeVariableAddressMode.DEFAULT,
+        #     #         var_decl.addr,
+        #     #     )
+        #     if isinstance(var_decl.var_t, FundamentalType) or isinstance(
+        #         var_decl.var_t, PointerType
+        #     ):
+        #         if expr.fund_t.size_bytes != var.fund_t.size_bytes:
+        #             # Emit a cast
+        #             self.codegen.emit_cast(expr.fund_t, var.fund_t)
+        #         self.codegen.emit_store_variable(
+        #             var.fund_t,
+        #             scope,
+        #             ByteCodeVariableAddressMode.DEFAULT,
+        #             var_decl.addr,
+        #         )
+        #     else:
+        #         raise InternalError(
+        #             f"Unsupported assignment target type {var_decl.var_t}"
+        #         )
+        # elif isinstance(target, ast.ArrayAccess):
+        #     raise NotImplementedError()
+        # elif isinstance(target, ast.Dereference):
+        #     raise NotImplementedError()
+        # elif isinstance(target, ast.FieldAccess):
+        #     raise NotImplementedError()
+        # else:
+        #     raise InternalError("Unsupported assignment target")
 
     @walk.register
     def _(self, numerical_const: ast.NumericalConst):
-        self.codegen.emit_numerical_constant(
-            numerical_const.expr_t, numerical_const.value
-        )
+        self.codegen.emit_push_constant(numerical_const.expr_t, numerical_const.value)
 
-    @walk.register
-    def _(self, var: ast.Var):
-        if self.symbol_table is None:
-            raise InternalError("Symbol table not set")
-        entry, depth = self.symbol_table.find(var.name)
-        var_decl = cast(ast.VarDecl, entry.node)
-        if var_decl.addr is None:
-            raise InternalError("Address not found")
-        if not isinstance(var_decl.var_t, FundamentalType):
-            raise InternalError("Default variable access should be FundamentalType")
-        scope = ByteCodeVariableScope.GLOBAL
-        if depth > 0:
-            if var_decl.addr < 0:
-                scope = ByteCodeVariableScope.PARAM
-            else:
-                scope = ByteCodeVariableScope.LOCAL
-        self.codegen.emit_load_variable(
-            var_decl.var_t,
-            scope,
-            ByteCodeVariableAddressMode.DEFAULT,
-            var_decl.addr,
-        )
+    # @walk.register
+    # def _(self, var: ast.Var):
+    #     if self.symbol_table is None:
+    #         raise InternalError("Symbol table not set")
+    #     entry, depth = self.symbol_table.find(var.name)
+    #     var_decl = cast(ast.VarDecl, entry.node)
+    #     if var_decl.addr is None:
+    #         raise InternalError("Address not found")
+    #     if not isinstance(var_decl.var_t, FundamentalType):
+    #         raise InternalError("Default variable access should be FundamentalType")
+    #     # scope = ByteCodeVariableScope.GLOBAL
+    #     if depth > 0:
+    #         # Local or parameter
+    #         self.codegen.emit_push_constant(FundamentalType.INT_T, var_decl.addr)
+    #         self.codegen.emit_load_relative(var_decl.var_t)
+    #     else:
+    #         # Global
+    #         self.codegen.emit_push_constant(FundamentalType.CARD_T, var_decl.addr)
+    #         self.codegen.emit_load_absolute(var_decl.var_t)
+
+    #     if var_decl.addr < 0:
+    #         scope = ByteCodeVariableScope.PARAM
+    #     else:
+    #         scope = ByteCodeVariableScope.LOCAL
+    # self.codegen.emit_load_variable(
+    #     var_decl.var_t,
+    #     scope,
+    #     ByteCodeVariableAddressMode.DEFAULT,
+    #     var_decl.addr,
+    # )
 
     @walk.register
     def _(self, binary_expr: ast.BinaryExpr):
@@ -386,3 +582,62 @@ class BCWalk:
         expr = devprint.expr
         self.walk(expr)
         self.codegen.emit_devprint(expr.fund_t)
+
+    def resolve_address(self, node: ast.Node) -> int:
+        if isinstance(node, ast.Var):
+            var = cast(ast.Var, node)
+            if self.symbol_table is None:
+                raise InternalError("Symbol table not set")
+            entry, depth = self.symbol_table.find(var.name)
+            var_decl = cast(ast.VarDecl, entry.node)
+            if var_decl.addr is None:
+                raise InternalError(f"Address not found for variable {var.name}")
+            return var_decl.addr
+        elif isinstance(node, ast.Dereference):
+            deref = cast(ast.Dereference, node)
+            return self.resolve_address(deref.var)
+        elif isinstance(node, ast.Reference):
+            ref = cast(ast.Reference, node)
+            return self.resolve_address(ref.var)
+        elif isinstance(node, ast.FieldAccess):
+            field_access = cast(ast.FieldAccess, node)
+            base_addr = self.resolve_address(field_access.var)
+            raise InternalError("FieldAccess not implemented for resolve_address")
+        elif isinstance(node, ast.ArrayAccess):
+            array_access = cast(ast.ArrayAccess, node)
+            # Actual address is base address + item size * index
+            # But the index is an expression, so we can't just compute it at compile time.
+            # (Though maybe there could be a way to optimize this for constant indexes?)
+            # Instead, we'll walk the index expression and then emit the calculation
+            # on the stack. The VM will then pop the index and calculate the address.
+            self.walk(array_access.index)
+            return self.resolve_address(array_access.var)
+        raise InternalError(f"Cannot resolve address for node type {node}")
+
+    def resolve_scope(self, node: ast.Node) -> ByteCodeVariableScope:
+        var_node = None
+        if isinstance(node, ast.Var):
+            var_node = cast(ast.Var, node)
+        elif isinstance(node, ast.Dereference):
+            deref_node = cast(ast.Dereference, node)
+            var_node = deref_node.var
+        elif isinstance(node, ast.Reference):
+            ref_node = cast(ast.Reference, node)
+            var_node = ref_node.var
+        elif isinstance(node, ast.FieldAccess):
+            field_access_node = cast(ast.FieldAccess, node)
+            var_node = field_access_node.var
+        elif isinstance(node, ast.ArrayAccess):
+            array_access_node = cast(ast.ArrayAccess, node)
+            var_node = array_access_node.var
+
+        if var_node is None:
+            raise InternalError(f"Cannot resolve scope for node type {node}")
+        if self.symbol_table is None:
+            raise InternalError("Symbol table not set")
+        entry, depth = self.symbol_table.find(var_node.name)
+        if entry is None:
+            raise InternalError(f"Variable {var_node.name} not found")
+        if depth > 0:
+            return ByteCodeVariableScope.LOCAL
+        return ByteCodeVariableScope.GLOBAL

@@ -171,33 +171,33 @@ class ByteCodeGen:
         self.append_byte(ByteCodeOp.POP.value)
         self.append_byte(operand_t.value)
 
-    def emit_numerical_constant(self, const_t: FundamentalType, value: int):
+    def emit_push_constant(self, const_t: FundamentalType, value: int):
         """
         Constant bytecode:
-            NUMERICAL_CONSTANT - 1 byte
+            PUSH_CONSTANT      - 1 byte
             TYPE               - 1 byte
             VALUE              - 1 or 2 bytes
         """
-        self.append_byte(ByteCodeOp.NUMERICAL_CONSTANT.value)
-        if value < 256:
-            self.append_byte(FundamentalType.BYTE_T.value)
-            self.append_byte(value)
-        elif value > -32768 and value < 32768:
-            self.append_byte(FundamentalType.INT_T.value)
-            self.append_short(value)
-        else:
-            self.append_byte(FundamentalType.CARD_T.value)
-            self.append_short(value)
+        self.append_byte(ByteCodeOp.PUSH_CONSTANT.value)
+        self.append_byte(const_t.value)
+        self.append(const_t, value)
 
-    def emit_local_data(self, local_index: int) -> int:
+    def emit_push_frame_pointer(self):
         """
-        This VM bytecode does not store local data in the code stream. This method exists so
-        that other code generators can use the same interface.
+        Push frame pointer bytecode:
+            PUSH_FRAME_POINTER - 1 byte
         """
-        return 0
-        # TODO
-        # local_var = self.symbol_table.locals[local_index]
-        # return local_var.address
+        self.append_byte(ByteCodeOp.PUSH_FRAME_POINTER.value)
+
+    # def emit_local_data(self, local_index: int) -> int:
+    #     """
+    #     This VM bytecode does not store local data in the code stream. This method exists so
+    #     that other code generators can use the same interface.
+    #     """
+    #     return 0
+    #     # TODO
+    # local_var = self.symbol_table.locals[local_index]
+    # return local_var.address
 
     def emit_bytes(self, data: list[int]) -> int:
         """
@@ -230,6 +230,42 @@ class ByteCodeGen:
         for char in string:
             self.append_byte(ord(char))
         return addr
+
+    def emit_load_absolute(self, operand_t: FundamentalType):
+        """
+        Load absolute bytecode:
+            LOAD_ABSOLUTE - 1 byte
+            OPERAND_T     - 1 byte
+        """
+        self.append_byte(ByteCodeOp.LOAD_ABSOLUTE.value)
+        self.append_byte(operand_t.value)
+
+    def emit_load_relative(self, operand_t: FundamentalType):
+        """
+        Load relative bytecode:
+            LOAD_RELATIVE - 1 byte
+            OPERAND_T     - 1 byte
+        """
+        self.append_byte(ByteCodeOp.LOAD_RELATIVE.value)
+        self.append_byte(operand_t.value)
+
+    def emit_store_absolute(self, operand_t: FundamentalType):
+        """
+        Store absolute bytecode:
+            STORE_ABSOLUTE - 1 byte
+            OPERAND_T      - 1 byte
+        """
+        self.append_byte(ByteCodeOp.STORE_ABSOLUTE.value)
+        self.append_byte(operand_t.value)
+
+    def emit_store_relative(self, operand_t: FundamentalType):
+        """
+        Store relative bytecode:
+            STORE_RELATIVE - 1 byte
+            OPERAND_T      - 1 byte
+        """
+        self.append_byte(ByteCodeOp.STORE_RELATIVE.value)
+        self.append_byte(operand_t.value)
 
     # def emit_global_data(self, var_decl: ast.VarDecl) -> int:
     #     """
@@ -267,47 +303,47 @@ class ByteCodeGen:
     #             self.append(var_decl.var_t, 0)
     #     return addr
 
-    def emit_load_variable(
-        self,
-        var_t: FundamentalType,
-        var_scope: ByteCodeVariableScope,
-        var_addr_mode: ByteCodeVariableAddressMode,
-        address: int,
-    ):
-        """
-        Get variable bytecode:
-            LOAD_VARIABLE - 1 byte
-            TYPE         - 1 byte
-            SCOPE        - 1 byte
-            ADDR_MODE    - 1 byte
-            ADDR         - 2 bytes
-        """
-        self.append_byte(ByteCodeOp.LOAD_VARIABLE.value)
-        self.append_byte(var_t.value)
-        self.append_byte(var_scope.value)
-        self.append_byte(var_addr_mode.value)
-        self.append_short(address)
+    # def emit_load_variable(
+    #     self,
+    #     var_t: FundamentalType,
+    #     var_scope: ByteCodeVariableScope,
+    #     var_addr_mode: ByteCodeVariableAddressMode,
+    #     address: int,
+    # ):
+    #     """
+    #     Get variable bytecode:
+    #         LOAD_VARIABLE - 1 byte
+    #         TYPE         - 1 byte
+    #         SCOPE        - 1 byte
+    #         ADDR_MODE    - 1 byte
+    #         ADDR         - 2 bytes
+    #     """
+    #     self.append_byte(ByteCodeOp.LOAD_VARIABLE.value)
+    #     self.append_byte(var_t.value)
+    #     self.append_byte(var_scope.value)
+    #     self.append_byte(var_addr_mode.value)
+    #     self.append_short(address)
 
-    def emit_store_variable(
-        self,
-        var_t: FundamentalType,
-        var_scope: ByteCodeVariableScope,
-        var_addr_mode: ByteCodeVariableAddressMode,
-        address: int,
-    ):
-        """
-        Set variable bytecode:
-            STORE_VARIABLE - 1 byte
-            TYPE          - 1 byte
-            SCOPE         - 1 byte
-            ADDR_MODE     - 1 byte
-            ADDR          - 2 bytes
-        """
-        self.append_byte(ByteCodeOp.STORE_VARIABLE.value)
-        self.append_byte(var_t.value)
-        self.append_byte(var_scope.value)
-        self.append_byte(var_addr_mode.value)
-        self.append_short(address)
+    # def emit_store_variable(
+    #     self,
+    #     var_t: FundamentalType,
+    #     var_scope: ByteCodeVariableScope,
+    #     var_addr_mode: ByteCodeVariableAddressMode,
+    #     address: int,
+    # ):
+    #     """
+    #     Set variable bytecode:
+    #         STORE_VARIABLE - 1 byte
+    #         TYPE          - 1 byte
+    #         SCOPE         - 1 byte
+    #         ADDR_MODE     - 1 byte
+    #         ADDR          - 2 bytes
+    #     """
+    #     self.append_byte(ByteCodeOp.STORE_VARIABLE.value)
+    #     self.append_byte(var_t.value)
+    #     self.append_byte(var_scope.value)
+    #     self.append_byte(var_addr_mode.value)
+    #     self.append_short(address)
 
     def emit_cast(self, from_t: FundamentalType, to_t: FundamentalType):
         """

@@ -7,7 +7,7 @@ from retraction.bytecode import (
 from retraction.bcasm import disasm_bytecode
 from retraction.error import InternalError
 from retraction.symtab import SymTab
-from retraction.types import FundamentalType, Type  # CAST_PRIORITY, SIZE_BYTES,
+from retraction.types import FundamentalType, Type
 
 
 # Virtualized 8-bit computer memory layout:
@@ -269,9 +269,17 @@ class VirtualMachine:
         elif t.size_bytes == 1:
             return self.read_byte(address)
         else:
-            raise InternalError(f"Invalid size for type {t}")
+            raise InternalError(f"Invalid size for type {t} in read")
 
-    def push_stack(self, value: int, t: FundamentalType):
+    def write(self, t: FundamentalType, address: int, value: int):
+        if t.size_bytes == 2:
+            self.write_card(address, value)
+        elif t.size_bytes == 1:
+            self.write_byte(address, value)
+        else:
+            raise InternalError(f"Invalid size for type {t} in write")
+
+    def push_stack(self, t: FundamentalType, value: int):
         size_bytes = t.size_bytes
         if self.stack_ptr + size_bytes > END_STACK + 1:
             raise InternalError("Stack overflow")
@@ -285,6 +293,7 @@ class VirtualMachine:
             raise InternalError(f"Invalid size for type {t}")
 
     def pop_stack(self, t: FundamentalType) -> int:
+        # TODO: Use int.from_bytes() to clean up the fussy byte manipulation
         size_bytes = t.size_bytes
         if self.stack_ptr - size_bytes < START_STACK:
             raise InternalError("Stack underflow")
@@ -344,18 +353,18 @@ class VirtualMachine:
             if op in BINARY_OPS:
                 op1_t, op2_t, op1, op2 = self.extract_binary_operands()
                 result, result_t = BINARY_OPS[op](op1, op2, op1_t, op2_t)
-                self.push_stack(result, result_t)
+                self.push_stack(result_t, result)
                 self.pc += 3
             elif op == ByteCodeOp.UNARY_MINUS:
                 operand_t = FundamentalType(self.memory[self.pc + 1])
                 operand = self.pop_stack(operand_t)
                 result = -operand
-                self.push_stack(result, FundamentalType.INT_T)
+                self.push_stack(FundamentalType.INT_T, result)
                 self.pc += 2
-            elif op == ByteCodeOp.NUMERICAL_CONSTANT:
+            elif op == ByteCodeOp.PUSH_CONSTANT:
                 constant_t = FundamentalType(self.memory[self.pc + 1])
                 const_value = self.read(constant_t, self.pc + 2)
-                self.push_stack(const_value, constant_t)
+                self.push_stack(constant_t, const_value)
                 self.pc += 4 if constant_t.size_bytes == 2 else 3
             elif op == ByteCodeOp.JUMP_IF_FALSE:
                 operand_t = FundamentalType(self.memory[self.pc + 1])
@@ -368,90 +377,117 @@ class VirtualMachine:
             elif op == ByteCodeOp.JUMP:
                 jump_addr = self.memory[self.pc + 1]
                 self.pc = jump_addr
-            elif op == ByteCodeOp.LOAD_VARIABLE:
+            elif op == ByteCodeOp.LOAD_ABSOLUTE:
                 value_t = FundamentalType(self.memory[self.pc + 1])
-                scope = ByteCodeVariableScope(self.memory[self.pc + 2])
-                address_mode = ByteCodeVariableAddressMode(self.memory[self.pc + 3])
-                address = self.read_card(self.pc + 4)
-                # Adjust address based on scope
-                if scope == ByteCodeVariableScope.LOCAL:
-                    # Skip return address and calling frame pointer
-                    address += self.frame_ptr
-                elif scope == ByteCodeVariableScope.PARAM:
-                    # param_size = self.read_card(self.frame_ptr - 6)
-                    # We read address in as a card, but it's a negative offset,
-                    # so we need the 17-bit one's complement
-                    address -= 0x10000
-                    address += self.frame_ptr  # - 6 - param_size
-                # Get value from address based on address mode
-                value = None
-                if address_mode == ByteCodeVariableAddressMode.DEFAULT:
-                    if value_t.size_bytes == 2:
-                        value = self.read_card(address)
-                    else:
-                        value = self.read_byte(address)
-                elif address_mode == ByteCodeVariableAddressMode.POINTER:
-                    if value_t.size_bytes == 2:
-                        value = self.read_card(self.read_card(address))
-                    else:
-                        value = self.read_byte(self.read_card(address))
-                elif address_mode == ByteCodeVariableAddressMode.REFERENCE:
-                    value = address
-                elif address_mode == ByteCodeVariableAddressMode.OFFSET:
-                    offset = self.read_card(self.pc + 6)
-                    if value_t.size_bytes == 2:
-                        value = self.read_card(address + offset)
-                    else:
-                        value = self.read_byte(address + offset)
-                if value is None:
-                    raise InternalError("Invalid value")
-                self.push_stack(value, value_t)
-                self.pc += (
-                    8 if address_mode == ByteCodeVariableAddressMode.OFFSET else 6
-                )
-            elif op == ByteCodeOp.STORE_VARIABLE:
+                addr = self.pop_stack(FundamentalType.CARD_T)
+                value = self.read(value_t, addr)
+                self.push_stack(value_t, value)
+                self.pc += 2
+            elif op == ByteCodeOp.LOAD_RELATIVE:
                 value_t = FundamentalType(self.memory[self.pc + 1])
-                scope = ByteCodeVariableScope(self.memory[self.pc + 2])
-                address_mode = ByteCodeVariableAddressMode(self.memory[self.pc + 3])
-                address = self.read_card(self.pc + 4)
+                offset = self.pop_stack(FundamentalType.INT_T)
+                addr = self.frame_ptr + offset
+                value = self.read(value_t, addr)
+                self.push_stack(value_t, value)
+                self.pc += 2
+            elif op == ByteCodeOp.STORE_ABSOLUTE:
+                value_t = FundamentalType(self.memory[self.pc + 1])
+                addr = self.pop_stack(FundamentalType.CARD_T)
                 value = self.pop_stack(value_t)
-                # Adjust address based on scope
-                if scope == ByteCodeVariableScope.LOCAL:
-                    # Skip return address and calling frame pointer
-                    address += self.frame_ptr
-                elif scope == ByteCodeVariableScope.PARAM:
-                    param_size = self.read_card(self.frame_ptr - 6)
-                    address += self.frame_ptr - 6 - param_size
-                # Store value at address based on address mode
-                if address_mode == ByteCodeVariableAddressMode.DEFAULT:
-                    if value_t.size_bytes == 2:
-                        self.write_card(address, value)
-                    else:
-                        self.write_byte(address, value)
-                elif address_mode == ByteCodeVariableAddressMode.POINTER:
-                    if value_t.size_bytes == 2:
-                        self.write_card(self.read_card(address), value)
-                    else:
-                        self.write_byte(self.read_card(address), value)
-                # elif address_mode == ByteCodeVariableAddressMode.REFERENCE:
-                #     self.write_card(address, value)
-                elif address_mode == ByteCodeVariableAddressMode.OFFSET:
-                    offset = self.read_card(self.pc + 6)
-                    if value_t.size_bytes == 2:
-                        self.write_card(address + offset, value)
-                    else:
-                        self.write_byte(address + offset, value)
-                self.pc += (
-                    8 if address_mode == ByteCodeVariableAddressMode.OFFSET else 6
-                )
+                self.write(value_t, addr, value)
+                self.pc += 2
+            elif op == ByteCodeOp.STORE_RELATIVE:
+                value_t = FundamentalType(self.memory[self.pc + 1])
+                offset = self.pop_stack(FundamentalType.INT_T)
+                addr = self.frame_ptr + offset
+                value = self.pop_stack(value_t)
+                self.write(value_t, addr, value)
+                self.pc += 2
+
+            # elif op == ByteCodeOp.LOAD_VARIABLE:
+            #     value_t = FundamentalType(self.memory[self.pc + 1])
+            #     scope = ByteCodeVariableScope(self.memory[self.pc + 2])
+            #     address_mode = ByteCodeVariableAddressMode(self.memory[self.pc + 3])
+            #     address = self.read_card(self.pc + 4)
+            #     # Adjust address based on scope
+            #     if scope == ByteCodeVariableScope.LOCAL:
+            #         # Skip return address and calling frame pointer
+            #         address += self.frame_ptr
+            #     elif scope == ByteCodeVariableScope.PARAM:
+            #         # param_size = self.read_card(self.frame_ptr - 6)
+            #         # We read address in as a card, but it's a negative offset,
+            #         # so we need the 17-bit one's complement
+            #         address -= 0x10000
+            #         address += self.frame_ptr  # - 6 - param_size
+            #     # Get value from address based on address mode
+            #     value = None
+            #     if address_mode == ByteCodeVariableAddressMode.DEFAULT:
+            #         if value_t.size_bytes == 2:
+            #             value = self.read_card(address)
+            #         else:
+            #             value = self.read_byte(address)
+            #     elif address_mode == ByteCodeVariableAddressMode.POINTER:
+            #         if value_t.size_bytes == 2:
+            #             value = self.read_card(self.read_card(address))
+            #         else:
+            #             value = self.read_byte(self.read_card(address))
+            #     elif address_mode == ByteCodeVariableAddressMode.REFERENCE:
+            #         value = address
+            #     elif address_mode == ByteCodeVariableAddressMode.OFFSET:
+            #         offset = self.read_card(self.pc + 6)
+            #         if value_t.size_bytes == 2:
+            #             value = self.read_card(address + offset)
+            #         else:
+            #             value = self.read_byte(address + offset)
+            #     if value is None:
+            #         raise InternalError("Invalid value")
+            #     self.push_stack(value, value_t)
+            #     self.pc += (
+            #         8 if address_mode == ByteCodeVariableAddressMode.OFFSET else 6
+            #     )
+            # elif op == ByteCodeOp.STORE_VARIABLE:
+            #     value_t = FundamentalType(self.memory[self.pc + 1])
+            #     scope = ByteCodeVariableScope(self.memory[self.pc + 2])
+            #     address_mode = ByteCodeVariableAddressMode(self.memory[self.pc + 3])
+            #     address = self.read_card(self.pc + 4)
+            #     value = self.pop_stack(value_t)
+            #     # Adjust address based on scope
+            #     if scope == ByteCodeVariableScope.LOCAL:
+            #         # Skip return address and calling frame pointer
+            #         address += self.frame_ptr
+            #     elif scope == ByteCodeVariableScope.PARAM:
+            #         param_size = self.read_card(self.frame_ptr - 6)
+            #         address += self.frame_ptr - 6 - param_size
+            #     # Store value at address based on address mode
+            #     if address_mode == ByteCodeVariableAddressMode.DEFAULT:
+            #         if value_t.size_bytes == 2:
+            #             self.write_card(address, value)
+            #         else:
+            #             self.write_byte(address, value)
+            #     elif address_mode == ByteCodeVariableAddressMode.POINTER:
+            #         if value_t.size_bytes == 2:
+            #             self.write_card(self.read_card(address), value)
+            #         else:
+            #             self.write_byte(self.read_card(address), value)
+            #     # elif address_mode == ByteCodeVariableAddressMode.REFERENCE:
+            #     #     self.write_card(address, value)
+            #     elif address_mode == ByteCodeVariableAddressMode.OFFSET:
+            #         offset = self.read_card(self.pc + 6)
+            #         if value_t.size_bytes == 2:
+            #             self.write_card(address + offset, value)
+            #         else:
+            #             self.write_byte(address + offset, value)
+            #     self.pc += (
+            #         8 if address_mode == ByteCodeVariableAddressMode.OFFSET else 6
+            #     )
             elif op == ByteCodeOp.ROUTINE_CALL:
                 return_t = FundamentalType(self.memory[self.pc + 1])  # TODO: Unused?
                 locals_size = self.read_card(self.pc + 2)
                 routine_addr = self.read_card(self.pc + 4)
                 # Push return address (operation after routine call)
-                self.push_stack(self.pc + 6, FundamentalType.CARD_T)
+                self.push_stack(FundamentalType.CARD_T, self.pc + 6)
                 # Push frame pointer
-                self.push_stack(self.frame_ptr, FundamentalType.CARD_T)
+                self.push_stack(FundamentalType.CARD_T, self.frame_ptr)
                 # Set new frame pointer to top of stack
                 self.frame_ptr = self.stack_ptr
                 # Advance stack pointer to work area
@@ -470,7 +506,7 @@ class VirtualMachine:
                 self.stack_ptr -= n_bytes
                 # Push return value
                 if return_t != FundamentalType.VOID_T:
-                    self.push_stack(return_value, return_t)
+                    self.push_stack(return_t, return_value)
                 self.pc += 4
             elif op == ByteCodeOp.RETURN:
                 # TODO: Make sure to add a cast in the parser to ensure that the actual return type
@@ -491,24 +527,27 @@ class VirtualMachine:
 
                 # Push return value
                 if return_value is not None:
-                    self.push_stack(return_value, return_t)
+                    self.push_stack(return_t, return_value)
             elif op == ByteCodeOp.CAST:
                 from_t = FundamentalType(self.memory[self.pc + 1])
                 to_t = FundamentalType(self.memory[self.pc + 2])
                 value = self.pop_stack(from_t)
-                self.push_stack(value, to_t)
+                self.push_stack(to_t, value)
                 self.pc += 3
             elif op == ByteCodeOp.NOP:
                 self.pc += 1
             elif op == ByteCodeOp.DUP:
                 value_t = FundamentalType(self.memory[self.pc + 1])
                 value = self.peek_stack(value_t)
-                self.push_stack(value, value_t)
+                self.push_stack(value_t, value)
                 self.pc += 2
             elif op == ByteCodeOp.POP:
                 pop_t = FundamentalType(self.memory[self.pc + 1])
                 self.pop_stack(pop_t)
                 self.pc += 2
+            elif op == ByteCodeOp.PUSH_FRAME_POINTER:
+                self.push_stack(FundamentalType.CARD_T, self.frame_ptr)
+                self.pc += 1
             elif op == ByteCodeOp.DEVPRINT:
                 value_t = FundamentalType(self.memory[self.pc + 1])
                 value = self.pop_stack(value_t)
