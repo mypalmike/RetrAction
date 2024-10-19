@@ -1,0 +1,14 @@
+BYTE y = [120]
+
+PROC main()
+    IF y < 10 THEN
+      DEVPRINT(10)
+    ELSEIF y < 20 THEN
+      DEVPRINT(20)
+    ELSEIF y < 30 THEN
+      DEVPRINT(30)
+    ELSE
+      DEVPRINT(99)
+    FI
+
+RETURN

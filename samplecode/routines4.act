@@ -1,0 +1,12 @@
+BYTE gnum = [1]
+
+PROC foo(CARD x)
+  DEVPRINT(x)
+RETURN
+
+PROC main()
+  BYTE lnum
+  lnum = 254 + 13
+  foo(gnum)
+  foo(lnum)
+RETURN

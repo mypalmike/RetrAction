@@ -1,0 +1,8 @@
+INT FUNC add_45(BYTE x)
+RETURN (x + 45)
+
+PROC main()
+  INT val
+  val = add_45(12)
+  DEVPRINT(val)
+RETURN

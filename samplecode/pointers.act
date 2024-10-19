@@ -1,0 +1,6 @@
+BYTE POINTER pX
+
+PROC main ()
+  pX^ = 4
+  DEVPRINT(pX^)
+RETURN

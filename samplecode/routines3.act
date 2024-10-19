@@ -1,0 +1,7 @@
+PROC foo()
+  DEVPRINT(123)
+RETURN
+
+PROC main()
+  foo()
+RETURN
