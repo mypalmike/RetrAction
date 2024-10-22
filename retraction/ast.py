@@ -6,6 +6,7 @@ from retraction.error import InternalError
 from retraction.types import (
     ArrayType,
     FundamentalType,
+    PointerType,
     RecordType,
     Type,
     binary_expression_type,
@@ -123,7 +124,7 @@ class GetVar(Expr):
         return cast(Var, self.var).fund_t
 
 
-class Dereference(Var):
+class Dereference(Expr):
     def __init__(self, var: Var):
         self.var = var
 
@@ -132,8 +133,10 @@ class Dereference(Var):
 
     @property
     def fund_t(self) -> FundamentalType:
-        # Any valid dereference refers to a pointer type
-        return cast(Var, self.var).fund_t
+        # Any valid dereference refers to a pointer-to-var type
+        pointer_t = cast(PointerType, self.var.var_t)
+        reference_t = pointer_t.reference_type
+        return cast_to_fundamental(reference_t)
 
 
 class Reference(Expr):

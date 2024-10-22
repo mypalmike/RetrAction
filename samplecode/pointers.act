@@ -1,6 +1,14 @@
-BYTE POINTER pX
+BYTE POINTER pX = $F000
+BYTE POINTER pY
 
 PROC main ()
-  pX^ = 4
-  DEVPRINT(pX^)
+  INT zzz
+  BYTE POINTER p1
+  BYTE POINTER p2
+  p1 = $F100
+
+  p1^ = 4
+  p2 = p1
+  DEVPRINT(p2^)
+
 RETURN

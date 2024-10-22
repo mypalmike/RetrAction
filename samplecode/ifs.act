@@ -1,4 +1,4 @@
-BYTE y = [120]
+BYTE y = [15]
 
 PROC main()
     IF y < 10 THEN

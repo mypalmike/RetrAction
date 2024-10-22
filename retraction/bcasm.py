@@ -215,6 +215,7 @@ BC_TO_DISASM_FN: dict[ByteCodeOp, Callable[[bytes], tuple[str, int]]] = {
     ByteCodeOp.ROUTINE_POSTLUDE: disasm_routine_postlude,
     ByteCodeOp.RETURN: disasm_return,
     ByteCodeOp.CAST: disasm_cast,
+    ByteCodeOp.PUSH_FRAME_POINTER: disasm_push_frame_pointer,
     ByteCodeOp.NOP: disasm_nop,
     ByteCodeOp.DEVPRINT: disasm_devprint,
 }

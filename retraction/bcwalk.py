@@ -177,14 +177,14 @@ class BCWalk:
     @walk.register
     def _(self, get_var: ast.GetVar):
         # Push the address of the variable onto the stack
-        print(f"get_var: {get_var.var.name}")
+        # print(f"get_var: {get_var.var.name}")
         self.walk(get_var.var)
-        print(f"get_var.addr: {get_var.var.addr}")
-        addr = get_var.var.addr
-        is_relative = get_var.var.addr_is_relative
-        if addr is None:
-            raise InternalError("Address not found for get_var")
-        self.codegen.emit_push_constant(FundamentalType.CARD_T, addr)
+        # print(f"get_var.addr: {get_var.var.addr}")
+        # addr = get_var.var.addr
+        is_relative = isinstance(get_var.var, ast.Var) and get_var.var.addr_is_relative
+        # if addr is None:
+        #     raise InternalError("Address not found for get_var")
+        # self.codegen.emit_push_constant(FundamentalType.CARD_T, addr)
 
         # Load the value from the address
         if is_relative:
@@ -205,6 +205,19 @@ class BCWalk:
         var.addr_is_relative = depth > 0
         print(f"var.addr: {var.addr}")
         print(f"var.addr_is_relative: {var.addr_is_relative}")
+
+        if isinstance(var_decl.var_t, PointerType):
+            if var.addr_is_relative:
+                # If pointer, we need to convert relative address to absolute
+                self.codegen.emit_push_frame_pointer()
+                self.codegen.emit_push_constant(FundamentalType.INT_T, var.addr)
+                self.codegen.emit_binary_op(
+                    ByteCodeOp.ADD, FundamentalType.INT_T, FundamentalType.INT_T
+                )
+            else:
+                self.codegen.emit_push_constant(FundamentalType.CARD_T, var.addr)
+        else:
+            self.codegen.emit_push_constant(FundamentalType.CARD_T, var.addr)
 
     @walk.register
     def _(self, ref: ast.Reference):
@@ -272,21 +285,30 @@ class BCWalk:
         # Push the address of the variable onto the stack
         self.walk(deref.var)
 
-        addr = deref.var.addr
-        is_relative = deref.var.addr_is_relative
-        if addr is None:
-            raise InternalError("Address not found for dereference")
+        # addr = deref.var.addr
+        # is_relative = deref.var.addr_is_relative
+        # if addr is None:
+        #     raise InternalError("Address not found for dereference")
 
-        self.codegen.emit_push_constant(FundamentalType.CARD_T, addr)
+        # self.codegen.emit_push_constant(FundamentalType.CARD_T, addr)
+
+        # # var_t = deref.var.var_t
+        # if not isinstance(var_t, PointerType):
+        #     raise InternalError("Dereference should be PointerType")
+        # var_fund_t = cast(PointerType, var_t).reference_type
+
+        # TODO: Deal with pointer to record type. For now, assume it's a fundamental type.
+        # if not isinstance(var_fund_t, FundamentalType):
+        #     raise InternalError("Dereference to non-FundamentalType not supported")
 
         # Load the value from the address. The new value on the stack will be the
         # address of the value to be dereferenced.
-        if is_relative:
-            self.codegen.emit_load_relative(
-                FundamentalType.CARD_T
-            )  # deref.fund_t) # TODO: Clean up commennted code here
-        else:
-            self.codegen.emit_load_absolute(FundamentalType.CARD_T)  # deref.fund_t)
+        # if is_relative:
+        #     self.codegen.emit_load_relative(
+        #         FundamentalType.CARD_T
+        #     )  # deref.fund_t) # TODO: Clean up commennted code here
+        # else:
+        self.codegen.emit_load_absolute(FundamentalType.CARD_T)  # deref.fund_t)
 
         # addr = self.resolve_address(deref)
         # scope = self.resolve_scope(deref, addr)
@@ -371,19 +393,36 @@ class BCWalk:
         self.walk(target)
 
         # TODO : Deal with non-Var targets
-        target_var = cast(ast.Var, target)
-        addr = target_var.addr
-        is_relative = target_var.addr_is_relative
+        if type(target) == ast.Var:  # isinstance(target, ast.Var):
+            target_var = cast(ast.Var, target)
+            # addr = target_var.addr
+            is_relative = target_var.addr_is_relative
 
-        if addr is None:
-            raise InternalError("Address not found for assign target")
+            # if addr is None:
+            #     raise InternalError("Address not found for assign target")
 
-        self.codegen.emit_push_constant(FundamentalType.CARD_T, addr)
+            # self.codegen.emit_push_constant(FundamentalType.CARD_T, addr)
 
-        if is_relative:
-            self.codegen.emit_store_relative(target.fund_t)
-        else:
+            if is_relative:
+                self.codegen.emit_store_relative(target.fund_t)
+            else:
+                self.codegen.emit_store_absolute(target.fund_t)
+        elif isinstance(target, ast.Dereference):
+            # Walking the dereference pushed the pointer value onto the stack.
+            # Note: The pointer value is always the runtime absolute address.
             self.codegen.emit_store_absolute(target.fund_t)
+        elif isinstance(target, ast.ArrayAccess):
+            # Walking the array access pushed the array base address onto the stack,
+            # so here we need to push the index value onto the stack and add it
+            # to the base address to get the actual address.
+            self.codegen.emit_store_absolute(target.fund_t)
+            # array_access = cast(ast.ArrayAccess, target)
+            # self.walk(array_access.index)
+            # self.codegen.emit_binary_op(
+            #     ByteCodeOp.ADD, FundamentalType.CARD_T, FundamentalType.CARD_T
+            # )
+        else:
+            raise InternalError(f"Unsupported assignment target {target}")
 
         # if isinstance(target, ast.Var):
         #     var = cast(ast.Var, target)

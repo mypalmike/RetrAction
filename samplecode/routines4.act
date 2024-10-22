@@ -6,7 +6,7 @@ RETURN
 
 PROC main()
   BYTE lnum
-  lnum = 254 + 13
+  lnum = 254 + 13 - gnum
   foo(gnum)
   foo(lnum)
 RETURN
