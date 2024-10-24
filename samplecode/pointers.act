@@ -1,14 +1,20 @@
-BYTE POINTER pX = $F000
-BYTE POINTER pY
+BYTE glob
 
 PROC main ()
-  INT zzz
-  BYTE POINTER p1
-  BYTE POINTER p2
-  p1 = $F100
+  BYTE loc
+  BYTE POINTER pGlob
+  BYTE POINTER pLoc
 
-  p1^ = 4
-  p2 = p1
-  DEVPRINT(p2^)
+  pGlob = @glob
+  pLoc = @loc
+
+  DEVPRINT(pGlob)
+  DEVPRINT(pLoc)
+
+  pGlob^ = 12
+  pLoc^ = 24
+
+  DEVPRINT(pGlob^)
+  DEVPRINT(pLoc^)
 
 RETURN

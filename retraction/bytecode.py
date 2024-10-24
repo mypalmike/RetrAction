@@ -36,8 +36,6 @@ class ByteCodeOp(Enum):
     CAST = 32
     PUSH_FRAME_POINTER = 33
     NOP = 34
-    # LOAD_VARIABLE = 24
-    # STORE_VARIABLE = 25
     # TODO: Remove when not needed
     DEVPRINT = 200
 

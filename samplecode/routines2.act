@@ -3,7 +3,7 @@ BYTE y = [1]
 PROC foo()
   BYTE z
   y = 2
-  z = 4 AND 5
+  z = 4 OR 5
   DEVPRINT(z)
   DEVPRINT(y)
 RETURN
