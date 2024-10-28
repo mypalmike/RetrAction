@@ -47,12 +47,10 @@ class BCWalk:
         self.local_param_index: int = 0
 
         self.force_absolute = False
-        # self.var_addr: int | None = None
-        # self.is_lhs: bool = False
 
     @singledispatchmethod
     def walk(self, node: ast.Node):
-        raise InternalError(f"Unsupported node type {node}")  # {type(node)}")
+        raise InternalError(f"Unsupported node type {node}")
 
     @walk.register
     def _(self, program: ast.Program):
@@ -221,6 +219,26 @@ class BCWalk:
         self.force_absolute = False
 
         self.codegen.emit_load_absolute(FundamentalType.CARD_T)
+
+    @walk.register
+    def _(self, array_access: ast.ArrayAccess):
+        # Generate code to calculate the address of the array element
+        # First, push the address of the array base onto the stack
+        self.walk(array_access.var)
+        var_fund_t = array_access.var.fund_t
+        element_size = var_fund_t.size_bytes
+        # Next, push the index onto the stack
+        self.walk(array_access.index_expr)
+        index_fund_t = array_access.index_expr.fund_t
+        # Indexing of arrays of INTs and CARDs is 2 bytes per element, so
+        # multiply the index by 2 to get the correct byte offset.
+        # if element_size == 2:
+        #     self.codegen.emit_push_constant(FundamentalType.BYTE_T, 1)
+        #     self.codegen.emit_binary_op(
+        #         ByteCodeOp.LSH, index_fund_t, FundamentalType.BYTE_T
+        #     )
+        # Add the index to the base address to get the address of the element
+        self.codegen.emit_binary_op(ByteCodeOp.ADD, var_fund_t, index_fund_t)
 
     @walk.register
     def _(self, routine: ast.Routine):

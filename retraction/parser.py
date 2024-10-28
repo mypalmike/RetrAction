@@ -1228,7 +1228,7 @@ class Parser:
                     self.advance()
                     index_expr = self.parse_arith_exp()
                     self.consume(TokenType.OP_RPAREN)
-                    return ast.ArrayAccess(var_node, index_expr)
+                    return ast.GetVar(ast.ArrayAccess(var_node, index_expr))
                 else:
                     return ast.Reference(var_node)
             return ast.GetVar(var_node)

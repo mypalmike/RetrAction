@@ -164,12 +164,12 @@ class FieldAccess(Expr):
 
 
 class ArrayAccess(Expr):
-    def __init__(self, var: Var, index: Expr):
+    def __init__(self, var: Var, index_expr: Expr):
         self.var = var
-        self.index = index
+        self.index_expr = index_expr
 
     def __repr__(self) -> str:
-        return f"ArrayAccess({self.var}, {self.index})"
+        return f"ArrayAccess({self.var}, {self.index_expr})"
 
     @property
     def fund_t(self) -> FundamentalType:
