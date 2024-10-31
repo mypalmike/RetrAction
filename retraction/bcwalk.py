@@ -83,6 +83,11 @@ class BCWalk:
             self.walk(routine)
 
     @walk.register
+    def _(self, struct_decl: ast.RecordDecl):
+        # Nothing to do here, struct declarations never generate code
+        pass
+
+    @walk.register
     def _(self, var_decl: ast.VarDecl):
         is_global = self.current_routine is None
         # Global vars are emitted as raw data
@@ -241,6 +246,27 @@ class BCWalk:
         self.codegen.emit_binary_op(ByteCodeOp.ADD, var_fund_t, index_fund_t)
 
     @walk.register
+    def _(self, field_access: ast.FieldAccess):
+        # Generate code to calculate the address of the field. This is done by
+        # adding the offset of the field to the address of the record base.
+        # First, push the address of the record base onto the stack
+        self.walk(field_access.var)
+        record_t = cast(RecordType, field_access.var.var_t)
+        field_name = field_access.field_name
+        field_offset = 0
+        # TODO: Optimization: pre-calculate field offsets
+        for field in record_t.fields:
+            if field[0] == field_name:
+                break
+            field_offset += field[1].size_bytes
+        # Next, push the offset of the field onto the stack
+        self.codegen.emit_push_constant(FundamentalType.CARD_T, field_offset)
+        # Add the offset to the base address to get the address of the field
+        self.codegen.emit_binary_op(
+            ByteCodeOp.ADD, FundamentalType.CARD_T, FundamentalType.CARD_T
+        )
+
+    @walk.register
     def _(self, routine: ast.Routine):
         try:
             self.symbol_table = routine.local_symtab
@@ -309,6 +335,13 @@ class BCWalk:
             # self.codegen.emit_binary_op(
             #     ByteCodeOp.ADD, FundamentalType.CARD_T, FundamentalType.CARD_T
             # )
+        elif isinstance(target, ast.FieldAccess):
+            target_field_access = cast(ast.FieldAccess, target)
+            is_relative = target_field_access.var.addr_is_relative
+            if is_relative:
+                self.codegen.emit_store_relative(target.fund_t)
+            else:
+                self.codegen.emit_store_absolute(target.fund_t)
         else:
             raise InternalError(f"Unsupported assignment target {target}")
 

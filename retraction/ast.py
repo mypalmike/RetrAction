@@ -68,13 +68,13 @@ class VarDecl(Decl):
         return f"VarDecl({self.name}, {self.var_t}, {self.init_opts})"
 
 
-class StructDecl(Decl):
-    def __init__(self, name: str, fields: list[VarDecl]):
+class RecordDecl(Decl):
+    def __init__(self, name: str, record_t: RecordType):
         self.name = name
-        self.fields = fields
+        self.record_t = record_t
 
     def __repr__(self) -> str:
-        return f"StructDecl({self.name}, {self.fields})"
+        return f"RecordDecl({self.name}, {self.record_t})"
 
 
 class Statement(Node):
@@ -156,11 +156,11 @@ class FieldAccess(Expr):
         # A valid field access refers to a var
         access_var = cast(Var, self.var)
         # Look up the field name in the struct
-        struct_t = cast(RecordType, access_var.var_t)
-        for field in struct_t.fields:
+        record_t = cast(RecordType, access_var.var_t)
+        for field in record_t.fields:
             if field[0] == self.field_name:
                 return field[1]
-        raise InternalError(f"Field {self.field_name} not found in struct {struct_t}")
+        raise InternalError(f"Field {self.field_name} not found in struct {record_t}")
 
 
 class ArrayAccess(Expr):

@@ -1,0 +1,7 @@
+BYTE ARRAY vals(5) = [8, 16, 32, 64, 128]
+
+PROC main()
+    vals(4) = $33
+
+    DEVPRINT(vals(4))
+RETURN

@@ -48,19 +48,17 @@ class ComplexType(SizeBytes):
 
 
 class RecordType(ComplexType):
-    def __init__(self, name: str):
+    def __init__(self, name: str, fields: list[tuple[str, FundamentalType]]):
         self.name = name
-        self.fields: list[tuple[str, FundamentalType]] = (
-            []
-        )  # Use list rather than just a dict to preserve order
-        self.lookup: dict[str, int] = {}
+        self.fields = fields
+        # self.lookup: dict[str, int] = {f[0]: i for i, f in enumerate(fields)}
 
-    def add_field(self, name: str, field_type: FundamentalType):
-        self.fields.append((name, field_type))
-        self.lookup[name] = len(self.fields) - 1
+    # def add_field(self, name: str, field_type: FundamentalType):
+    #     self.fields.append((name, field_type))
+    #     self.lookup[name] = len(self.fields) - 1
 
-    def get_field(self, name: str) -> tuple[str, FundamentalType]:
-        return self.fields[self.lookup[name]]
+    # def get_field(self, name: str) -> tuple[str, FundamentalType]:
+    #     return self.fields[self.lookup[name]]
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, RecordType):

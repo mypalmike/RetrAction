@@ -8,6 +8,7 @@ from retraction.tokens import Token, TokenType
 from retraction.error import IdentifierError, InternalError, SyntaxError
 from retraction.types import (
     ArrayType,
+    ComplexType,
     FundamentalType,
     PointerType,
     Type,
@@ -154,7 +155,7 @@ class Parser:
 
         return decls
 
-    def parse_system_decl(self) -> ast.StructDecl | list[ast.VarDecl] | None:
+    def parse_system_decl(self) -> ast.RecordDecl | list[ast.VarDecl] | None:
         """
         Parse a single system decl
         """
@@ -172,7 +173,7 @@ class Parser:
             return var_decl
         return None
 
-    def parse_type_decl(self) -> ast.StructDecl | None:
+    def parse_type_decl(self) -> ast.RecordDecl | None:
         """
         Note: The grammar specifies multiple type declarations, but this is unnecessary
         because higher-level rules already handle repetition. So we just parse a single
@@ -189,20 +190,29 @@ class Parser:
         self.consume(TokenType.OP_LBRACK)
         field_list = self.parse_field_init()
         self.consume(TokenType.OP_RBRACK)
-        return ast.StructDecl(rec_name, field_list)
+        record_t = RecordType(rec_name, field_list)
+        return ast.RecordDecl(rec_name, record_t)
 
-    def parse_field_init(self) -> list[ast.VarDecl]:
+    def parse_field_init(self) -> list[tuple[str, FundamentalType]]:
         """
         As with some other rules, we handle repetition differently from the published
         grammar. Here, we iterate over fund decls until we reach the closing bracket.
         <field init> ::= <fund var decl>
         """
-        fields: list[ast.VarDecl] = []
+        fields: list[tuple[str, FundamentalType]] = []
         while True:
             curr_fields = self.parse_fund_decl(False)
             if curr_fields is None:
                 break
-            fields = fields + curr_fields
+            # Raise an error if any of the types are not fundamental
+            if any(not isinstance(f.var_t, FundamentalType) for f in curr_fields):
+                raise SyntaxError("Non-fundamental type in record declaration")
+            curr_fields_tuple = [
+                (f.name, f.var_t)
+                for f in curr_fields
+                if isinstance(f.var_t, FundamentalType)
+            ]
+            fields += curr_fields_tuple
         # Empty record is an error, matching behavior of the original Action! compiler.
         if len(fields) == 0:
             raise SyntaxError("Empty record declaration")
@@ -328,14 +338,14 @@ class Parser:
                 return ast.InitOpts([addr], True)
         return None
 
-    def parse_fund_or_record_type(self) -> FundamentalType | RecordType | None:
+    def parse_ptr_type(self) -> FundamentalType | RecordType | None:
         """
-        <fund or record type> ::= <fund type> | <record type>
+        <ptr type> ::= <fund type> | <rec name>
         """
         fund_t = self.parse_fund_type()
         if fund_t is not None:
             return fund_t
-        record_t = self.parse_record_type()
+        record_t = self.parse_rec_name()
         if record_t:
             return record_t
         return None
@@ -349,7 +359,7 @@ class Parser:
         """
         if not self.next_token() or self.next_token().tok_type != TokenType.POINTER:
             return None
-        ref_t = self.parse_fund_or_record_type()
+        ref_t = self.parse_ptr_type()
         if ref_t is None:
             raise SyntaxError(
                 "Expected fundamental or record type in pointer declaration"
@@ -505,9 +515,9 @@ class Parser:
                 self.advance()
         return values
 
-    def parse_record_type(self) -> RecordType | None:
+    def parse_rec_name(self) -> RecordType | None:
         """
-        <record type> ::= <identifier>
+        <rec name> ::= <identifier>
         """
         if self.current_token().tok_type != TokenType.IDENTIFIER:
             return None
@@ -516,15 +526,13 @@ class Parser:
         if symtab_entry is None or symtab_entry.entry_type != EntryType.RECORD:
             return None
         self.advance()
-        return RecordType(identifier)
+        record_decl = cast(ast.RecordDecl, symtab_entry.node)
+        return record_decl.record_t
 
     def parse_record_decl(self) -> list[ast.VarDecl] | None:
         """
         Variable Declaration for Records
         <record decl> ::= <identifier> <rec ident list>
-        <address> ::= <comp const>
-        TODO: Probably need to refer to a symbol/type table to look up the record type to
-        distinguish between record and array or other declarations
         """
         if self.current_token().tok_type != TokenType.IDENTIFIER:
             return None
@@ -534,7 +542,9 @@ class Parser:
         if symtab_entry is None or symtab_entry.entry_type != EntryType.RECORD:
             return None
         self.advance()
-        return self.parse_rec_ident_list(RecordType(identifier))
+        record_decl = cast(ast.RecordDecl, symtab_entry.node)
+        record_t = record_decl.record_t
+        return self.parse_rec_ident_list(record_t)
 
     def parse_rec_ident_list(
         self,
@@ -1199,6 +1209,7 @@ class Parser:
         """
         is_reference = False
         is_pointer = False
+        field_name = None
         if self.current_token().tok_type == TokenType.OP_AT:
             is_reference = True
             self.advance()
@@ -1215,6 +1226,9 @@ class Parser:
             if self.current_token().tok_type == TokenType.OP_CARET:
                 is_pointer = True
                 self.advance()
+            elif self.current_token().tok_type == TokenType.OP_DOT:
+                self.advance()
+                field_name = self.consume(TokenType.IDENTIFIER).value
             var_decl = cast(ast.VarDecl, symbol_table_entry.node)
             var_node = ast.Var(identifier, var_decl.var_t)
             if is_pointer:
@@ -1223,6 +1237,8 @@ class Parser:
                 return ast.GetVar(ast.Dereference(var_node))
             if is_reference:
                 return ast.Reference(var_node)
+            if field_name is not None:
+                return ast.GetVar(ast.FieldAccess(var_node, field_name))
             if isinstance(var_decl.var_t, ArrayType):
                 if self.current_token().tok_type == TokenType.OP_LPAREN:
                     self.advance()

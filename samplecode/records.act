@@ -1,0 +1,15 @@
+TYPE rec = [
+    BYTE b1,b2
+    INT i1
+    CARD c1,c2,c3,c4,c5
+    BYTE b3
+]
+
+
+rec myRec
+
+PROC main()
+    myRec.b2 = 4
+
+    DEVPRINT(myRec.b2)
+RETURN
