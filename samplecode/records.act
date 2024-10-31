@@ -9,7 +9,11 @@ TYPE rec = [
 rec myRec
 
 PROC main()
+    rec myLocalRec
+
     myRec.b2 = 4
+    myLocalRec.c2 = 12
 
     DEVPRINT(myRec.b2)
+    DEVPRINT(myLocalRec.c2)
 RETURN

@@ -183,7 +183,22 @@ class BCWalk:
     def _(self, get_var: ast.GetVar):
         # Push the address of the variable onto the stack
         self.walk(get_var.var)
-        is_relative = isinstance(get_var.var, ast.Var) and get_var.var.addr_is_relative
+
+        # TODO: This is hacky, but it works for now. Would be better to have
+        # a more clean, general way to determine if an address is relative.
+        is_relative = False
+        if isinstance(get_var.var, ast.Var) and get_var.var.addr_is_relative:
+            is_relative = True
+        elif (
+            isinstance(get_var.var, ast.FieldAccess)
+            and get_var.var.var.addr_is_relative
+        ):
+            is_relative = True
+        elif (
+            isinstance(get_var.var, ast.ArrayAccess)
+            and get_var.var.var.addr_is_relative
+        ):
+            is_relative = True
 
         # Load the value from the address
         if is_relative:
