@@ -245,20 +245,30 @@ class BCWalk:
         # Generate code to calculate the address of the array element
         # First, push the address of the array base onto the stack
         self.walk(array_access.var)
-        var_fund_t = array_access.var.fund_t
+        var_fund_t = array_access.fund_t
         element_size = var_fund_t.size_bytes
+
         # Next, push the index onto the stack
         self.walk(array_access.index_expr)
+
         index_fund_t = array_access.index_expr.fund_t
         # Indexing of arrays of INTs and CARDs is 2 bytes per element, so
         # multiply the index by 2 to get the correct byte offset.
-        # if element_size == 2:
-        #     self.codegen.emit_push_constant(FundamentalType.BYTE_T, 1)
-        #     self.codegen.emit_binary_op(
-        #         ByteCodeOp.LSH, index_fund_t, FundamentalType.BYTE_T
-        #     )
+
+        # TODO: If index_fund_t is BYTE_T and is multiplied by 2, it may overflow.
+        # In cases where it's computed at runtime, we would need to either check for it
+        # at runtime or always cast to CARD_T.
+        # In cases where it's a constant, this could be optimized for values < 128.
+        # In general, when it's constant, the multiplication by 2 could be done at compile time.
+        if element_size == 2:
+            self.codegen.emit_push_constant(FundamentalType.BYTE_T, 1)
+            self.codegen.emit_binary_op(
+                ByteCodeOp.LSH, index_fund_t, FundamentalType.BYTE_T
+            )
         # Add the index to the base address to get the address of the element
-        self.codegen.emit_binary_op(ByteCodeOp.ADD, var_fund_t, index_fund_t)
+        self.codegen.emit_binary_op(
+            ByteCodeOp.ADD, FundamentalType.CARD_T, index_fund_t
+        )
 
     @walk.register
     def _(self, field_access: ast.FieldAccess):
@@ -344,12 +354,12 @@ class BCWalk:
             # Walking the array access pushed the array base address onto the stack,
             # so here we need to push the index value onto the stack and add it
             # to the base address to get the actual address.
-            self.codegen.emit_store_absolute(target.fund_t)
-            # array_access = cast(ast.ArrayAccess, target)
-            # self.walk(array_access.index)
-            # self.codegen.emit_binary_op(
-            #     ByteCodeOp.ADD, FundamentalType.CARD_T, FundamentalType.CARD_T
-            # )
+            array_access = cast(ast.ArrayAccess, target)
+            is_relative = array_access.var.addr_is_relative
+            if is_relative:
+                self.codegen.emit_store_relative(target.fund_t)
+            else:
+                self.codegen.emit_store_absolute(target.fund_t)
         elif isinstance(target, ast.FieldAccess):
             target_field_access = cast(ast.FieldAccess, target)
             is_relative = target_field_access.var.addr_is_relative
