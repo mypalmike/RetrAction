@@ -505,21 +505,6 @@ class BCWalk:
 
     @walk.register
     def _(self, while_stmt: ast.While):
-        #         self.prepare_exits()
-        # jump_start_addr = self.code_gen.get_next_addr()
-        # self.parse_cond_exp()
-        # jump_end_addr = self.code_gen.emit_jump_if_false(self.last_t)
-        # self.consume(TokenType.DO)
-        # self.parse_stmt_list()
-        # if self.current_token().tok_type == TokenType.UNTIL:
-        #     self.advance()
-        #     self.parse_cond_exp()
-        #     self.code_gen.emit_jump_if_false(self.last_t, jump_start_addr)
-        # else:
-        #     self.code_gen.emit_jump(jump_start_addr)
-        # self.consume(TokenType.OD)
-        # self.code_gen.fixup_jump(jump_end_addr, self.code_gen.get_next_addr())
-        # self.patch_exits()
         self.prepare_exits()
         self.while_jump_start_addr = self.codegen.get_next_addr()
         self.walk(while_stmt.condition)
@@ -531,9 +516,6 @@ class BCWalk:
 
     @walk.register
     def _(self, do_stmt: ast.Do):
-        # for statement in do_stmt.body:
-        #     self.walk(statement)
-
         if self.while_jump_start_addr is not None:
             self.prepare_exits()
 
@@ -550,20 +532,6 @@ class BCWalk:
 
         if self.while_jump_start_addr is not None:
             self.patch_exits()
-
-        # self.prepare_exits()
-        # jump_start_addr = self.code_gen.get_next_addr()
-        # self.parse_stmt_list()
-        # if self.current_token().tok_type == TokenType.UNTIL:
-        #     self.advance()
-        #     self.parse_cond_exp()
-        #     self.code_gen.emit_jump_if_false(self.last_t, jump_start_addr)
-        #     self.consume(TokenType.OD)
-        # else:
-        #     self.consume(TokenType.OD)
-        #     self.code_gen.emit_jump(jump_start_addr)
-        # self.patch_exits()
-        # return True
 
     @walk.register
     def _(self, devprint: ast.DevPrint):
