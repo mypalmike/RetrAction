@@ -47,6 +47,24 @@ class BCWalk:
         self.local_param_index: int = 0
 
         self.force_absolute = False
+        self.exits_to_patch: list[list[int]] = []
+        self.while_jump_start_addr: int | None = None
+
+    def prepare_exits(self):
+        """
+        Helper method to set up exit patching
+        """
+        self.exits_to_patch.append([])
+
+    def patch_exits(self):
+        """
+        Helper method for patching exits at the end of loops
+        """
+        exits_to_patch = self.exits_to_patch.pop()
+        if exits_to_patch:
+            next_addr = self.code_gen.get_next_addr()
+            for jump_exit in exits_to_patch:
+                self.code_gen.fixup_jump(jump_exit, next_addr)
 
     @singledispatchmethod
     def walk(self, node: ast.Node):
@@ -484,6 +502,68 @@ class BCWalk:
         end_addr = self.codegen.get_next_addr()
         for jump_end_addr in jump_end_addrs:
             self.codegen.fixup_jump(jump_end_addr, end_addr)
+
+    @walk.register
+    def _(self, while_stmt: ast.While):
+        #         self.prepare_exits()
+        # jump_start_addr = self.code_gen.get_next_addr()
+        # self.parse_cond_exp()
+        # jump_end_addr = self.code_gen.emit_jump_if_false(self.last_t)
+        # self.consume(TokenType.DO)
+        # self.parse_stmt_list()
+        # if self.current_token().tok_type == TokenType.UNTIL:
+        #     self.advance()
+        #     self.parse_cond_exp()
+        #     self.code_gen.emit_jump_if_false(self.last_t, jump_start_addr)
+        # else:
+        #     self.code_gen.emit_jump(jump_start_addr)
+        # self.consume(TokenType.OD)
+        # self.code_gen.fixup_jump(jump_end_addr, self.code_gen.get_next_addr())
+        # self.patch_exits()
+        self.prepare_exits()
+        self.while_jump_start_addr = self.codegen.get_next_addr()
+        self.walk(while_stmt.condition)
+        jump_end_addr = self.codegen.emit_jump_if_false(while_stmt.condition.fund_t)
+        self.walk(while_stmt.do_statement)
+        self.codegen.fixup_jump(jump_end_addr, self.codegen.get_next_addr())
+        self.while_jump_start_addr = None
+        self.patch_exits()
+
+    @walk.register
+    def _(self, do_stmt: ast.Do):
+        # for statement in do_stmt.body:
+        #     self.walk(statement)
+
+        if self.while_jump_start_addr is not None:
+            self.prepare_exits()
+
+        jump_start_addr = self.codegen.get_next_addr()
+        if self.while_jump_start_addr is not None:
+            jump_start_addr = self.while_jump_start_addr
+        for statement in do_stmt.body:
+            self.walk(statement)
+        if do_stmt.until is not None:
+            self.walk(do_stmt.until)
+            self.codegen.emit_jump_if_false(do_stmt.until.fund_t, jump_start_addr)
+        else:
+            self.codegen.emit_jump(jump_start_addr)
+
+        if self.while_jump_start_addr is not None:
+            self.patch_exits()
+
+        # self.prepare_exits()
+        # jump_start_addr = self.code_gen.get_next_addr()
+        # self.parse_stmt_list()
+        # if self.current_token().tok_type == TokenType.UNTIL:
+        #     self.advance()
+        #     self.parse_cond_exp()
+        #     self.code_gen.emit_jump_if_false(self.last_t, jump_start_addr)
+        #     self.consume(TokenType.OD)
+        # else:
+        #     self.consume(TokenType.OD)
+        #     self.code_gen.emit_jump(jump_start_addr)
+        # self.patch_exits()
+        # return True
 
     @walk.register
     def _(self, devprint: ast.DevPrint):

@@ -1,0 +1,27 @@
+PROC doWhiles()
+    BYTE w, x, y
+    w = $AA
+    y = $CC
+    x = 4
+    WHILE x > 0 DO
+        DEVPRINT(x)
+        x = x - 1
+    OD
+RETURN
+
+PROC doUntils()
+    BYTE w, x, y
+    w = $AA
+    y = $CC
+    x = 19
+    DO
+        DEVPRINT(x)
+        x = x - 1
+    UNTIL x < 15
+    OD
+RETURN
+
+PROC main()
+    doWhiles()
+    doUntils()
+RETURN

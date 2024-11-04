@@ -44,7 +44,7 @@ See samplecode directory for other examples. The interpreter currently outputs e
 
 - Local variable initialization.
 
-- "Preprocessor" - INCLUDE, DEFINE, SET, and comments. Note: the "SET" directive, which was designed to set memory locations on an Atari 8-bit machine at runtime might be emulated at some point for "common" compile-time settings.
+- "Preprocessor" - INCLUDE, DEFINE, SET, and comments. Note: the "SET" directive, which was designed to set memory locations on an Atari 8-bit machine at compile time might be emulated at some point for "common" compile-time settings.
 
 - Case-insensitive compilation, which is an option in the original Action! compiler.
 
