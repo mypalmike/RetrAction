@@ -1,6 +1,8 @@
 # RetrAction
 
-An interpreter and compiler for the Action programming language. Not yet complete.
+An interpreter and compiler for the Action! programming language. Action! is a language developed in the 1980s for the Atari 8-bit computer line. It is similar to C in terms of overall functionality, including pointer, array, and record types. But it is a bit more limited than C. For instance, it does not support nested records. The syntax is simpler than C, requiring neither semicolons nor meaningful whitespace.
+
+The ultimate goal of this project is to have a usable cross-compiler to generate 6502 machine code, hosted on any platform that supports Python.
 
 ## Up and running
 
@@ -20,6 +22,8 @@ See samplecode directory for other examples. The interpreter currently outputs e
 
 ## Status
 
+This is a work in progress. The first major milestone will be completing all functionality of the Action! language, generating the stack VM bytecode.
+
 **What works?**
 
 - Parses virtually all of the Action! language into bytecode.
@@ -36,11 +40,17 @@ See samplecode directory for other examples. The interpreter currently outputs e
 
 - Arrays.
 
+- Binary operations.
+
 - IF/ELSEIF/ELSE/ENDIF
 
-**What doesn't work?**
+- DO/WHILE/UNTIL/EXIT
 
-- DO/WHILE/UNTIL and FOR loops. These were implemented in an earlier version before a major change (adding ast rather than flat/direct compilation) and should be relatively simple to add again.
+**What's left?**
+
+- Unary negation.
+
+- FOR loops. These were implemented in an earlier version before a major change (adding ast rather than flat/direct compilation) and should be relatively simple to add again.
 
 - Local variable initialization.
 
