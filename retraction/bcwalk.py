@@ -62,9 +62,9 @@ class BCWalk:
         """
         exits_to_patch = self.exits_to_patch.pop()
         if exits_to_patch:
-            next_addr = self.code_gen.get_next_addr()
+            next_addr = self.codegen.get_next_addr()
             for jump_exit in exits_to_patch:
-                self.code_gen.fixup_jump(jump_exit, next_addr)
+                self.codegen.fixup_jump(jump_exit, next_addr)
 
     @singledispatchmethod
     def walk(self, node: ast.Node):
@@ -516,7 +516,7 @@ class BCWalk:
 
     @walk.register
     def _(self, do_stmt: ast.Do):
-        if self.while_jump_start_addr is not None:
+        if self.while_jump_start_addr is None:
             self.prepare_exits()
 
         jump_start_addr = self.codegen.get_next_addr()
@@ -530,8 +530,17 @@ class BCWalk:
         else:
             self.codegen.emit_jump(jump_start_addr)
 
-        if self.while_jump_start_addr is not None:
+        if self.while_jump_start_addr is None:
             self.patch_exits()
+
+    @walk.register
+    def _(self, exit_stmt: ast.Exit):
+        if len(self.exits_to_patch) == 0:
+            raise SyntaxError("EXIT statement outside of loop")
+        # This gets patched at the end of the loop with the address following the loop
+        jump_exit_addr = self.codegen.emit_jump()
+        self.exits_to_patch[-1].append(jump_exit_addr)
+        return True
 
     @walk.register
     def _(self, devprint: ast.DevPrint):

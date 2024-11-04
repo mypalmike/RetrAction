@@ -19,6 +19,15 @@ PROC doUntils()
         x = x - 1
     UNTIL x < 15
     OD
+    x = 29
+    DO
+        DEVPRINT(x)
+        x = x - 1
+        IF x < 25 THEN
+            EXIT
+        FI
+    UNTIL x < 20
+    OD
 RETURN
 
 PROC main()
