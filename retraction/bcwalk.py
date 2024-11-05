@@ -48,7 +48,6 @@ class BCWalk:
 
         self.force_absolute = False
         self.exits_to_patch: list[list[int]] = []
-        self.while_jump_start_addr: int | None = None
 
     def prepare_exits(self):
         """
@@ -506,32 +505,113 @@ class BCWalk:
     @walk.register
     def _(self, while_stmt: ast.While):
         self.prepare_exits()
-        self.while_jump_start_addr = self.codegen.get_next_addr()
+        loop_start_addr = self.codegen.get_next_addr()
         self.walk(while_stmt.condition)
         jump_end_addr = self.codegen.emit_jump_if_false(while_stmt.condition.fund_t)
-        self.walk(while_stmt.do_statement)
+        self.walk(while_stmt.do_statement, loop_start_addr)
         self.codegen.fixup_jump(jump_end_addr, self.codegen.get_next_addr())
-        self.while_jump_start_addr = None
         self.patch_exits()
 
     @walk.register
-    def _(self, do_stmt: ast.Do):
-        if self.while_jump_start_addr is None:
+    def _(self, do_stmt: ast.Do, loop_start_addr: int | None = None):
+        # Do loops are embedded in while and for loops.
+        # In those cases, we don't patch exits here, and the loop start address
+        # is passed in as a parameter.
+        if loop_start_addr is None:
             self.prepare_exits()
+            loop_addr = self.codegen.get_next_addr()
+        else:
+            loop_addr = loop_start_addr
 
-        jump_start_addr = self.codegen.get_next_addr()
-        if self.while_jump_start_addr is not None:
-            jump_start_addr = self.while_jump_start_addr
         for statement in do_stmt.body:
             self.walk(statement)
         if do_stmt.until is not None:
             self.walk(do_stmt.until)
-            self.codegen.emit_jump_if_false(do_stmt.until.fund_t, jump_start_addr)
+            self.codegen.emit_jump_if_false(do_stmt.until.fund_t, loop_addr)
         else:
-            self.codegen.emit_jump(jump_start_addr)
+            self.codegen.emit_jump(loop_addr)
 
-        if self.while_jump_start_addr is None:
+        if loop_start_addr is None:
             self.patch_exits()
+
+    @walk.register
+    def _(self, for_loop: ast.For):
+        self.prepare_exits()
+        # Assign var_target to the initial value
+        self.walk(for_loop.start_expr)
+        if (
+            for_loop.var_target.fund_t.size_bytes
+            != for_loop.start_expr.fund_t.size_bytes
+        ):
+            self.codegen.emit_cast(
+                for_loop.start_expr.fund_t, for_loop.var_target.fund_t
+            )
+        self.walk(for_loop.var_target)
+        if for_loop.var_target.addr_is_relative:
+            self.codegen.emit_store_relative(for_loop.var_target.fund_t)
+        else:
+            self.codegen.emit_store_absolute(for_loop.var_target.fund_t)
+
+        # Jump to the condition check
+        jump_condition_addr = self.codegen.emit_jump()
+
+        # Increment the loop variable (Top of loop)
+        loop_start_addr = self.codegen.get_next_addr()
+        self.walk(for_loop.var_target)
+        if for_loop.var_target.addr_is_relative:
+            self.codegen.emit_load_relative(for_loop.var_target.fund_t)
+        else:
+            self.codegen.emit_load_absolute(for_loop.var_target.fund_t)
+        if for_loop.inc_expr is not None:
+            self.walk(for_loop.inc_expr)
+            if (
+                for_loop.var_target.fund_t.size_bytes
+                != for_loop.inc_expr.fund_t.size_bytes
+            ):
+                self.codegen.emit_cast(
+                    for_loop.inc_expr.fund_t, for_loop.var_target.fund_t
+                )
+        else:
+            self.codegen.emit_push_constant(for_loop.var_target.fund_t, 1)
+        self.codegen.emit_binary_op(
+            ByteCodeOp.ADD, for_loop.var_target.fund_t, for_loop.var_target.fund_t
+        )
+        self.walk(for_loop.var_target)
+        if for_loop.var_target.addr_is_relative:
+            self.codegen.emit_store_relative(for_loop.var_target.fund_t)
+        else:
+            self.codegen.emit_store_absolute(for_loop.var_target.fund_t)
+
+        # Check the condition
+        condition_addr = self.codegen.get_next_addr()
+        self.codegen.fixup_jump(jump_condition_addr, condition_addr)
+        self.walk(for_loop.var_target)
+        if for_loop.var_target.addr_is_relative:
+            self.codegen.emit_load_relative(for_loop.var_target.fund_t)
+        else:
+            self.codegen.emit_load_absolute(for_loop.var_target.fund_t)
+        self.walk(for_loop.finish_expr)
+        if (
+            for_loop.var_target.fund_t.size_bytes
+            != for_loop.finish_expr.fund_t.size_bytes
+        ):
+            self.codegen.emit_cast(
+                for_loop.finish_expr.fund_t, for_loop.var_target.fund_t
+            )
+        self.codegen.emit_binary_op(
+            ByteCodeOp.LE, for_loop.var_target.fund_t, for_loop.var_target.fund_t
+        )
+        jump_end_addr = self.codegen.emit_jump_if_false(for_loop.var_target.fund_t)
+
+        # Walk the body
+        self.walk(for_loop.do_loop, loop_start_addr)
+
+        # Note: Jumping back to the top of the loop is done by the do loop
+
+        # Fix the jump at the end of the loop
+        self.codegen.fixup_jump(jump_end_addr, self.codegen.get_next_addr())
+
+        self.patch_exits()
 
     @walk.register
     def _(self, exit_stmt: ast.Exit):

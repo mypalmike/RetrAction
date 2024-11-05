@@ -375,7 +375,7 @@ class VirtualMachine:
                 else:
                     self.pc += 4
             elif op == ByteCodeOp.JUMP:
-                jump_addr = self.memory[self.pc + 1]
+                jump_addr = self.read_card(self.pc + 1)
                 self.pc = jump_addr
             elif op == ByteCodeOp.LOAD_ABSOLUTE:
                 value_t = FundamentalType(self.memory[self.pc + 1])

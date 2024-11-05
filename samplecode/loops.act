@@ -30,7 +30,16 @@ PROC doUntils()
     OD
 RETURN
 
+PROC doFors()
+    BYTE x
+
+    FOR x = 1 TO 5
+    DO
+        DEVPRINT(x)
+    OD
+RETURN
+
 PROC main()
-    doWhiles()
-    doUntils()
+
+    doFors()
 RETURN

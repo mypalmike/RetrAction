@@ -44,13 +44,11 @@ This is a work in progress. The first major milestone will be completing all fun
 
 - IF/ELSEIF/ELSE/ENDIF
 
-- DO/WHILE/UNTIL/EXIT
+- All loop structures: WHILE/FOR/DO/UNTIL/EXIT/OD
 
 **What's left?**
 
 - Unary negation.
-
-- FOR loops. These were implemented in an earlier version before a major change (adding ast rather than flat/direct compilation) and should be relatively simple to add again.
 
 - Local variable initialization.
 
