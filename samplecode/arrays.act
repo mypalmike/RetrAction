@@ -1,7 +1,7 @@
 BYTE ARRAY vals(5) = [8, 16, 32, 64, 128]
 
 PROC main()
-    CARD ARRAY localVals(4)
+    CARD ARRAY localVals(4) = [6 12 18 24]
 
     DEVPRINT(vals(4))
 
@@ -10,6 +10,8 @@ PROC main()
     localVals(3) = 12345
 
     DEVPRINT(vals(4))
-    DEVPRINT(localVals(3))
+    DEVPRINT(localVals(0))
+    DEVPRINT(localVals(1))
     DEVPRINT(localVals(2))
+    DEVPRINT(localVals(3))
 RETURN

@@ -5,8 +5,9 @@ PROC foo(CARD x)
 RETURN
 
 PROC main()
-  BYTE lnum
-  lnum = 254 + 13 - gnum
+  BYTE nada
+  BYTE lnum = [10]
+  lnum = lnum + 13 - gnum
   foo(gnum)
   foo(lnum)
 RETURN

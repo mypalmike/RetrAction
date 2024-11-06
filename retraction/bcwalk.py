@@ -184,17 +184,63 @@ class BCWalk:
             self.next_local_addr += var_decl.var_t.size_bytes
 
             # Local var initialization is emitted as instructions
-            # TODO: This is incomplete and broken.
             if var_decl.init_opts is not None:
-                self.codegen.emit_push_constant(
-                    var_decl.init_opts.initial_values[self.local_param_index]
-                )
-                self.codegen.emit_store_variable(
-                    var_decl.var_t,
-                    ByteCodeVariableScope.LOCAL,
-                    ByteCodeVariableAddressMode.DEFAULT,
-                    var_decl.addr,
-                )
+                if isinstance(var_decl.var_t, FundamentalType):
+                    if var_decl.init_opts.is_address:
+                        # Var is essentially a global pointer.
+                        # TODO
+                        raise NotImplementedError(
+                            "Local var initialization with address"
+                        )
+                    else:
+                        init_value = var_decl.init_opts.initial_values[0]
+                        self.codegen.emit_push_constant(var_decl.var_t, init_value)
+                        # Push relative address of the variable
+                        self.codegen.emit_push_constant(
+                            FundamentalType.CARD_T, var_decl.addr
+                        )
+                        self.codegen.emit_store_relative(var_decl.var_t)
+                elif isinstance(var_decl.var_t, ArrayType):
+                    if var_decl.init_opts.is_address:
+                        # Var is essentially a global pointer.
+                        # TODO
+                        raise NotImplementedError(
+                            "Local array initialization with address"
+                        )
+                    else:
+                        init_values = var_decl.init_opts.initial_values
+                        offset = 0
+                        for init_value in init_values:
+                            self.codegen.emit_push_constant(
+                                var_decl.var_t.element_t, init_value
+                            )
+                            # Push relative address of the variable
+                            self.codegen.emit_push_constant(
+                                FundamentalType.CARD_T, var_decl.addr + offset
+                            )
+                            self.codegen.emit_store_relative(var_decl.var_t.element_t)
+                            offset += var_decl.var_t.element_t.size_bytes
+                elif isinstance(var_decl.var_t, PointerType):
+                    if var_decl.init_opts.is_address:
+                        # Var is essentially a global pointer.
+                        # TODO
+                        raise NotImplementedError(
+                            "Local pointer initialization with address"
+                        )
+                    else:
+                        init_value = var_decl.init_opts.initial_values[0]
+                        self.codegen.emit_push_constant(
+                            FundamentalType.CARD_T, init_value
+                        )
+                        # Push relative address of the variable
+                        self.codegen.emit_push_constant(
+                            FundamentalType.CARD_T, var_decl.addr
+                        )
+                        self.codegen.emit_store_relative(FundamentalType.CARD_T)
+                else:
+                    raise NotImplementedError(
+                        f"Local var initialization for type {var_decl.var_t}"
+                    )
 
     @walk.register
     def _(self, get_var: ast.GetVar):

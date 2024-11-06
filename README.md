@@ -34,13 +34,15 @@ This is a work in progress. The first major milestone will be completing all fun
 
 - Local and global variables.
 
+- Local and global variable initialization.
+
 - Pointers.
 
 - Records.
 
 - Arrays.
 
-- Binary operations.
+- All operators.
 
 - IF/ELSEIF/ELSE/ENDIF
 
@@ -48,11 +50,11 @@ This is a work in progress. The first major milestone will be completing all fun
 
 **What's left?**
 
-- Unary negation.
-
-- Local variable initialization.
-
 - "Preprocessor" - INCLUDE, DEFINE, SET, and comments. Note: the "SET" directive, which was designed to set memory locations on an Atari 8-bit machine at compile time might be emulated at some point for "common" compile-time settings.
+
+- Basic optimizations e.g. math on constants.
+
+- Augment and modify ast to make some things cleaner. e.g. create cast node rather than sprinkle cast operations around. Similar approach for sprinkling of is_relative checks for vars?
 
 - Case-insensitive compilation, which is an option in the original Action! compiler.
 

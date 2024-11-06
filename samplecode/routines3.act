@@ -1,5 +1,5 @@
 PROC foo()
-  DEVPRINT(123)
+  DEVPRINT(---1)
 RETURN
 
 PROC main()

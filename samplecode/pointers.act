@@ -1,9 +1,17 @@
 BYTE glob
 
+PROC locPtrInit()
+  CARD POINTER ptr = $0004
+
+  DEVPRINT(ptr^)
+RETURN
+
 PROC main ()
   BYTE loc
   BYTE POINTER pGlob
   BYTE POINTER pLoc
+
+  locPtrInit()
 
   pGlob = @glob
   pLoc = @loc
@@ -16,5 +24,4 @@ PROC main ()
 
   DEVPRINT(pGlob^)
   DEVPRINT(pLoc^)
-
 RETURN
