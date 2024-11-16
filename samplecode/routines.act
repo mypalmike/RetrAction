@@ -1,4 +1,4 @@
-BYTE x
+BYTE x  ; Global
 
 PROC r1()
   x = 2

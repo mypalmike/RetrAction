@@ -1,6 +1,7 @@
 BYTE glob
 
 PROC locPtrInit()
+  ; BYTE xx = $0004
   CARD POINTER ptr = $0004
 
   DEVPRINT(ptr^)

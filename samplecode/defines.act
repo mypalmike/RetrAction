@@ -1,0 +1,13 @@
+DEFINE DEF = "PROC"
+DEFINE FN1 = "fn1()"
+
+DEF fn1()
+    ; Test sccoped define
+    DEFINE DEF = "DEVPRINT"
+    DEF(2)
+RETURN
+
+DEF main()
+    FN1
+    DEVPRINT(1)
+RETURN

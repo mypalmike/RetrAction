@@ -1,0 +1,3 @@
+PROC doThing()
+  DEVPRINT(1)
+RETURN

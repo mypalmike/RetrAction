@@ -1,0 +1,5 @@
+INCLUDE "samplecode/included.act"
+
+PROC main()
+  doThing()
+RETURN

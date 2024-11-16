@@ -1,9 +1,11 @@
 import unittest
 from retraction import tokenize, Token, TokenType
+from retraction.define import DefineStack
 
 
 # Dummy source filename for tests
 S_F = "<test>"
+DEF_STACK = DefineStack()
 
 
 class TokenizeTestCase(unittest.TestCase):
@@ -15,7 +17,7 @@ class TokenizeTestCase(unittest.TestCase):
             Token(TokenType.ELSE, None, S_F, 0),
             Token(TokenType.EOF, None, S_F, 0),
         ]
-        tokens = tokenize(source_code, S_F)
+        tokens = tokenize(source_code, S_F, DEF_STACK)
         for token, expected_token in zip(tokens, expected_tokens):
             self.assertEqual(token.tok_type, expected_token.tok_type)
             self.assertEqual(token.value, expected_token.value)
@@ -46,7 +48,7 @@ class TokenizeTestCase(unittest.TestCase):
             Token(TokenType.EOF, None, S_F, 0),
         ]
 
-        tokens = tokenize(source_code, S_F)
+        tokens = tokenize(source_code, S_F, DEF_STACK)
         for token, expected_token in zip(tokens, expected_tokens):
             self.assertEqual(token.tok_type, expected_token.tok_type)
             self.assertEqual(token.value, expected_token.value)
@@ -61,7 +63,7 @@ class TokenizeTestCase(unittest.TestCase):
             Token(TokenType.INT_LITERAL, "123", S_F, 1),
             Token(TokenType.EOF, None, S_F, 1),
         ]
-        tokens = tokenize(source_code, S_F)
+        tokens = tokenize(source_code, S_F, DEF_STACK)
         for token, expected_token in zip(tokens, expected_tokens):
             self.assertEqual(token.tok_type, expected_token.tok_type)
             self.assertEqual(token.value, expected_token.value)
@@ -75,7 +77,7 @@ class TokenizeTestCase(unittest.TestCase):
             Token(TokenType.IDENTIFIER, "d0nutS", S_F, 0),
             Token(TokenType.EOF, None, S_F, 0),
         ]
-        tokens = tokenize(source_code, S_F)
+        tokens = tokenize(source_code, S_F, DEF_STACK)
         for token, expected_token in zip(tokens, expected_tokens):
             self.assertEqual(token.tok_type, expected_token.tok_type)
             self.assertEqual(token.value, expected_token.value)

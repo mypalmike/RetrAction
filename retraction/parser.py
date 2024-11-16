@@ -3,6 +3,7 @@ import sys
 from typing import cast
 
 from retraction import ast
+from retraction.define import DefineStack
 from retraction.pratt import EXPRESSION_RULES, ExprAction, ExprPrecedence
 from retraction.tokens import Token, TokenType
 from retraction.error import IdentifierError, InternalError, SyntaxError
@@ -66,13 +67,12 @@ class Parser:
     """
 
     def __init__(
-        self,
-        tokens: list[Token],
-        symbol_table: SymTab,
+        self, tokens: list[Token], symbol_table: SymTab, define_stack: DefineStack
     ):
         self.tokens = tokens
         self.current_token_index = 0
         self.symbol_table = symbol_table
+        self.define_stack = define_stack
 
         # Parsing state
         self.parsing_param_decl = False
@@ -626,7 +626,8 @@ class Parser:
             # Push symbol table stack
             outer_symbol_table = self.symbol_table
             self.symbol_table = SymTab(outer_symbol_table)
-            # self.symbol_table.parent = outer_symbol_table
+            # Push define stack
+            self.define_stack.push()
             self.consume(TokenType.OP_LPAREN)
             param_decls = self.parse_param_decls()
             self.consume(TokenType.OP_RPAREN)
@@ -648,8 +649,8 @@ class Parser:
             outer_symbol_table.add_entry(identifier, EntryType.ROUTINE, routine)
             return routine
         finally:
-            # Restore state
             self.symbol_table = outer_symbol_table
+            self.define_stack.pop()
             self.parsing_routine = None
 
     def parse_addr(self) -> int:

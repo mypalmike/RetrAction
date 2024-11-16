@@ -1,6 +1,7 @@
 from binascii import hexlify
 import unittest
 
+from retraction.define import DefineStack
 from retraction.symtab import SymTab
 from retraction.bcwalk import BCWalk
 from retraction.codegen import ByteCodeGen
@@ -10,6 +11,7 @@ from retraction.tokens import tokenize
 
 # Dummy source filename for tests
 S_F = "<test>"
+DEF_STACK = DefineStack()
 
 
 class test_BCWalk(unittest.TestCase):
@@ -20,7 +22,7 @@ class test_BCWalk(unittest.TestCase):
         INT z = [$1234]
         CARD a
         """
-        tokens = tokenize(source_code, S_F)
+        tokens = tokenize(source_code, S_F, DEF_STACK)
         symbol_table = SymTab()
         parser = Parser(tokens, symbol_table)
         tree = parser.parse_program()
@@ -54,7 +56,7 @@ class test_BCWalk(unittest.TestCase):
         CARD ARRAY ca2 = $1234
         BYTE ARRAY ba2(4) = [1, 2, 3, 4, 5]
         """
-        tokens = tokenize(source_code, S_F)
+        tokens = tokenize(source_code, S_F, DEF_STACK)
         symbol_table = SymTab()
         parser = Parser(tokens, symbol_table)
         tree = parser.parse_program()
@@ -103,7 +105,7 @@ class test_BCWalk(unittest.TestCase):
           proc1()
         RETURN
         """
-        tokens = tokenize(source_code, S_F)
+        tokens = tokenize(source_code, S_F, DEF_STACK)
         symbol_table = SymTab()
         parser = Parser(tokens, symbol_table)
         tree = parser.parse_program()

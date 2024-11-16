@@ -6,6 +6,7 @@ import unittest
 from retraction import Parser, TokenType, tokenize
 from retraction.bytecode import ByteCodeOp
 from retraction.codegen import ByteCodeGen
+from retraction.define import DefineStack
 from retraction.symtab import EntryType, SymTab
 from retraction.types import Type
 import retraction.ast as ast
@@ -13,6 +14,7 @@ import retraction.ast as ast
 
 # Dummy source filename for tests
 S_F = "<test>"
+DEF_STACK = DefineStack()
 
 
 class ParserTestCase(unittest.TestCase):
@@ -24,7 +26,7 @@ class ParserTestCase(unittest.TestCase):
 
     def test_arith_expr_numerical_constants(self):
         source_code = "33"
-        tokens = tokenize(source_code, S_F)
+        tokens = tokenize(source_code, S_F, DEF_STACK)
         symbol_table = SymTab()
         parser = Parser(tokens, symbol_table)
         tree = parser.parse_expression()
@@ -36,7 +38,7 @@ class ParserTestCase(unittest.TestCase):
 
     def test_arith_expr_simple(self):
         source_code = "23 + $45 * $678"
-        tokens = tokenize(source_code, S_F)
+        tokens = tokenize(source_code, S_F, DEF_STACK)
         symbol_table = SymTab()
         parser = Parser(tokens, symbol_table)
         tree = parser.parse_expression()
@@ -48,7 +50,7 @@ class ParserTestCase(unittest.TestCase):
 
     def test_arith_expr_parens(self):
         source_code = "(87 + 65) * (43 + $1B)"
-        tokens = tokenize(source_code, S_F)
+        tokens = tokenize(source_code, S_F, DEF_STACK)
         symbol_table = SymTab()
         parser = Parser(tokens, symbol_table)
         tree = parser.parse_expression()
@@ -60,7 +62,7 @@ class ParserTestCase(unittest.TestCase):
 
     def test_unary_minus(self):
         source_code = "-$12"
-        tokens = tokenize(source_code, S_F)
+        tokens = tokenize(source_code, S_F, DEF_STACK)
         symbol_table = SymTab()
         parser = Parser(tokens, symbol_table)
         tree = parser.parse_expression()
@@ -72,7 +74,7 @@ class ParserTestCase(unittest.TestCase):
 
     def test_double_unary_minus(self):
         source_code = "--$12"
-        tokens = tokenize(source_code, S_F)
+        tokens = tokenize(source_code, S_F, DEF_STACK)
         symbol_table = SymTab()
         parser = Parser(tokens, symbol_table)
         tree = parser.parse_expression()
@@ -83,7 +85,7 @@ class ParserTestCase(unittest.TestCase):
 
     def test_subtract_unary_minus(self):
         source_code = "1 - -$12"
-        tokens = tokenize(source_code, S_F)
+        tokens = tokenize(source_code, S_F, DEF_STACK)
         symbol_table = SymTab()
         parser = Parser(tokens, symbol_table)
         tree = parser.parse_expression()
@@ -95,7 +97,7 @@ class ParserTestCase(unittest.TestCase):
 
     def test_arith_expr_nums(self):
         source_code = "98 2 3"
-        tokens = tokenize(source_code, S_F)
+        tokens = tokenize(source_code, S_F, DEF_STACK)
         symbol_table = SymTab()
         parser = Parser(tokens, symbol_table)
         tree = parser.parse_expression()
@@ -115,7 +117,7 @@ class ParserTestCase(unittest.TestCase):
             DEVPRINT (3)
         FI
         """
-        tokens = tokenize(source_code, S_F)
+        tokens = tokenize(source_code, S_F, DEF_STACK)
         symbol_table = SymTab()
         parser = Parser(tokens, symbol_table)
         tree = parser.parse_if_stmt()
@@ -131,7 +133,7 @@ class ParserTestCase(unittest.TestCase):
             DEVPRINT (1)
         FI
         """
-        tokens = tokenize(source_code, S_F)
+        tokens = tokenize(source_code, S_F, DEF_STACK)
         symbol_table = SymTab()
         parser = Parser(tokens, symbol_table)
         tree = parser.parse_if_stmt()
@@ -148,7 +150,7 @@ class ParserTestCase(unittest.TestCase):
         UNTIL 2
         OD
         """
-        tokens = tokenize(source_code, S_F)
+        tokens = tokenize(source_code, S_F, DEF_STACK)
         symbol_table = SymTab()
         parser = Parser(tokens, symbol_table)
         tree = parser.parse_do_loop()
@@ -165,7 +167,7 @@ class ParserTestCase(unittest.TestCase):
             DEVPRINT (2)
         OD
         """
-        tokens = tokenize(source_code, S_F)
+        tokens = tokenize(source_code, S_F, DEF_STACK)
         symbol_table = SymTab()
         parser = Parser(tokens, symbol_table)
         tree = parser.parse_while_loop()
@@ -196,7 +198,7 @@ class ParserTestCase(unittest.TestCase):
           DEVPRINT (8)
         OD
         """
-        tokens = tokenize(source_code, S_F)
+        tokens = tokenize(source_code, S_F, DEF_STACK)
         symbol_table = SymTab()
         parser = Parser(tokens, symbol_table)
         tree = parser.parse_while_loop()
@@ -230,7 +232,7 @@ class ParserTestCase(unittest.TestCase):
           OD
         RETURN
         """
-        tokens = tokenize(source_code, S_F)
+        tokens = tokenize(source_code, S_F, DEF_STACK)
         symbol_table = SymTab()
         parser = Parser(tokens, symbol_table)
         tree = parser.parse_program()
@@ -255,7 +257,7 @@ class ParserTestCase(unittest.TestCase):
         CARD somecard = [$2345]
         INT someint = [$6789]
         """
-        tokens = tokenize(source_code, S_F)
+        tokens = tokenize(source_code, S_F, DEF_STACK)
         symbol_table = SymTab()
         parser = Parser(tokens, symbol_table)
         tree = parser.parse_system_decls()
@@ -289,7 +291,7 @@ class ParserTestCase(unittest.TestCase):
         CHAR ARRAY somechararrinit = ['a 'b 'c]
         CHAR ARRAY somechararrinit2 = "abc"
         """
-        tokens = tokenize(source_code, S_F)
+        tokens = tokenize(source_code, S_F, DEF_STACK)
         print(tokens)
         symbol_table = SymTab()
         parser = Parser(tokens, symbol_table)
@@ -326,7 +328,7 @@ class ParserTestCase(unittest.TestCase):
             INT field4
         ]
         """
-        tokens = tokenize(source_code, S_F)
+        tokens = tokenize(source_code, S_F, DEF_STACK)
         symbol_table = SymTab()
         parser = Parser(tokens, symbol_table)
         tree = parser.parse_type_decl()
@@ -351,7 +353,7 @@ class ParserTestCase(unittest.TestCase):
             DEVPRINT (somebyte)
         RETURN
         """
-        tokens = tokenize(source_code, S_F)
+        tokens = tokenize(source_code, S_F, DEF_STACK)
         symbol_table = SymTab()
         parser = Parser(tokens, symbol_table)
         tree = parser.parse_program()
@@ -379,7 +381,7 @@ class ParserTestCase(unittest.TestCase):
             localbyte = 2
         RETURN
         """
-        tokens = tokenize(source_code, S_F)
+        tokens = tokenize(source_code, S_F, DEF_STACK)
         symbol_table = SymTab()
         parser = Parser(tokens, symbol_table)
         tree = parser.parse_program()
@@ -413,7 +415,7 @@ class ParserTestCase(unittest.TestCase):
             proc2(6)
         RETURN
         """
-        tokens = tokenize(source_code, S_F)
+        tokens = tokenize(source_code, S_F, DEF_STACK)
         symbol_table = SymTab()
         parser = Parser(tokens, symbol_table)
         tree = parser.parse_program()
@@ -447,7 +449,7 @@ class ParserTestCase(unittest.TestCase):
             DEVPRINT(func1(24))
         RETURN
         """
-        tokens = tokenize(source_code, S_F)
+        tokens = tokenize(source_code, S_F, DEF_STACK)
         symbol_table = SymTab()
         parser = Parser(tokens, symbol_table)
         tree = parser.parse_program()
@@ -473,7 +475,7 @@ class ParserTestCase(unittest.TestCase):
             DEVPRINT(somearr(i))
         RETURN
         """
-        tokens = tokenize(source_code, S_F)
+        tokens = tokenize(source_code, S_F, DEF_STACK)
         symbol_table = SymTab()
         parser = Parser(tokens, symbol_table)
         tree = parser.parse_program()
@@ -498,7 +500,7 @@ class ParserTestCase(unittest.TestCase):
             DEVPRINT(c)
         RETURN
         """
-        tokens = tokenize(source_code, S_F)
+        tokens = tokenize(source_code, S_F, DEF_STACK)
         symbol_table = SymTab()
         parser = Parser(tokens, symbol_table)
         tree = parser.parse_program()
@@ -539,7 +541,7 @@ class ParserTestCase(unittest.TestCase):
             FI
         RETURN
         """
-        tokens = tokenize(source_code, S_F)
+        tokens = tokenize(source_code, S_F, DEF_STACK)
         symbol_table = SymTab()
         parser = Parser(tokens, symbol_table)
         tree = parser.parse_program()
@@ -587,7 +589,7 @@ class ParserTestCase(unittest.TestCase):
             [$1234$5678$9ABC$DEF0]
         RETURN
         """
-        tokens = tokenize(source_code, S_F)
+        tokens = tokenize(source_code, S_F, DEF_STACK)
         symbol_table = SymTab()
         parser = Parser(tokens, symbol_table)
         tree = parser.parse_program()

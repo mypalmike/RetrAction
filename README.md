@@ -48,9 +48,19 @@ This is a work in progress. The first major milestone will be completing all fun
 
 - All loop structures: WHILE/FOR/DO/UNTIL/EXIT/OD
 
+- Comments.
+
+- Compiler directives INCLUDE, DEFINE.
+
 **What's left?**
 
-- "Preprocessor" - INCLUDE, DEFINE, SET, and comments. Note: the "SET" directive, which was designed to set memory locations on an Atari 8-bit machine at compile time might be emulated at some point for "common" compile-time settings.
+- Fix scoped DEFINE. Requires tokenizer to be streamed rather than all tokens gathered into an array in one go. The machinery for this is largely set up (TokenStreams) but the calling code still just calls the tokenize wrapper.
+
+- Compiler SET directive. Note: the "SET" directive, which was designed to set memory locations on an Atari 8-bit machine at compile time might be emulated for common compile-time settings in order to enhance compatibility with the original Action! compiler.
+
+- Local variable initialization to addresses (e.g. "BYTE x = $1234" declaration in a routine). These refer to absolute memory but are scoped locally. Implementation of access seems like it will be somewhat invasive, having to modify variable reads and writes to check for this case.
+
+- == shortcut for self-assignment
 
 - Basic optimizations e.g. math on constants.
 
